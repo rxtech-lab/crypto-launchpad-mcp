@@ -1,0 +1,122 @@
+package models
+
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
+
+// Chain represents blockchain configurations
+type Chain struct {
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	ChainType string         `gorm:"not null" json:"chain_type"` // ethereum, solana
+	RPC       string         `gorm:"not null" json:"rpc"`
+	ChainID   string         `json:"chain_id"`
+	Name      string         `gorm:"not null" json:"name"`
+	IsActive  bool           `gorm:"default:false" json:"is_active"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// Template represents smart contract templates by chain type
+type Template struct {
+	ID           uint           `gorm:"primaryKey" json:"id"`
+	Name         string         `gorm:"not null" json:"name"`
+	Description  string         `json:"description"`
+	ChainType    string         `gorm:"not null" json:"chain_type"` // ethereum, solana
+	TemplateCode string         `gorm:"type:text;not null" json:"template_code"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// Deployment represents deployed token contracts
+type Deployment struct {
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	TemplateID      uint      `gorm:"not null" json:"template_id"`
+	ContractAddress string    `gorm:"not null" json:"contract_address"`
+	TokenName       string    `gorm:"not null" json:"token_name"`
+	TokenSymbol     string    `gorm:"not null" json:"token_symbol"`
+	ChainType       string    `gorm:"not null" json:"chain_type"`
+	ChainID         string    `gorm:"not null" json:"chain_id"`
+	DeployerAddress string    `gorm:"not null" json:"deployer_address"`
+	TransactionHash string    `gorm:"not null" json:"transaction_hash"`
+	Status          string    `gorm:"default:pending" json:"status"` // pending, confirmed, failed
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+
+	Template Template `gorm:"foreignKey:TemplateID" json:"template,omitempty"`
+}
+
+// UniswapSettings represents Uniswap version and configuration
+type UniswapSettings struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Version   string    `gorm:"not null" json:"version"` // v2, v3, v4
+	IsActive  bool      `gorm:"default:false" json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// LiquidityPool represents created pool information
+type LiquidityPool struct {
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	TokenAddress    string    `gorm:"not null" json:"token_address"`
+	PairAddress     string    `gorm:"not null" json:"pair_address"`
+	UniswapVersion  string    `gorm:"not null" json:"uniswap_version"`
+	Token0          string    `gorm:"not null" json:"token0"`
+	Token1          string    `gorm:"not null" json:"token1"`
+	InitialToken0   string    `gorm:"not null" json:"initial_token0"`
+	InitialToken1   string    `gorm:"not null" json:"initial_token1"`
+	CreatorAddress  string    `gorm:"not null" json:"creator_address"`
+	TransactionHash string    `gorm:"not null" json:"transaction_hash"`
+	Status          string    `gorm:"default:pending" json:"status"` // pending, confirmed, failed
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// LiquidityPosition represents user liquidity positions
+type LiquidityPosition struct {
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	PoolID          uint      `gorm:"not null" json:"pool_id"`
+	UserAddress     string    `gorm:"not null" json:"user_address"`
+	LiquidityAmount string    `gorm:"not null" json:"liquidity_amount"`
+	Token0Amount    string    `gorm:"not null" json:"token0_amount"`
+	Token1Amount    string    `gorm:"not null" json:"token1_amount"`
+	TransactionHash string    `gorm:"not null" json:"transaction_hash"`
+	Action          string    `gorm:"not null" json:"action"`        // add, remove
+	Status          string    `gorm:"default:pending" json:"status"` // pending, confirmed, failed
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+
+	Pool LiquidityPool `gorm:"foreignKey:PoolID" json:"pool,omitempty"`
+}
+
+// SwapTransaction represents historical swap data
+type SwapTransaction struct {
+	ID                uint      `gorm:"primaryKey" json:"id"`
+	UserAddress       string    `gorm:"not null" json:"user_address"`
+	FromToken         string    `gorm:"not null" json:"from_token"`
+	ToToken           string    `gorm:"not null" json:"to_token"`
+	FromAmount        string    `gorm:"not null" json:"from_amount"`
+	ToAmount          string    `gorm:"not null" json:"to_amount"`
+	SlippageTolerance string    `gorm:"not null" json:"slippage_tolerance"`
+	TransactionHash   string    `gorm:"not null" json:"transaction_hash"`
+	Status            string    `gorm:"default:pending" json:"status"` // pending, confirmed, failed
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+// TransactionSession represents signing session management
+type TransactionSession struct {
+	ID              string    `gorm:"primaryKey" json:"id"`
+	SessionType     string    `gorm:"not null" json:"session_type"` // deploy, create_pool, add_liquidity, remove_liquidity, swap
+	ChainType       string    `gorm:"not null" json:"chain_type"`
+	ChainID         string    `gorm:"not null" json:"chain_id"`
+	TransactionData string    `gorm:"type:text;not null" json:"transaction_data"` // JSON data for the transaction
+	Status          string    `gorm:"default:pending" json:"status"`              // pending, signed, confirmed, failed
+	TransactionHash string    `json:"transaction_hash"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+	ExpiresAt       time.Time `json:"expires_at"`
+}

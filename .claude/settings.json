@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "go fmt ./..."
+          },
+          {
+            "type": "command",
+            "command": "make build"
+          }
+        ]
+      }
+    ]
+  }
+}

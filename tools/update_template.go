@@ -1,0 +1,148 @@
+package tools
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strconv"
+
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
+	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+)
+
+func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+	tool := mcp.NewTool("update_template",
+		mcp.WithDescription("Update existing smart contract template with new description, chain type, or template code. Performs syntax validation on updated code."),
+		mcp.WithString("template_id",
+			mcp.Required(),
+			mcp.Description("ID of the template to update"),
+		),
+		mcp.WithString("description",
+			mcp.Description("New description for the template"),
+		),
+		mcp.WithString("chain_type",
+			mcp.Description("New chain type (ethereum or solana)"),
+		),
+		mcp.WithString("template_code",
+			mcp.Description("New template code"),
+		),
+	)
+
+	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		templateIDStr, err := request.RequireString("template_id")
+		if err != nil {
+			return nil, fmt.Errorf("template_id parameter is required: %w", err)
+		}
+
+		templateID, err := strconv.ParseUint(templateIDStr, 10, 32)
+		if err != nil {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.NewTextContent("Error: "),
+					mcp.NewTextContent(fmt.Sprintf("Invalid template_id: %v", err)),
+				},
+			}, nil
+		}
+
+		description := request.GetString("description", "")
+		chainType := request.GetString("chain_type", "")
+		templateCode := request.GetString("template_code", "")
+
+		// Get existing template
+		template, err := db.GetTemplateByID(uint(templateID))
+		if err != nil {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.NewTextContent("Error: "),
+					mcp.NewTextContent(fmt.Sprintf("Template not found: %v", err)),
+				},
+			}, nil
+		}
+
+		// Track what's being updated
+		updates := make([]string, 0)
+
+		// Update description if provided
+		if description != "" {
+			template.Description = description
+			updates = append(updates, "description")
+		}
+
+		// Update chain type if provided
+		if chainType != "" {
+			if chainType != "ethereum" && chainType != "solana" {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						mcp.NewTextContent("Error: "),
+						mcp.NewTextContent("Invalid chain_type. Supported values: ethereum, solana"),
+					},
+				}, nil
+			}
+			template.ChainType = chainType
+			updates = append(updates, "chain_type")
+		}
+
+		// Update template code if provided
+		if templateCode != "" {
+			// Use the current or new chain type for validation
+			validationChainType := template.ChainType
+			if chainType != "" {
+				validationChainType = chainType
+			}
+
+			// Validate template code
+			if err := validateTemplateCode(validationChainType, templateCode); err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						mcp.NewTextContent("Error: "),
+						mcp.NewTextContent(fmt.Sprintf("Template validation failed: %v", err)),
+					},
+				}, nil
+			}
+
+			template.TemplateCode = templateCode
+			updates = append(updates, "template_code")
+		}
+
+		// Check if any updates were provided
+		if len(updates) == 0 {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.NewTextContent("Error: "),
+					mcp.NewTextContent("No update parameters provided. Specify description, chain_type, or template_code"),
+				},
+			}, nil
+		}
+
+		// Save updated template
+		if err := db.UpdateTemplate(template); err != nil {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.NewTextContent("Error: "),
+					mcp.NewTextContent(fmt.Sprintf("Error updating template: %v", err)),
+				},
+			}, nil
+		}
+
+		result := map[string]interface{}{
+			"id":             template.ID,
+			"name":           template.Name,
+			"description":    template.Description,
+			"chain_type":     template.ChainType,
+			"updated_at":     template.UpdatedAt,
+			"updated_fields": updates,
+			"message":        fmt.Sprintf("Template updated successfully. Fields updated: %v", updates),
+		}
+
+		resultJSON, _ := json.Marshal(result)
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				mcp.NewTextContent("Success message: "),
+				mcp.NewTextContent(string(resultJSON)),
+			},
+		}, nil
+	}
+
+	return tool, handler
+}

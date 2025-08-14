@@ -1,0 +1,90 @@
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - typecheck
+    - unconvert
+    - unused
+    - errcheck
+    - gosimple
+    - goconst
+    - gocyclo
+    - gosec
+    - depguard
+    - asciicheck
+    - bodyclose
+    - exportloopref
+    - gocritic
+    - godot
+    - goprintffuncname
+    - noctx
+    - rowserrcheck
+    - sqlclosecheck
+    - whitespace
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+  
+  gosec:
+    excludes:
+      - G204 # Subprocess launched with variable
+      - G304 # File path provided as taint input
+  
+  revive:
+    rules:
+      - name: exported
+        disabled: true
+      - name: package-comments
+        disabled: true
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+    
+    # Exclude known linter issues
+    - text: "weak cryptographic primitive"
+      linters:
+        - gosec
+    
+    # Exclude shadow warnings for common variable names
+    - text: "shadow: declaration of \"err\""
+      linters:
+        - govet
+    
+    # Exclude unused parameters in interface methods
+    - text: "parameter .* seems to be unused, consider removing or renaming it as _"
+      linters:
+        - revive
+
+  max-issues-per-linter: 0
+  max-same-issues: 0

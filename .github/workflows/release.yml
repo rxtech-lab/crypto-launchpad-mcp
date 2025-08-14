@@ -1,0 +1,164 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  release:
+    types:
+      - created
+
+jobs:
+  build-cross-platform:
+    name: Build Cross-Platform Binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          check-latest: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Build binaries for all platforms
+        run: make binaries
+        env:
+          VERSION: ${{ github.event_name == 'release' && github.ref_name || format('dev-{0}', github.sha) }}
+
+      - name: List built binaries
+        run: ls -la bin/
+
+      - name: Upload binaries as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-platform-binaries
+          path: bin/
+          retention-days: 7
+
+  build-macos:
+    name: Build, Sign and Notarize macOS Binary
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          check-latest: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Build the binary
+        run: make build
+        env:
+          VERSION: ${{ github.event_name == 'release' && github.ref_name || format('dev-{0}', github.sha) }}
+
+      - name: Import code signing certificates
+        if: github.event_name == 'release'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.P12_PASSWORD }}
+
+      - name: Sign the binary
+        if: github.event_name == 'release'
+        run: ./scripts/sign.sh
+        env:
+          SIGNING_CERTIFICATE_NAME: ${{ secrets.SIGNING_CERTIFICATE_NAME }}
+
+      - name: Import installer certificates
+        if: github.event_name == 'release'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.INSTALLER_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.P12_PASSWORD }}
+          keychain: installer
+
+      - name: Create and notarize package
+        if: github.event_name == 'release'
+        run: ./scripts/package-notarize.sh
+        env:
+          INSTALLER_SIGNING_CERTIFICATE_NAME: ${{ secrets.INSTALLER_SIGNING_CERTIFICATE_NAME }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PWD: ${{ secrets.APPLE_ID_PWD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Prepare assets for release
+        if: github.event_name == 'release'
+        run: |
+          mkdir -p assets
+          cp launchpad-mcp_macOS_arm64_*.pkg assets/ || true
+          ls -la assets/
+
+      - name: Upload macOS package as artifact
+        if: github.event_name == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-package
+          path: assets/
+          retention-days: 30
+
+      # Upload to release if this is a release event
+      - name: Upload binaries to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            assets/launchpad-mcp_macOS_arm64_*.pkg
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-cross-platform-release:
+    name: Upload Cross-Platform Binaries to Release
+    needs: build-cross-platform
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    permissions:
+      contents: write
+    steps:
+      - name: Download cross-platform binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: cross-platform-binaries
+          path: bin/
+
+      - name: Create archives
+        run: |
+          mkdir -p release-assets
+          
+          # Create archives for each platform
+          cd bin
+          for file in launchpad-mcp_*; do
+            if [[ "$file" == *.exe ]]; then
+              # Windows binary
+              platform=$(echo "$file" | sed 's/launchpad-mcp_\(.*\)\.exe/\1/')
+              zip "../release-assets/launchpad-mcp_${platform}.zip" "$file"
+            else
+              # Unix binary
+              platform=$(echo "$file" | sed 's/launchpad-mcp_\(.*\)/\1/')
+              tar -czf "../release-assets/launchpad-mcp_${platform}.tar.gz" "$file"
+            fi
+          done
+          
+          cd ..
+          ls -la release-assets/
+
+      - name: Upload cross-platform archives to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          token: ${{ secrets.GITHUB_TOKEN }}
