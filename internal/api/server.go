@@ -1,24 +1,26 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
-	"path/filepath"
+	"strings"
+	"text/template"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/rxtech-lab/launchpad-mcp/internal/assets"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
-	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 )
 
 type APIServer struct {
-	app  *fiber.App
-	db   *database.Database
-	port int
+	app       *fiber.App
+	db        *database.Database
+	port      int
+	templates map[string]*template.Template
 }
 
 func NewAPIServer(db *database.Database) *APIServer {
@@ -35,8 +37,37 @@ func NewAPIServer(db *database.Database) *APIServer {
 		db:  db,
 	}
 
+	server.initTemplates()
 	server.setupRoutes()
 	return server
+}
+
+func (s *APIServer) initTemplates() {
+	s.templates = make(map[string]*template.Template)
+
+	// Parse deployment template
+	deployTmpl, err := template.New("deploy").Parse(string(assets.DeployHTML))
+	if err != nil {
+		log.Printf("Error parsing deploy template: %v", err)
+	} else {
+		s.templates["deploy"] = deployTmpl
+	}
+
+	// Parse create pool template
+	poolTmpl, err := template.New("create_pool").Parse(string(assets.CreatePoolHTML))
+	if err != nil {
+		log.Printf("Error parsing create pool template: %v", err)
+	} else {
+		s.templates["create_pool"] = poolTmpl
+	}
+
+	// Parse generic template
+	genericTmpl, err := template.New("generic").Parse(string(assets.GenericHTML))
+	if err != nil {
+		log.Printf("Error parsing generic template: %v", err)
+	} else {
+		s.templates["generic"] = genericTmpl
+	}
 }
 
 func (s *APIServer) setupRoutes() {
@@ -121,7 +152,9 @@ func (s *APIServer) handleDeploymentPage(c *fiber.Ctx) error {
 	}
 
 	// Serve HTML page with embedded transaction data
-	html := s.generateDeploymentHTML(session)
+	html := s.renderTemplate("deploy", map[string]interface{}{
+		"SessionID": session.ID,
+	})
 	c.Set("Content-Type", "text/html")
 	return c.SendString(html)
 }
@@ -161,6 +194,7 @@ func (s *APIServer) handleDeploymentConfirm(c *fiber.Ctx) error {
 	var body struct {
 		TransactionHash string `json:"transaction_hash"`
 		Status          string `json:"status"`
+		ContractAddress string `json:"contract_address"`
 	}
 
 	if err := c.BodyParser(&body); err != nil {
@@ -179,14 +213,22 @@ func (s *APIServer) handleDeploymentConfirm(c *fiber.Ctx) error {
 			var transactionData map[string]interface{}
 			if err := json.Unmarshal([]byte(session.TransactionData), &transactionData); err == nil {
 				if deploymentID, ok := transactionData["deployment_id"].(float64); ok {
-					// Update deployment with transaction hash
-					s.db.UpdateDeploymentStatus(uint(deploymentID), "confirmed", "", body.TransactionHash)
+					// Update deployment with transaction hash and contract address
+					s.db.UpdateDeploymentStatus(uint(deploymentID), "confirmed", body.ContractAddress, body.TransactionHash)
 				}
 			}
 		}
 	}
 
-	return c.JSON(map[string]string{"status": "success"})
+	response := map[string]interface{}{
+		"status": "success",
+	}
+
+	if body.ContractAddress != "" {
+		response["contract_address"] = body.ContractAddress
+	}
+
+	return c.JSON(response)
 }
 
 // Similar handlers for other transaction types...
@@ -202,7 +244,9 @@ func (s *APIServer) handleCreatePoolPage(c *fiber.Ctx) error {
 		return c.Status(400).SendString("Invalid session type")
 	}
 
-	html := s.generateCreatePoolHTML(session)
+	html := s.renderTemplate("create_pool", map[string]interface{}{
+		"SessionID": session.ID,
+	})
 	c.Set("Content-Type", "text/html")
 	return c.SendString(html)
 }
@@ -216,7 +260,7 @@ func (s *APIServer) handleCreatePoolConfirm(c *fiber.Ctx) error {
 }
 
 func (s *APIServer) handleAddLiquidityPage(c *fiber.Ctx) error {
-	return s.handleGenericPage(c, "add_liquidity", s.generateAddLiquidityHTML)
+	return s.handleGenericPage(c, "add_liquidity")
 }
 
 func (s *APIServer) handleAddLiquidityAPI(c *fiber.Ctx) error {
@@ -228,7 +272,7 @@ func (s *APIServer) handleAddLiquidityConfirm(c *fiber.Ctx) error {
 }
 
 func (s *APIServer) handleRemoveLiquidityPage(c *fiber.Ctx) error {
-	return s.handleGenericPage(c, "remove_liquidity", s.generateRemoveLiquidityHTML)
+	return s.handleGenericPage(c, "remove_liquidity")
 }
 
 func (s *APIServer) handleRemoveLiquidityAPI(c *fiber.Ctx) error {
@@ -240,7 +284,7 @@ func (s *APIServer) handleRemoveLiquidityConfirm(c *fiber.Ctx) error {
 }
 
 func (s *APIServer) handleSwapPage(c *fiber.Ctx) error {
-	return s.handleGenericPage(c, "swap", s.generateSwapHTML)
+	return s.handleGenericPage(c, "swap")
 }
 
 func (s *APIServer) handleSwapAPI(c *fiber.Ctx) error {
@@ -252,7 +296,7 @@ func (s *APIServer) handleSwapConfirm(c *fiber.Ctx) error {
 }
 
 // Generic handlers
-func (s *APIServer) handleGenericPage(c *fiber.Ctx, sessionType string, htmlGenerator func(*models.TransactionSession) string) error {
+func (s *APIServer) handleGenericPage(c *fiber.Ctx, sessionType string) error {
 	sessionID := c.Params("session_id")
 
 	session, err := s.db.GetTransactionSession(sessionID)
@@ -264,7 +308,10 @@ func (s *APIServer) handleGenericPage(c *fiber.Ctx, sessionType string, htmlGene
 		return c.Status(400).SendString("Invalid session type")
 	}
 
-	html := htmlGenerator(session)
+	html := s.renderTemplate("generic", map[string]interface{}{
+		"SessionID": session.ID,
+		"Title":     s.getPageTitle(sessionType),
+	})
 	c.Set("Content-Type", "text/html")
 	return c.SendString(html)
 }
@@ -346,106 +393,43 @@ func (s *APIServer) updateRelatedRecord(recordType string, transactionData map[s
 	}
 }
 
-// HTML generation methods will be implemented in the next step
-func (s *APIServer) generateDeploymentHTML(session *models.TransactionSession) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Deploy Contract</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-</head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-6">
-            <h1 class="text-3xl font-bold text-gray-800 mb-6">Deploy Contract</h1>
-            <div id="session-data" data-session-id="%s" data-api-url="/api/deploy/%s"></div>
-            <div id="content" class="space-y-6">
-                <p class="text-gray-600">Loading transaction details...</p>
-            </div>
-        </div>
-    </div>
-    <script src="/js/wallet.js"></script>
-</body>
-</html>`, session.ID, session.ID)
-}
-
-func (s *APIServer) generateCreatePoolHTML(session *models.TransactionSession) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Create Liquidity Pool</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-</head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-6">
-            <h1 class="text-3xl font-bold text-gray-800 mb-6">Create Liquidity Pool</h1>
-            <div id="session-data" data-session-id="%s" data-api-url="/api/pool/create/%s"></div>
-            <div id="content" class="space-y-6">
-                <p class="text-gray-600">Loading transaction details...</p>
-            </div>
-        </div>
-    </div>
-    <script src="/js/wallet.js"></script>
-</body>
-</html>`, session.ID, session.ID)
-}
-
-func (s *APIServer) generateAddLiquidityHTML(session *models.TransactionSession) string {
-	return s.generateGenericHTML("Add Liquidity", session)
-}
-
-func (s *APIServer) generateRemoveLiquidityHTML(session *models.TransactionSession) string {
-	return s.generateGenericHTML("Remove Liquidity", session)
-}
-
-func (s *APIServer) generateSwapHTML(session *models.TransactionSession) string {
-	return s.generateGenericHTML("Swap Tokens", session)
-}
-
-func (s *APIServer) generateGenericHTML(title string, session *models.TransactionSession) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <title>%s</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-</head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-6">
-            <h1 class="text-3xl font-bold text-gray-800 mb-6">%s</h1>
-            <div id="session-data" data-session-id="%s"></div>
-            <div id="content" class="space-y-6">
-                <p class="text-gray-600">Loading transaction details...</p>
-            </div>
-        </div>
-    </div>
-    <script src="/js/wallet.js"></script>
-</body>
-</html>`, title, title, session.ID)
-}
-
-// handleWalletJS serves the wallet.js file
-func (s *APIServer) handleWalletJS(c *fiber.Ctx) error {
-	// Read the wallet.js file from templates directory
-	walletJSPath := filepath.Join("templates", "wallet.js")
-	content, err := ioutil.ReadFile(walletJSPath)
-	if err != nil {
-		return c.Status(404).SendString("File not found")
+// Template rendering helper methods
+func (s *APIServer) renderTemplate(templateName string, data interface{}) string {
+	tmpl, exists := s.templates[templateName]
+	if !exists {
+		log.Printf("Template %s not found", templateName)
+		return fmt.Sprintf("Template %s not found", templateName)
 	}
 
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		log.Printf("Error executing template %s: %v", templateName, err)
+		return fmt.Sprintf("Error rendering template: %v", err)
+	}
+
+	return buf.String()
+}
+
+func (s *APIServer) getPageTitle(sessionType string) string {
+	switch sessionType {
+	case "add_liquidity":
+		return "Add Liquidity"
+	case "remove_liquidity":
+		return "Remove Liquidity"
+	case "swap":
+		return "Swap Tokens"
+	default:
+		// Capitalize first letter and replace underscores with spaces
+		title := strings.ReplaceAll(sessionType, "_", " ")
+		if len(title) > 0 {
+			title = strings.ToUpper(string(title[0])) + title[1:]
+		}
+		return title
+	}
+}
+
+// handleWalletJS serves the embedded wallet.js file
+func (s *APIServer) handleWalletJS(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/javascript")
-	return c.Send(content)
+	return c.Send(assets.WalletJS)
 }

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Deploy Contract - Launchpad</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Apple-style custom styles */
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .success-glow {
+            box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.2), 0 10px 25px -5px rgba(34, 197, 94, 0.1), 0 20px 25px -5px rgba(34, 197, 94, 0.1);
+        }
+        .contract-address {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+    <!-- Background Pattern -->
+    <div class="fixed inset-0 opacity-5">
+        <div class="absolute inset-0" style="background-image: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 50%)"></div>
+    </div>
+    
+    <!-- Main Container -->
+    <div class="relative z-10 min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl">
+            <!-- Logo/Brand Area -->
+            <div class="text-center mb-8 fade-in">
+                <div class="w-16 h-16 mx-auto bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-semibold text-gray-900 mb-1">Deploy Contract</h1>
+                <p class="text-gray-600 text-sm">Secure blockchain deployment</p>
+            </div>
+            
+            <!-- Main Content Card -->
+            <div class="bg-white/80 glass-effect border border-gray-200/50 rounded-3xl shadow-xl fade-in">
+                <div id="session-data" data-session-id="{{.SessionID}}" data-api-url="/api/deploy/{{.SessionID}}"></div>
+                <div id="content" class="p-6">
+                    <!-- Loading State -->
+                    <div class="text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-4"></div>
+                        <p class="text-gray-600">Loading transaction details...</p>
+                    </div>
+                </div>
+                
+                <!-- Success State (Initially Hidden) -->
+                <div id="success-state" class="hidden p-6 text-center">
+                    <div class="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-4">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-semibold text-green-800 mb-2">Contract Deployed!</h2>
+                    <p class="text-green-700 text-sm mb-6">Your smart contract has been successfully deployed to the blockchain</p>
+                    
+                    <!-- Contract Details Grid -->
+                    <div class="grid grid-cols-1 gap-6 mb-6">
+                        <!-- Contract Address Display -->
+                        <div id="contract-address-section" class="bg-green-50 border border-green-200 rounded-2xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                                        <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                    </div>
+                                    <p class="text-green-800 font-semibold">📋 Contract Address</p>
+                                </div>
+                                <button id="copy-address-button" onclick="copyContractAddress()" class="px-3 py-1 text-sm text-green-600 hover:text-green-800 hover:bg-green-100 rounded-lg transition-all">
+                                    <div class="flex items-center">
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                                        </svg>
+                                        Copy
+                                    </div>
+                                </button>
+                            </div>
+                            <div class="bg-white rounded-xl p-4 border border-green-200">
+                                <code id="contract-address-display" class="contract-address text-green-800 text-base break-all block">Loading...</code>
+                            </div>
+                            <div id="contract-address-note" class="hidden mt-3">
+                                <p class="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                    ⚠️ Contract address not available. Check the transaction on the blockchain explorer for the deployed contract.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Transaction Hash -->
+                        <div class="bg-gray-50 border border-gray-200 rounded-2xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mr-3">
+                                        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
+                                        </svg>
+                                    </div>
+                                    <p class="text-gray-700 font-semibold">Transaction Hash</p>
+                                </div>
+                                <button onclick="copyTransactionHash()" class="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all">
+                                    <div class="flex items-center">
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                                        </svg>
+                                        Copy
+                                    </div>
+                                </button>
+                            </div>
+                            <div class="bg-white rounded-xl p-4 border border-gray-200">
+                                <code id="transaction-hash-display" class="contract-address text-gray-700 text-sm break-all block">Loading...</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="text-center mt-6 text-xs text-gray-500">
+                Powered by Ethereum • Secured by Web3
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Copy contract address function
+        function copyContractAddress() {
+            const addressElement = document.getElementById('contract-address-display');
+            if (addressElement && addressElement.textContent !== 'Loading...' && addressElement.textContent !== 'Contract address not available') {
+                navigator.clipboard.writeText(addressElement.textContent).then(() => {
+                    // Show feedback
+                    const button = event.currentTarget;
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                    }, 2000);
+                });
+            }
+        }
+
+        // Copy transaction hash function
+        function copyTransactionHash() {
+            const hashElement = document.getElementById('transaction-hash-display');
+            if (hashElement && hashElement.textContent !== 'Loading...') {
+                navigator.clipboard.writeText(hashElement.textContent).then(() => {
+                    // Show feedback
+                    const button = event.currentTarget;
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = '<div class="flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Copied</div>';
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                    }, 2000);
+                });
+            }
+        }
+
+        // Show warning note when contract address is not available
+        function showContractAddressUnavailable() {
+            const addressDisplay = document.getElementById('contract-address-display');
+            const copyButton = document.getElementById('copy-address-button');
+            const addressNote = document.getElementById('contract-address-note');
+            const addressSection = document.getElementById('contract-address-section');
+            
+            if (addressDisplay) {
+                addressDisplay.textContent = 'Contract address not available';
+                addressDisplay.classList.add('text-yellow-700');
+                addressDisplay.classList.remove('text-green-800');
+            }
+            
+            if (copyButton) {
+                copyButton.style.display = 'none';
+            }
+            
+            if (addressNote) {
+                addressNote.classList.remove('hidden');
+            }
+            
+            if (addressSection) {
+                addressSection.classList.remove('bg-green-50', 'border-green-200');
+                addressSection.classList.add('bg-yellow-50', 'border-yellow-200');
+                
+                const title = addressSection.querySelector('p');
+                if (title) {
+                    title.classList.remove('text-green-800');
+                    title.classList.add('text-yellow-800');
+                }
+            }
+        }
+    </script>
+    <script src="/js/wallet.js"></script>
+</body>
+</html>

@@ -64,6 +64,7 @@ clean:
 
 
 e2e-network:
+	killall anvil || true
 	anvil
 
 # Format code

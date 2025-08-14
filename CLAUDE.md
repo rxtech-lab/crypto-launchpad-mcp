@@ -102,9 +102,9 @@ make sec         # Run security scan with gosec
 │   ├── models/                 # GORM data models
 │   ├── database/               # Database layer with CRUD operations
 │   ├── mcp/                    # MCP server implementation
-│   └── api/                    # HTTP server for transaction signing
+│   ├── api/                    # HTTP server for transaction signing
+│   └── assets/                 # Embedded HTML templates and JavaScript assets
 ├── tools/                      # 14 MCP tool implementations
-├── templates/                  # HTML templates and JavaScript for signing interfaces
 ├── scripts/                    # Build and distribution scripts
 │   ├── binaries.sh            # Cross-platform build script
 │   ├── sign.sh                # macOS code signing script
@@ -145,6 +145,7 @@ make sec         # Run security scan with gosec
 - **EIP-6963**: Standard wallet discovery for maximum compatibility
 - **Progressive Enhancement**: Works without JavaScript for basic functionality
 - **Responsive Design**: Tailwind CSS for mobile-friendly interfaces
+- **Embedded Assets**: HTML templates and JavaScript assets embedded using Go's embed directive
 
 ### Tool Implementation Pattern
 All tools follow the exact structure from the example project:
@@ -153,6 +154,12 @@ All tools follow the exact structure from the example project:
 - Parameter validation with required/optional parameters
 - Database operations with error handling
 - JSON response formatting
+
+### Asset Management
+- **Embedded Templates**: HTML templates stored in `internal/assets/` and embedded at compile time
+- **Template Engine**: Go's `text/template` package for dynamic content rendering
+- **Static Assets**: JavaScript files embedded and served via HTTP endpoints
+- **Build-time Inclusion**: All assets compiled into the binary for single-file distribution
 
 ## Security Considerations
 
