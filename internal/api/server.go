@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"path/filepath"
 
@@ -90,7 +91,7 @@ func (s *APIServer) Start() (int, error) {
 	// Start the server on the found port
 	go func() {
 		if err := s.app.Listen(fmt.Sprintf(":%d", port)); err != nil {
-			fmt.Printf("Error starting API server: %v\n", err)
+			log.Printf("Error starting API server: %v\n", err)
 		}
 	}()
 

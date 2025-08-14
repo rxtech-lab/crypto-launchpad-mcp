@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -27,24 +26,24 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("Crypto Launchpad MCP Server\n")
-		fmt.Printf("Version: %s\n", Version)
-		fmt.Printf("Commit: %s\n", CommitHash)
-		fmt.Printf("Built: %s\n", BuildTime)
+		log.Printf("Crypto Launchpad MCP Server\n")
+		log.Printf("Version: %s\n", Version)
+		log.Printf("Commit: %s\n", CommitHash)
+		log.Printf("Built: %s\n", BuildTime)
 		return
 	}
 
 	if *showHelp {
-		fmt.Printf("Crypto Launchpad MCP Server\n\n")
-		fmt.Printf("Usage: %s [options]\n\n", os.Args[0])
-		fmt.Printf("Options:\n")
-		fmt.Printf("  --version    Show version information\n")
-		fmt.Printf("  --help       Show this help message\n\n")
-		fmt.Printf("Description:\n")
-		fmt.Printf("  AI-powered crypto launchpad supporting Ethereum and Solana blockchains.\n")
-		fmt.Printf("  Provides 14 MCP tools for token deployment and Uniswap integration.\n\n")
-		fmt.Printf("Database: ~/launchpad.db (SQLite)\n")
-		fmt.Printf("Web Interface: http://localhost:[random-port]\n")
+		log.Printf("Crypto Launchpad MCP Server\n\n")
+		log.Printf("Usage: %s [options]\n\n", os.Args[0])
+		log.Printf("Options:\n")
+		log.Printf("  --version    Show version information\n")
+		log.Printf("  --help       Show this help message\n\n")
+		log.Printf("Description:\n")
+		log.Printf("  AI-powered crypto launchpad supporting Ethereum and Solana blockchains.\n")
+		log.Printf("  Provides 14 MCP tools for token deployment and Uniswap integration.\n\n")
+		log.Printf("Database: ~/launchpad.db (SQLite)\n")
+		log.Printf("Web Interface: http://localhost:[random-port]\n")
 		return
 	}
 
@@ -90,7 +89,7 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
-	fmt.Println("\nShutting down servers...")
+	log.Println("\nShutting down servers...")
 
 	// Shutdown API server
 	if err := apiServer.Shutdown(); err != nil {
@@ -99,5 +98,5 @@ func main() {
 		log.Printf("Error shutting down API server: %v", err)
 	}
 
-	fmt.Println("Servers shut down successfully")
+	log.Println("Servers shut down successfully")
 }
