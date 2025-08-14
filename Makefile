@@ -62,6 +62,10 @@ clean:
 	sudo rm -rf /usr/local/bin/$(BINARY_NAME) 2>/dev/null || true
 	go clean
 
+
+e2e-network:
+	anvil
+
 # Format code
 fmt:
 	go fmt ./...
