@@ -29,15 +29,6 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		mcp.WithString("template_code",
 			mcp.Description("New template code"),
 		),
-		mcp.WithString("use_openzeppelin",
-			mcp.Description("Whether to use OpenZeppelin contracts (Ethereum only, 'true'/'false')"),
-		),
-		mcp.WithString("openzeppelin_version",
-			mcp.Description("OpenZeppelin contracts version"),
-		),
-		mcp.WithString("openzeppelin_contracts",
-			mcp.Description("Comma-separated list of OpenZeppelin contracts to include"),
-		),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

@@ -15,7 +15,7 @@ import (
 
 func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("create_template",
-		mcp.WithDescription("Create new smart contract template with syntax validation. Template code should be valid Solidity (for Ethereum) or Rust (for Solana). OpenZeppelin contracts are available to use."),
+		mcp.WithDescription("Create new smart contract template with syntax validation. Template code should be valid Solidity (for Ethereum) or Rust (for Solana) and there is no template language in use when rendering the template. OpenZeppelin contracts are available to use."),
 		mcp.WithString("name",
 			mcp.Required(),
 			mcp.Description("Name of the template (e.g., 'ERC20 Basic Token', 'SPL Token')"),
@@ -32,15 +32,7 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			mcp.Required(),
 			mcp.Description("The smart contract source code template"),
 		),
-		mcp.WithString("use_openzeppelin",
-			mcp.Description("Whether to use OpenZeppelin contracts (Ethereum only, 'true'/'false', default: 'false')"),
-		),
-		mcp.WithString("openzeppelin_version",
-			mcp.Description("OpenZeppelin contracts version (default: latest stable)"),
-		),
-		mcp.WithString("openzeppelin_contracts",
-			mcp.Description("Comma-separated list of OpenZeppelin contracts to include (e.g., 'ERC20,Ownable,ReentrancyGuard')"),
-		),
+
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

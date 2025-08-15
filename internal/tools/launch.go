@@ -141,7 +141,6 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			"chain_type":    activeChain.ChainType,
 			"chain_id":      activeChain.ChainID,
 			"message":       "Deployment session created. Use the signing URL to connect wallet and deploy contract.",
-			"instructions":  "1. Open the signing URL in your browser\n2. Connect your wallet using EIP-6963\n3. Review the transaction details\n4. Sign and send the deployment transaction",
 		}
 
 		// Add compilation information
@@ -179,7 +178,8 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				mcp.NewTextContent(successMessage + ": "),
+				mcp.NewTextContent(successMessage + ": " + signingURL),
+				mcp.NewTextContent("Please render the url using markdown link format"),
 				mcp.NewTextContent(string(resultJSON)),
 			},
 		}, nil
