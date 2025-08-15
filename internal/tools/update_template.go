@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
@@ -26,6 +28,15 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		),
 		mcp.WithString("template_code",
 			mcp.Description("New template code"),
+		),
+		mcp.WithString("use_openzeppelin",
+			mcp.Description("Whether to use OpenZeppelin contracts (Ethereum only, 'true'/'false')"),
+		),
+		mcp.WithString("openzeppelin_version",
+			mcp.Description("OpenZeppelin contracts version"),
+		),
+		mcp.WithString("openzeppelin_contracts",
+			mcp.Description("Comma-separated list of OpenZeppelin contracts to include"),
 		),
 	)
 
@@ -48,6 +59,28 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		description := request.GetString("description", "")
 		chainType := request.GetString("chain_type", "")
 		templateCode := request.GetString("template_code", "")
+
+		// OpenZeppelin configuration
+		useOpenZeppelinStr := request.GetString("use_openzeppelin", "")
+		openzeppelinVersion := request.GetString("openzeppelin_version", "")
+		openzeppelinContractsStr := request.GetString("openzeppelin_contracts", "")
+
+		// Parse OpenZeppelin usage
+		var useOpenZeppelin bool
+		if useOpenZeppelinStr != "" {
+			useOpenZeppelin = strings.ToLower(useOpenZeppelinStr) == "true"
+		}
+
+		// Convert comma-separated OpenZeppelin contracts to slice
+		var ozContracts []string
+		if openzeppelinContractsStr != "" {
+			for _, contract := range strings.Split(openzeppelinContractsStr, ",") {
+				contract = strings.TrimSpace(contract)
+				if contract != "" {
+					ozContracts = append(ozContracts, contract)
+				}
+			}
+		}
 
 		// Get existing template
 		template, err := db.GetTemplateByID(uint(templateID))
@@ -84,33 +117,66 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		}
 
 		// Update template code if provided
-		if templateCode != "" {
+		if templateCode != "" || useOpenZeppelinStr != "" {
 			// Use the current or new chain type for validation
 			validationChainType := template.ChainType
 			if chainType != "" {
 				validationChainType = chainType
 			}
 
-			// Validate template code
-			if err := validateTemplateCode(validationChainType, templateCode); err != nil {
+			// OpenZeppelin validation for non-Ethereum chains
+			if useOpenZeppelin && validationChainType != "ethereum" {
 				return &mcp.CallToolResult{
 					Content: []mcp.Content{
 						mcp.NewTextContent("Error: "),
-						mcp.NewTextContent(fmt.Sprintf("Template validation failed: %v", err)),
+						mcp.NewTextContent("OpenZeppelin is only supported for Ethereum contracts"),
 					},
 				}, nil
 			}
 
-			template.TemplateCode = templateCode
-			updates = append(updates, "template_code")
+			// Use existing template code if not provided
+			codeToValidate := templateCode
+			if codeToValidate == "" {
+				codeToValidate = template.TemplateCode
+			}
+
+			// Validate template code using Solidity compiler for Ethereum
+			if validationChainType == "ethereum" {
+				// Use Solidity version 0.8.20 for validation
+				_, err := utils.CompileSolidity("0.8.20", codeToValidate)
+				if err != nil {
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{
+							mcp.NewTextContent("Error: "),
+							mcp.NewTextContent(fmt.Sprintf("Solidity compilation failed: %v", err)),
+						},
+					}, nil
+				}
+			} else if validationChainType == "solana" {
+				// For Solana, perform basic validation checks
+				if !strings.Contains(codeToValidate, "use anchor_lang::prelude::*;") && !strings.Contains(codeToValidate, "#[program]") {
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{
+							mcp.NewTextContent("Error: "),
+							mcp.NewTextContent("Solana template must contain anchor_lang imports or #[program] attribute"),
+						},
+					}, nil
+				}
+			}
+
+			// Update the template code if provided
+			if templateCode != "" {
+				template.TemplateCode = codeToValidate
+				updates = append(updates, "template_code")
+			}
 		}
 
 		// Check if any updates were provided
-		if len(updates) == 0 {
+		if len(updates) == 0 && useOpenZeppelinStr == "" {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("No update parameters provided. Specify description, chain_type, or template_code"),
+					mcp.NewTextContent("No update parameters provided. Specify description, chain_type, template_code, or OpenZeppelin options"),
 				},
 			}, nil
 		}
@@ -125,6 +191,7 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			}, nil
 		}
 
+		// Prepare result with comprehensive information
 		result := map[string]interface{}{
 			"id":             template.ID,
 			"name":           template.Name,
@@ -135,10 +202,27 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			"message":        fmt.Sprintf("Template updated successfully. Fields updated: %v", updates),
 		}
 
+		// Add OpenZeppelin information if configured
+		if useOpenZeppelinStr != "" {
+			result["use_openzeppelin"] = useOpenZeppelin
+			if openzeppelinVersion != "" {
+				result["openzeppelin_version"] = openzeppelinVersion
+			}
+			if len(ozContracts) > 0 {
+				result["openzeppelin_contracts"] = ozContracts
+			}
+		}
+
+		// Format success message
+		successMessage := "Template updated successfully"
+		if len(updates) > 0 {
+			successMessage += fmt.Sprintf(" (fields: %s)", strings.Join(updates, ", "))
+		}
+
 		resultJSON, _ := json.Marshal(result)
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				mcp.NewTextContent("Success message: "),
+				mcp.NewTextContent(successMessage + ": "),
 				mcp.NewTextContent(string(resultJSON)),
 			},
 		}, nil

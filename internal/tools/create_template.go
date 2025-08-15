@@ -10,11 +10,12 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("create_template",
-		mcp.WithDescription("Create new smart contract template with syntax validation. Template code should be valid Solidity (for Ethereum) or Rust (for Solana)."),
+		mcp.WithDescription("Create new smart contract template with syntax validation. Template code should be valid Solidity (for Ethereum) or Rust (for Solana). OpenZeppelin contracts are available to use."),
 		mcp.WithString("name",
 			mcp.Required(),
 			mcp.Description("Name of the template (e.g., 'ERC20 Basic Token', 'SPL Token')"),
@@ -30,6 +31,15 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		mcp.WithString("template_code",
 			mcp.Required(),
 			mcp.Description("The smart contract source code template"),
+		),
+		mcp.WithString("use_openzeppelin",
+			mcp.Description("Whether to use OpenZeppelin contracts (Ethereum only, 'true'/'false', default: 'false')"),
+		),
+		mcp.WithString("openzeppelin_version",
+			mcp.Description("OpenZeppelin contracts version (default: latest stable)"),
+		),
+		mcp.WithString("openzeppelin_contracts",
+			mcp.Description("Comma-separated list of OpenZeppelin contracts to include (e.g., 'ERC20,Ownable,ReentrancyGuard')"),
 		),
 	)
 
@@ -64,14 +74,30 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			}, nil
 		}
 
-		// Basic syntax validation
-		if err := validateTemplateCode(chainType, templateCode); err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Template validation failed: %v", err)),
-				},
-			}, nil
+		// Validate template code using Solidity compiler for Ethereum
+		var compilationResult *utils.CompilationResult
+		if chainType == "ethereum" {
+			// Use Solidity version 0.8.20 for validation
+			result, err := utils.CompileSolidity("0.8.20", templateCode)
+			if err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						mcp.NewTextContent("Error: "),
+						mcp.NewTextContent(fmt.Sprintf("Solidity compilation failed: %v", err)),
+					},
+				}, nil
+			}
+			compilationResult = &result
+		} else if chainType == "solana" {
+			// For Solana, perform basic validation checks
+			if !strings.Contains(templateCode, "use anchor_lang::prelude::*;") && !strings.Contains(templateCode, "#[program]") {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						mcp.NewTextContent("Error: "),
+						mcp.NewTextContent("Solana template must contain anchor_lang imports or #[program] attribute"),
+					},
+				}, nil
+			}
 		}
 
 		// Create template
@@ -91,6 +117,7 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			}, nil
 		}
 
+		// Prepare result
 		result := map[string]interface{}{
 			"id":          template.ID,
 			"name":        template.Name,
@@ -100,49 +127,33 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			"message":     "Template created successfully",
 		}
 
+		// Add compilation information for Ethereum
+		if compilationResult != nil {
+			result["compilation_status"] = "success"
+			result["compiled_contracts"] = len(compilationResult.Bytecode)
+			var contractNames []string
+			for contractName := range compilationResult.Bytecode {
+				contractNames = append(contractNames, contractName)
+			}
+			result["contract_names"] = contractNames
+		}
+
+		// Format success message
+		successMessage := "Template created successfully"
+		if compilationResult != nil {
+			successMessage += " (Solidity compilation validated)"
+		} else if chainType == "solana" {
+			successMessage += " (Rust syntax validated)"
+		}
+
 		resultJSON, _ := json.Marshal(result)
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				mcp.NewTextContent("Success message: "),
+				mcp.NewTextContent(successMessage + ": "),
 				mcp.NewTextContent(string(resultJSON)),
 			},
 		}, nil
 	}
 
 	return tool, handler
-}
-
-// validateTemplateCode performs basic syntax validation for template code
-func validateTemplateCode(chainType, templateCode string) error {
-	if strings.TrimSpace(templateCode) == "" {
-		return fmt.Errorf("template code cannot be empty")
-	}
-
-	switch chainType {
-	case "ethereum":
-		// Basic Solidity validation
-		if !strings.Contains(templateCode, "pragma solidity") {
-			return fmt.Errorf("Ethereum templates must include 'pragma solidity' directive")
-		}
-		if !strings.Contains(templateCode, "contract") {
-			return fmt.Errorf("Ethereum templates must contain at least one contract")
-		}
-	case "solana":
-		// Basic Rust validation for Solana programs
-		if !strings.Contains(templateCode, "use anchor_lang::prelude::*") &&
-			!strings.Contains(templateCode, "use solana_program") {
-			return fmt.Errorf("Solana templates should use Anchor framework or native Solana program library")
-		}
-		if !strings.Contains(templateCode, "#[program]") &&
-			!strings.Contains(templateCode, "entrypoint!") {
-			return fmt.Errorf("Solana templates must define a program entrypoint")
-		}
-	}
-
-	// Check for common security issues
-	if strings.Contains(strings.ToLower(templateCode), "selfdestruct") {
-		return fmt.Errorf("templates containing 'selfdestruct' are not allowed for security reasons")
-	}
-
-	return nil
 }

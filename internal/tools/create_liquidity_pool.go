@@ -117,25 +117,17 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 			}, nil
 		}
 
-		// Prepare transaction data for signing
-		transactionData := map[string]interface{}{
-			"pool_id":              pool.ID,
-			"token_address":        tokenAddress,
-			"initial_token_amount": initialTokenAmount,
-			"initial_eth_amount":   initialETHAmount,
-			"creator_address":      creatorAddress,
-			"uniswap_version":      uniswapSettings.Version,
-			"chain_type":           activeChain.ChainType,
-			"chain_id":             activeChain.ChainID,
-			"rpc":                  activeChain.RPC,
+		// Prepare minimal session data (transaction data will be generated on-demand)
+		sessionData := map[string]interface{}{
+			"pool_id": pool.ID,
 		}
 
-		transactionDataJSON, err := json.Marshal(transactionData)
+		sessionDataJSON, err := json.Marshal(sessionData)
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error encoding transaction data: %v", err)),
+					mcp.NewTextContent(fmt.Sprintf("Error encoding session data: %v", err)),
 				},
 			}, nil
 		}
@@ -145,7 +137,7 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 			"create_pool",
 			activeChain.ChainType,
 			activeChain.ChainID,
-			string(transactionDataJSON),
+			string(sessionDataJSON),
 		)
 		if err != nil {
 			return &mcp.CallToolResult{

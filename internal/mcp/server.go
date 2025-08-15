@@ -7,7 +7,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
-	"github.com/rxtech-lab/launchpad-mcp/tools"
+	"github.com/rxtech-lab/launchpad-mcp/internal/tools"
 )
 
 type MCPServer struct {
@@ -69,6 +69,9 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	updateTemplateTool, updateTemplateHandler := tools.NewUpdateTemplateTool(db)
 	srv.AddTool(updateTemplateTool, updateTemplateHandler)
 
+	deleteTemplateTool, deleteTemplateHandler := tools.NewDeleteTemplateTool(db)
+	srv.AddTool(deleteTemplateTool, deleteTemplateHandler)
+
 	// Deployment Tool
 	launchTool, launchHandler := tools.NewLaunchTool(db, serverPort)
 	srv.AddTool(launchTool, launchHandler)
@@ -125,7 +128,10 @@ func getToolInstructions(category string) string {
    Usage: Add custom smart contract templates for deployment
 
 3. update_template - Update existing template
-   Usage: Modify existing contract templates`
+   Usage: Modify existing contract templates
+
+4. delete_template - Delete templates by ID(s)
+   Usage: Remove one or multiple templates (supports bulk deletion)`
 
 	case "deployment":
 		return `Deployment Tools:
@@ -163,16 +169,17 @@ func getToolInstructions(category string) string {
 	case "all":
 		return `Crypto Launchpad MCP Tools Overview:
 
-This MCP server provides 14 tools for managing cryptocurrency token deployments and Uniswap operations:
+This MCP server provides 15 tools for managing cryptocurrency token deployments and Uniswap operations:
 
 CHAIN MANAGEMENT (2 tools):
 - select_chain: Switch between ethereum/solana
 - set_chain: Configure RPC endpoints
 
-TEMPLATE MANAGEMENT (3 tools):
+TEMPLATE MANAGEMENT (4 tools):
 - list_template: Browse contract templates
 - create_template: Add new templates
 - update_template: Modify existing templates
+- delete_template: Delete templates by ID(s)
 
 DEPLOYMENT (1 tool):
 - launch: Deploy contracts via web interface

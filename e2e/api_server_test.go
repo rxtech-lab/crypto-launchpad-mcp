@@ -65,26 +65,19 @@ func TestAPIServer_TemplateWorkflow(t *testing.T) {
 		err := setup.DB.CreateDeployment(deployment)
 		require.NoError(t, err)
 
-		// Create transaction session
-		transactionData := map[string]interface{}{
-			"deployment_id":    deployment.ID,
-			"template_code":    template.TemplateCode,
-			"token_name":       "TestToken",
-			"token_symbol":     "TEST",
-			"deployer_address": setup.GetPrimaryTestAccount().Address.Hex(),
-			"chain_type":       "ethereum",
-			"chain_id":         TESTNET_CHAIN_ID,
-			"rpc":              TESTNET_RPC,
+		// Create transaction session with minimal session data
+		sessionData := map[string]interface{}{
+			"deployment_id": deployment.ID,
 		}
 
-		transactionDataJSON, err := json.Marshal(transactionData)
+		sessionDataJSON, err := json.Marshal(sessionData)
 		require.NoError(t, err)
 
 		sessionID, err := setup.DB.CreateTransactionSession(
 			"deploy",
 			"ethereum",
 			TESTNET_CHAIN_ID,
-			string(transactionDataJSON),
+			string(sessionDataJSON),
 		)
 		require.NoError(t, err)
 
@@ -115,25 +108,33 @@ func TestAPIServer_TemplateWorkflow(t *testing.T) {
 			GetMintableTokenContract(),
 		)
 
-		transactionData := map[string]interface{}{
-			"deployment_id":    1,
-			"template_code":    template.TemplateCode,
-			"token_name":       "APIToken",
-			"token_symbol":     "API",
-			"deployer_address": setup.GetPrimaryTestAccount().Address.Hex(),
-			"chain_type":       "ethereum",
-			"chain_id":         TESTNET_CHAIN_ID,
-			"rpc":              TESTNET_RPC,
+		// Create deployment record with APIToken/API values
+		deployment := &models.Deployment{
+			TemplateID:      template.ID,
+			TokenName:       "APIToken",
+			TokenSymbol:     "API",
+			ChainType:       "ethereum",
+			ChainID:         TESTNET_CHAIN_ID,
+			DeployerAddress: setup.GetPrimaryTestAccount().Address.Hex(),
+			Status:          "pending",
 		}
 
-		transactionDataJSON, err := json.Marshal(transactionData)
+		err := setup.DB.CreateDeployment(deployment)
+		require.NoError(t, err)
+
+		// Create minimal session data (transaction data will be generated on-demand)
+		sessionData := map[string]interface{}{
+			"deployment_id": deployment.ID,
+		}
+
+		sessionDataJSON, err := json.Marshal(sessionData)
 		require.NoError(t, err)
 
 		sessionID, err := setup.DB.CreateTransactionSession(
 			"deploy",
 			"ethereum",
 			TESTNET_CHAIN_ID,
-			string(transactionDataJSON),
+			string(sessionDataJSON),
 		)
 		require.NoError(t, err)
 

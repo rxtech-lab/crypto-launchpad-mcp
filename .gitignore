@@ -56,3 +56,4 @@ Thumbs.db
 dist/
 build/
 bin
+internal/contracts/contracts.go

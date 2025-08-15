@@ -24,16 +24,17 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 - Liquidity positions and swap transaction history
 - Transaction sessions for signing interface management
 
-### MCP Tools (14 total)
+### MCP Tools (15 total)
 
 #### Chain Management (2 tools)
 - `select_chain` - Select active blockchain (ethereum/solana)
 - `set_chain` - Configure blockchain RPC and chain ID
 
-#### Template Management (3 tools)
+#### Template Management (4 tools)
 - `list_template` - List smart contract templates with search
 - `create_template` - Create new contract template with validation
 - `update_template` - Update existing template
+- `delete_template` - Delete templates by ID(s) with bulk deletion support
 
 #### Deployment (1 tool)
 - `launch` - Generate deployment URL with signing interface
@@ -68,6 +69,7 @@ make build       # Build the project with version info
 make test        # Run tests
 make run         # Run the MCP server directly (no build)
 make run-bin     # Build and run the binary
+make generate    # Generate embedded contract files from OpenZeppelin submodule
 make deps        # Download and tidy dependencies
 make clean       # Clean build artifacts
 
@@ -103,7 +105,8 @@ make sec         # Run security scan with gosec
 │   ├── database/               # Database layer with CRUD operations
 │   ├── mcp/                    # MCP server implementation
 │   ├── api/                    # HTTP server for transaction signing
-│   └── assets/                 # Embedded HTML templates and JavaScript assets
+│   ├── assets/                 # Embedded HTML templates and JavaScript assets
+│   └── contracts/              # OpenZeppelin contracts submodule and generated embeds
 ├── tools/                      # 14 MCP tool implementations
 ├── scripts/                    # Build and distribution scripts
 │   ├── binaries.sh            # Cross-platform build script
@@ -219,12 +222,39 @@ Write comprehensive tests for:
 - Cross-platform binary compatibility
 - CI/CD pipeline validation
 
+## OpenZeppelin Contracts Integration
+
+The project uses OpenZeppelin contracts as a git submodule located at `internal/contracts/openzeppelin-contracts/`. 
+
+### Git Submodule Setup
+```bash
+# Initialize and update the submodule
+git submodule init
+git submodule update
+
+# Or clone with submodules
+git clone --recurse-submodules <repository-url>
+```
+
+### Embedding Contracts
+The OpenZeppelin contracts are embedded in the Go binary using Go's embed directive. The embedding is automated through code generation:
+
+1. **Generate embed directives**: Run `make generate` to scan all `.sol` files in the OpenZeppelin contracts submodule and generate the appropriate `//go:embed` directives in `internal/contracts/contracts.go`.
+
+2. **Code Generation**: The `tools/generate_contracts.go` script automatically creates embed directives for all Solidity files found in the submodule, ensuring all contracts are available at compile time.
+
+3. **Build Integration**: The generation step should be run whenever the OpenZeppelin submodule is updated or when setting up the project for the first time.
+
+### Usage in Solidity Compilation
+The `utils/solidity.go` file includes an import callback for `@openzeppelin-contracts/` imports that resolves to the embedded filesystem, enabling seamless compilation of contracts that depend on OpenZeppelin libraries.
+
 ## Key Dependencies
 
 - `github.com/mark3labs/mcp-go` - MCP server framework
 - `github.com/gofiber/fiber/v2` - HTTP framework with middleware
 - `gorm.io/gorm` and `gorm.io/driver/sqlite` - ORM and database driver
 - `github.com/google/uuid` - UUID generation for sessions
+- `github.com/rxtech-lab/solc-go` - Solidity compiler for contract validation
 - Tailwind CSS + HTMX - Frontend framework (CDN)
 
 ## Distribution and Installation

@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
@@ -67,6 +70,26 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			return mcp.NewToolResultError(fmt.Sprintf("Template chain type (%s) doesn't match active chain (%s)", template.ChainType, activeChain.ChainType)), nil
 		}
 
+		// Extract contract name for compilation
+		contractName := extractContractName(template.TemplateCode)
+		if contractName == "" {
+			return mcp.NewToolResultError("Could not extract contract name from template code"), nil
+		}
+
+		// Compile contract for validation and bytecode generation (Ethereum only)
+		var compilationResult *utils.CompilationResult
+		if activeChain.ChainType == "ethereum" {
+			// Replace template placeholders with actual values
+			processedCode := replaceTemplatePlaceholders(template.TemplateCode, tokenName, tokenSymbol)
+
+			// Compile the contract using utils/solidity.go
+			result, err := utils.CompileSolidity("0.8.20", processedCode)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Contract compilation failed: %v", err)), nil
+			}
+			compilationResult = &result
+		}
+
 		// Create deployment record
 		deployment := &models.Deployment{
 			TemplateID:      uint(templateID),
@@ -82,21 +105,14 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			return mcp.NewToolResultError(fmt.Sprintf("Error creating deployment record: %v", err)), nil
 		}
 
-		// Prepare transaction data for signing
-		transactionData := map[string]interface{}{
-			"deployment_id":    deployment.ID,
-			"template_code":    template.TemplateCode,
-			"token_name":       tokenName,
-			"token_symbol":     tokenSymbol,
-			"deployer_address": "", // Will be populated by frontend wallet connection
-			"chain_type":       activeChain.ChainType,
-			"chain_id":         activeChain.ChainID,
-			"rpc":              activeChain.RPC,
+		// Prepare minimal session data (compilation will be done on-demand)
+		sessionData := map[string]interface{}{
+			"deployment_id": deployment.ID,
 		}
 
-		transactionDataJSON, err := json.Marshal(transactionData)
+		sessionDataJSON, err := json.Marshal(sessionData)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Error encoding transaction data: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("Error encoding session data: %v", err)), nil
 		}
 
 		// Create transaction session
@@ -104,7 +120,7 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			"deploy",
 			activeChain.ChainType,
 			activeChain.ChainID,
-			string(transactionDataJSON),
+			string(sessionDataJSON),
 		)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error creating transaction session: %v", err)), nil
@@ -113,11 +129,13 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 		// Generate signing URL
 		signingURL := fmt.Sprintf("http://localhost:%d/deploy/%s", serverPort, sessionID)
 
+		// Prepare comprehensive result
 		result := map[string]interface{}{
 			"deployment_id": deployment.ID,
 			"session_id":    sessionID,
 			"signing_url":   signingURL,
 			"template_name": template.Name,
+			"contract_name": contractName,
 			"token_name":    tokenName,
 			"token_symbol":  tokenSymbol,
 			"chain_type":    activeChain.ChainType,
@@ -126,14 +144,76 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			"instructions":  "1. Open the signing URL in your browser\n2. Connect your wallet using EIP-6963\n3. Review the transaction details\n4. Sign and send the deployment transaction",
 		}
 
+		// Add compilation information
+		if compilationResult != nil {
+			result["compilation_status"] = "success"
+			result["contract_compiled"] = true
+			result["compiled_contracts"] = len(compilationResult.Bytecode)
+			var contractNames []string
+			for contractName := range compilationResult.Bytecode {
+				contractNames = append(contractNames, contractName)
+			}
+			result["contract_names"] = contractNames
+
+			// Calculate contract size in bytes for the main contract
+			mainBytecode := compilationResult.Bytecode[contractName]
+			if mainBytecode != "" {
+				bytecodeSize := len(mainBytecode) / 2 // Convert hex to bytes
+				result["contract_size_bytes"] = bytecodeSize
+				result["contract_size_limit"] = 24576 // EIP-170 limit
+			}
+		} else {
+			result["compilation_status"] = "skipped"
+			result["contract_compiled"] = false
+			if activeChain.ChainType == "ethereum" {
+				result["compilation_note"] = "Solidity compiler not available - contract will be compiled client-side"
+			}
+		}
+
 		resultJSON, _ := json.Marshal(result)
+		// Format success message based on compilation status
+		successMessage := "Deployment URL generated"
+		if compilationResult != nil {
+			successMessage += " (contract pre-compiled and validated)"
+		}
+
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				mcp.NewTextContent("Deployment URL generated: "),
+				mcp.NewTextContent(successMessage + ": "),
 				mcp.NewTextContent(string(resultJSON)),
 			},
 		}, nil
 	}
 
 	return tool, handler
+}
+
+// extractContractName extracts the contract name from Solidity source code
+func extractContractName(sourceCode string) string {
+	// Look for contract definition
+	contractRegex := regexp.MustCompile(`contract\s+(\w+)`)
+	matches := contractRegex.FindStringSubmatch(sourceCode)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
+// replaceTemplatePlaceholders replaces common template placeholders with actual values
+func replaceTemplatePlaceholders(templateCode, tokenName, tokenSymbol string) string {
+	// Replace common placeholders
+	code := strings.ReplaceAll(templateCode, "{{TOKEN_NAME}}", tokenName)
+	code = strings.ReplaceAll(code, "{{TOKEN_SYMBOL}}", tokenSymbol)
+	code = strings.ReplaceAll(code, "{TOKEN_NAME}", tokenName)
+	code = strings.ReplaceAll(code, "{TOKEN_SYMBOL}", tokenSymbol)
+	code = strings.ReplaceAll(code, "$TOKEN_NAME", tokenName)
+	code = strings.ReplaceAll(code, "$TOKEN_SYMBOL", tokenSymbol)
+
+	// Replace placeholder values in constructor calls
+	code = strings.ReplaceAll(code, "\"MyToken\"", fmt.Sprintf("\"%s\"", tokenName))
+	code = strings.ReplaceAll(code, "\"MTK\"", fmt.Sprintf("\"%s\"", tokenSymbol))
+	code = strings.ReplaceAll(code, "'MyToken'", fmt.Sprintf("'%s'", tokenName))
+	code = strings.ReplaceAll(code, "'MTK'", fmt.Sprintf("'%s'", tokenSymbol))
+
+	return code
 }

@@ -794,11 +794,6 @@ async function executeTransactionWithFeedback() {
   const statusMessage = document.getElementById("status-message");
   
   try {
-    // Step 1: Execute transaction
-    const originalExecute = transactionManager.executeTransaction;
-    
-    // Override the waitForContractAddress method to provide feedback
-    const originalWaitForContract = transactionManager.waitForContractAddress;
     transactionManager.waitForContractAddress = async function(txHash, maxAttempts = 30) {
       if (statusMessage) {
         statusMessage.innerHTML = `

@@ -6,15 +6,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "go fmt ./..."
-          },
-          {
-            "type": "command",
             "command": "make build"
           },
           {
             "type": "command",
             "command": "make test"
+          },
+          {
+            "type": "command",
+            "command": "make fmt"
           }
         ]
       }

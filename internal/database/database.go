@@ -132,6 +132,11 @@ func (d *Database) DeleteTemplate(id uint) error {
 	return d.DB.Delete(&models.Template{}, id).Error
 }
 
+func (d *Database) DeleteTemplates(ids []uint) (int64, error) {
+	result := d.DB.Delete(&models.Template{}, ids)
+	return result.RowsAffected, result.Error
+}
+
 // Deployment operations
 func (d *Database) CreateDeployment(deployment *models.Deployment) error {
 	return d.DB.Create(deployment).Error

@@ -1,4 +1,4 @@
-.PHONY: build test run clean deps help install-local package binaries
+.PHONY: build test run clean deps help install-local package binaries generate
 
 BINARY_NAME=launchpad-mcp
 BUILD_DIR=./bin
@@ -16,6 +16,11 @@ all: deps build test
 deps:
 	go mod download
 	go mod tidy
+
+# Generate embedded contract files
+generate:
+	@echo "Generating embedded contract files..."
+	go generate ./...
 inspect:
 	npx -y @modelcontextprotocol/inspector go run cmd/main.go
 
@@ -89,6 +94,7 @@ help:
 	@echo "  run-bin     - Build and run the binary"
 	@echo "  install-local - Install to /usr/local/bin (requires sudo)"
 	@echo "  package     - Package and notarize for distribution"
+	@echo "  generate    - Generate embedded contract files"
 	@echo "  deps        - Download and tidy dependencies"
 	@echo "  clean       - Clean build artifacts"
 	@echo "  fmt         - Format code"
