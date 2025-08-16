@@ -187,11 +187,17 @@ class WalletManager {
                                 <div class="space-y-1">
                                     <div class="flex justify-between text-sm">
                                         <span class="text-green-700">Address:</span>
-                                        <code class="bg-green-100 px-2 py-1 rounded text-green-800">${this.account.slice(0, 6)}...${this.account.slice(-4)}</code>
+                                        <code class="bg-green-100 px-2 py-1 rounded text-green-800">${this.account.slice(
+                                          0,
+                                          6
+                                        )}...${this.account.slice(-4)}</code>
                                     </div>
                                     <div class="flex justify-between text-sm">
                                         <span class="text-green-700">Chain ID:</span>
-                                        <span class="text-green-800 font-medium">${parseInt(this.chainId, 16)}</span>
+                                        <span class="text-green-800 font-medium">${parseInt(
+                                          this.chainId,
+                                          16
+                                        )}</span>
                                     </div>
                                 </div>
                             </div>
@@ -322,7 +328,10 @@ class TransactionManager {
                     </div>
                     <div class="flex justify-between py-2">
                         <span class="text-gray-600">Chain</span>
-                        <span class="font-medium text-gray-900">${chain_type.charAt(0).toUpperCase() + chain_type.slice(1)}</span>
+                        <span class="font-medium text-gray-900">${
+                          chain_type.charAt(0).toUpperCase() +
+                          chain_type.slice(1)
+                        }</span>
                     </div>
                     <div class="flex justify-between py-2 border-t border-gray-200">
                         <span class="text-gray-600">Chain ID</span>
@@ -387,12 +396,6 @@ class TransactionManager {
                     </div>
                 </div>
                 
-                <!-- Deployer Address -->
-                <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                    <span class="text-blue-800 text-sm font-medium block mb-2">Deployer Address</span>
-                    <code class="text-sm bg-white px-3 py-2 rounded-lg text-blue-800 break-all block font-mono">${data.deployer_address}</code>
-                </div>
-                
                 <!-- Template Info -->
                 <div class="flex justify-between items-center py-3 border-t border-gray-200">
                     <span class="text-gray-600 font-medium">Contract Template</span>
@@ -407,15 +410,21 @@ class TransactionManager {
             <div class="space-y-3">
                 <div class="py-2">
                     <span class="text-gray-600 block mb-1">Token Address</span>
-                    <code class="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-800 break-all">${data.token_address}</code>
+                    <code class="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-800 break-all">${
+                      data.token_address
+                    }</code>
                 </div>
                 <div class="flex justify-between items-center py-2 border-t border-gray-100">
                     <span class="text-gray-600">Token Amount</span>
-                    <span class="font-medium text-gray-900">${data.initial_token_amount}</span>
+                    <span class="font-medium text-gray-900">${
+                      data.initial_token_amount
+                    }</span>
                 </div>
                 <div class="flex justify-between items-center py-2 border-t border-gray-100">
                     <span class="text-gray-600">ETH Amount</span>
-                    <span class="font-medium text-gray-900">${data.initial_eth_amount} ETH</span>
+                    <span class="font-medium text-gray-900">${
+                      data.initial_eth_amount
+                    } ETH</span>
                 </div>
                 <div class="flex justify-between items-center py-2 border-t border-gray-100">
                     <span class="text-gray-600">Protocol</span>
@@ -423,7 +432,9 @@ class TransactionManager {
                 </div>
                 <div class="py-2 border-t border-gray-100">
                     <span class="text-gray-600 block mb-1">Creator</span>
-                    <code class="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-800 break-all">${data.creator_address}</code>
+                    <code class="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-800 break-all">${
+                      data.creator_address
+                    }</code>
                 </div>
             </div>
         `;
@@ -497,7 +508,11 @@ class TransactionManager {
                     <div class="flex items-center justify-between">
                         <div class="flex flex-col items-center">
                             <span class="text-sm text-gray-600 mb-1">From</span>
-                            <span class="font-mono text-sm bg-white px-3 py-1 rounded-lg">${fromDisplay === "ETH" ? "ETH" : fromDisplay.slice(0, 8) + "..."}</span>
+                            <span class="font-mono text-sm bg-white px-3 py-1 rounded-lg">${
+                              fromDisplay === "ETH"
+                                ? "ETH"
+                                : fromDisplay.slice(0, 8) + "..."
+                            }</span>
                         </div>
                         <div class="px-4">
                             <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -506,21 +521,31 @@ class TransactionManager {
                         </div>
                         <div class="flex flex-col items-center">
                             <span class="text-sm text-gray-600 mb-1">To</span>
-                            <span class="font-mono text-sm bg-white px-3 py-1 rounded-lg">${toDisplay === "ETH" ? "ETH" : toDisplay.slice(0, 8) + "..."}</span>
+                            <span class="font-mono text-sm bg-white px-3 py-1 rounded-lg">${
+                              toDisplay === "ETH"
+                                ? "ETH"
+                                : toDisplay.slice(0, 8) + "..."
+                            }</span>
                         </div>
                     </div>
                 </div>
                 <div class="flex justify-between items-center py-2">
                     <span class="text-gray-600">Amount</span>
-                    <span class="font-medium text-gray-900">${data.amount}</span>
+                    <span class="font-medium text-gray-900">${
+                      data.amount
+                    }</span>
                 </div>
                 <div class="flex justify-between items-center py-2 border-t border-gray-100">
                     <span class="text-gray-600">Slippage</span>
-                    <span class="text-orange-600 font-medium">${data.slippage_tolerance}%</span>
+                    <span class="text-orange-600 font-medium">${
+                      data.slippage_tolerance
+                    }%</span>
                 </div>
                 <div class="py-2 border-t border-gray-100">
                     <span class="text-gray-600 block mb-1">User Address</span>
-                    <code class="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-800 break-all">${data.user_address}</code>
+                    <code class="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-800 break-all">${
+                      data.user_address
+                    }</code>
                 </div>
             </div>
         `;
@@ -583,14 +608,14 @@ class TransactionManager {
   async waitForContractAddress(txHash, maxAttempts = 30) {
     // Wait for transaction receipt with contract address
     // Try every 2 seconds for up to 60 seconds (30 attempts)
-    
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const receipt = await this.walletManager.selectedWallet.request({
           method: "eth_getTransactionReceipt",
-          params: [txHash]
+          params: [txHash],
         });
-        
+
         if (receipt) {
           if (receipt.contractAddress) {
             console.log(`Contract address found: ${receipt.contractAddress}`);
@@ -604,24 +629,30 @@ class TransactionManager {
             return null;
           }
         }
-        
+
         // Receipt not available yet, wait and try again
         if (attempt < maxAttempts) {
-          console.log(`Waiting for transaction confirmation... (attempt ${attempt}/${maxAttempts})`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          console.log(
+            `Waiting for transaction confirmation... (attempt ${attempt}/${maxAttempts})`
+          );
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       } catch (error) {
         if (attempt === maxAttempts) {
-          throw new Error(`Failed to get transaction receipt after ${maxAttempts} attempts: ${error.message}`);
+          throw new Error(
+            `Failed to get transaction receipt after ${maxAttempts} attempts: ${error.message}`
+          );
         }
-        
+
         // For non-final attempts, just log and continue
         console.warn(`Attempt ${attempt} failed:`, error.message);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     }
-    
-    throw new Error("Transaction confirmation timeout - please check the blockchain explorer");
+
+    throw new Error(
+      "Transaction confirmation timeout - please check the blockchain explorer"
+    );
   }
 
   prepareTransactionData() {
@@ -643,8 +674,6 @@ class TransactionManager {
 
   async updateSessionStatus(txHash, status, contractAddress = null) {
     // Construct the confirm URL by appending /confirm to current path
-    const confirmUrl = `${window.location.pathname}/confirm`.replace('/api', '/api');
-
     const requestBody = {
       transaction_hash: txHash,
       status: status,
@@ -657,10 +686,10 @@ class TransactionManager {
     try {
       // If we're on /deploy/:session_id, this will create /api/deploy/:session_id/confirm
       let apiUrl = `/api${window.location.pathname}/confirm`;
-      
-      console.log(`Updating session status at: ${apiUrl}`);
+
+      console.log(`Updating deployment status at: ${apiUrl}`);
       console.log(`Request body:`, requestBody);
-      
+
       const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
@@ -672,12 +701,30 @@ class TransactionManager {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`HTTP ${response.status}: ${errorText}`);
-        throw new Error(`Failed to update session status: ${response.status} ${errorText}`);
+        throw new Error(
+          `Failed to update deployment status: ${response.status} ${errorText}`
+        );
       }
-      
-      return await response.json();
+
+      const result = await response.json();
+      console.log("Deployment status updated successfully:", result);
+
+      // Log deployment status update for confirmation
+      if (
+        this.sessionData?.session_type === "deploy" &&
+        status === "confirmed"
+      ) {
+        console.log("✅ Deployment record updated in database:");
+        console.log(`   - Transaction Hash: ${txHash}`);
+        if (contractAddress) {
+          console.log(`   - Contract Address: ${contractAddress}`);
+        }
+        console.log(`   - Status: ${status}`);
+      }
+
+      return result;
     } catch (error) {
-      console.error("Error updating session status:", error);
+      console.error("Error updating deployment status:", error);
       throw error;
     }
   }
@@ -707,11 +754,15 @@ async function connectWallet() {
 async function signTransaction() {
   const statusElement = document.getElementById("transaction-status");
   const statusMessage = document.getElementById("status-message");
-  
+
   // Check if we have the new HTML structure
   const successState = document.getElementById("success-state");
-  const contractAddressDisplay = document.getElementById("contract-address-display");
-  const transactionHashDisplay = document.getElementById("transaction-hash-display");
+  const contractAddressDisplay = document.getElementById(
+    "contract-address-display"
+  );
+  const transactionHashDisplay = document.getElementById(
+    "transaction-hash-display"
+  );
 
   try {
     if (statusElement) {
@@ -726,34 +777,37 @@ async function signTransaction() {
 
     // Execute the transaction with progress feedback
     const result = await executeTransactionWithFeedback();
-    
+
     // If we have the new HTML structure (for deployment page)
-    if (successState && transactionManager.sessionData.session_type === "deploy") {
+    if (
+      successState &&
+      transactionManager.sessionData.session_type === "deploy"
+    ) {
       // Hide the main content and show success state
       const content = document.getElementById("content");
       if (content) content.style.display = "none";
-      
+
       // Update contract address and transaction hash
       if (contractAddressDisplay && result.contractAddress) {
         contractAddressDisplay.textContent = result.contractAddress;
       } else if (contractAddressDisplay) {
         // Check if the showContractAddressUnavailable function exists (from deploy.html)
-        if (typeof showContractAddressUnavailable === 'function') {
+        if (typeof showContractAddressUnavailable === "function") {
           showContractAddressUnavailable();
         } else {
           contractAddressDisplay.textContent = "Contract address not available";
           contractAddressDisplay.parentElement.classList.add("opacity-50");
         }
       }
-      
+
       if (transactionHashDisplay) {
         transactionHashDisplay.textContent = result.txHash || result;
       }
-      
+
       // Show success state with animation
       successState.classList.remove("hidden");
       successState.classList.add("fade-in");
-      
+
       // Add success glow effect
       const card = successState.closest(".glass-effect");
       if (card) {
@@ -761,10 +815,15 @@ async function signTransaction() {
       }
     } else {
       // Fallback to original display method
-      let message = `✅ Transaction confirmed!<br>Hash: <code>${result.txHash || result}</code>`;
-      
+      let message = `✅ Transaction confirmed!<br>Hash: <code>${
+        result.txHash || result
+      }</code>`;
+
       // If it's a deployment and we have a contract address, show it
-      if (result.contractAddress && transactionManager.sessionData.session_type === "deploy") {
+      if (
+        result.contractAddress &&
+        transactionManager.sessionData.session_type === "deploy"
+      ) {
         message += `<br>📋 Contract Address: <code>${result.contractAddress}</code>`;
       } else if (transactionManager.sessionData.session_type === "deploy") {
         message += `<br>⚠️ Contract address not available - check blockchain explorer`;
@@ -780,9 +839,9 @@ async function signTransaction() {
     // Hide the sign button
     const signButton = document.getElementById("sign-button");
     if (signButton) signButton.style.display = "none";
-    
   } catch (error) {
-    if (statusMessage) statusMessage.innerHTML = `❌ Transaction failed: ${error.message}`;
+    if (statusMessage)
+      statusMessage.innerHTML = `❌ Transaction failed: ${error.message}`;
     if (statusElement) {
       statusElement.className =
         "bg-red-50 border border-red-200 text-red-800 px-6 py-4 rounded-xl shadow-sm";
@@ -792,9 +851,12 @@ async function signTransaction() {
 
 async function executeTransactionWithFeedback() {
   const statusMessage = document.getElementById("status-message");
-  
+
   try {
-    transactionManager.waitForContractAddress = async function(txHash, maxAttempts = 30) {
+    transactionManager.waitForContractAddress = async function (
+      txHash,
+      maxAttempts = 30
+    ) {
       if (statusMessage) {
         statusMessage.innerHTML = `
           <div class="flex items-center justify-center">
@@ -803,7 +865,7 @@ async function executeTransactionWithFeedback() {
           </div>
         `;
       }
-      
+
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         if (statusMessage && attempt > 1) {
           const elapsed = attempt * 2;
@@ -814,13 +876,13 @@ async function executeTransactionWithFeedback() {
             </div>
           `;
         }
-        
+
         try {
           const receipt = await this.walletManager.selectedWallet.request({
             method: "eth_getTransactionReceipt",
-            params: [txHash]
+            params: [txHash],
           });
-          
+
           if (receipt) {
             if (receipt.contractAddress) {
               console.log(`Contract address found: ${receipt.contractAddress}`);
@@ -838,7 +900,9 @@ async function executeTransactionWithFeedback() {
             } else if (receipt.status === "0x0") {
               throw new Error("Transaction failed during execution");
             } else {
-              console.warn("Transaction succeeded but no contract address found");
+              console.warn(
+                "Transaction succeeded but no contract address found"
+              );
               if (statusMessage) {
                 statusMessage.innerHTML = `
                   <div class="flex items-center justify-center text-yellow-600">
@@ -852,26 +916,31 @@ async function executeTransactionWithFeedback() {
               return null;
             }
           }
-          
+
           if (attempt < maxAttempts) {
-            console.log(`Waiting for transaction confirmation... (attempt ${attempt}/${maxAttempts})`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            console.log(
+              `Waiting for transaction confirmation... (attempt ${attempt}/${maxAttempts})`
+            );
+            await new Promise((resolve) => setTimeout(resolve, 2000));
           }
         } catch (error) {
           if (attempt === maxAttempts) {
-            throw new Error(`Failed to get transaction receipt after ${maxAttempts} attempts: ${error.message}`);
+            throw new Error(
+              `Failed to get transaction receipt after ${maxAttempts} attempts: ${error.message}`
+            );
           }
-          
+
           console.warn(`Attempt ${attempt} failed:`, error.message);
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       }
-      
-      throw new Error("Transaction confirmation timeout - please check the blockchain explorer");
+
+      throw new Error(
+        "Transaction confirmation timeout - please check the blockchain explorer"
+      );
     };
-    
+
     return await transactionManager.executeTransaction();
-    
   } catch (error) {
     throw error;
   }

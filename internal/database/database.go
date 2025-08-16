@@ -196,6 +196,45 @@ func (d *Database) SetUniswapVersion(version string) error {
 	return d.DB.Model(&setting).Update("is_active", true).Error
 }
 
+func (d *Database) SetUniswapConfiguration(version, routerAddress, factoryAddress, wethAddress, quoterAddress, positionManager, swapRouter02 string) error {
+	// Deactivate all versions
+	if err := d.DB.Model(&models.UniswapSettings{}).Where("is_active = ?", true).Update("is_active", false).Error; err != nil {
+		return err
+	}
+
+	// Create or update the selected version with addresses
+	var setting models.UniswapSettings
+	err := d.DB.Where("version = ?", version).First(&setting).Error
+	if err == gorm.ErrRecordNotFound {
+		// Create new setting
+		setting = models.UniswapSettings{
+			Version:         version,
+			RouterAddress:   routerAddress,
+			FactoryAddress:  factoryAddress,
+			WETHAddress:     wethAddress,
+			QuoterAddress:   quoterAddress,
+			PositionManager: positionManager,
+			SwapRouter02:    swapRouter02,
+			IsActive:        true,
+		}
+		return d.DB.Create(&setting).Error
+	} else if err != nil {
+		return err
+	}
+
+	// Update existing setting with new addresses and activate
+	updates := map[string]interface{}{
+		"router_address":   routerAddress,
+		"factory_address":  factoryAddress,
+		"weth_address":     wethAddress,
+		"quoter_address":   quoterAddress,
+		"position_manager": positionManager,
+		"swap_router02":    swapRouter02,
+		"is_active":        true,
+	}
+	return d.DB.Model(&setting).Updates(updates).Error
+}
+
 func (d *Database) GetActiveUniswapSettings() (*models.UniswapSettings, error) {
 	var settings models.UniswapSettings
 	err := d.DB.Where("is_active = ?", true).First(&settings).Error

@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -12,10 +13,13 @@ import (
 
 type MCPServer struct {
 	server *server.MCPServer
+	db     *database.Database
 }
 
 func NewMCPServer(db *database.Database, serverPort int) *MCPServer {
-	mcpServer := &MCPServer{}
+	mcpServer := &MCPServer{
+		db: db,
+	}
 	mcpServer.InitializeTools(db, serverPort)
 	return mcpServer
 }
@@ -26,6 +30,7 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 		"1.0.0",
 		server.WithToolCapabilities(true),
 	)
+	srv.EnableSampling()
 
 	srv.AddPrompt(mcp.NewPrompt("launchpad-mcp-usage",
 		mcp.WithPromptDescription("Instructions and guidance for using launchpad MCP tools"),
@@ -72,13 +77,19 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	deleteTemplateTool, deleteTemplateHandler := tools.NewDeleteTemplateTool(db)
 	srv.AddTool(deleteTemplateTool, deleteTemplateHandler)
 
-	// Deployment Tool
+	// Deployment Tools
 	launchTool, launchHandler := tools.NewLaunchTool(db, serverPort)
 	srv.AddTool(launchTool, launchHandler)
 
-	// Uniswap Configuration Tool
+	listDeploymentsTool, listDeploymentsHandler := tools.NewListDeploymentsTool(db)
+	srv.AddTool(listDeploymentsTool, listDeploymentsHandler)
+
+	// Uniswap Configuration Tools
 	setUniswapVersionTool, setUniswapVersionHandler := tools.NewSetUniswapVersionTool(db)
 	srv.AddTool(setUniswapVersionTool, setUniswapVersionHandler)
+
+	getUniswapAddressesTool, getUniswapAddressesHandler := tools.NewGetUniswapAddressesTool(db)
+	srv.AddTool(getUniswapAddressesTool, getUniswapAddressesHandler)
 
 	// Liquidity Management Tools
 	createLiquidityPoolTool, createLiquidityPoolHandler := tools.NewCreateLiquidityPoolTool(db, serverPort)
@@ -105,6 +116,24 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	srv.AddTool(monitorPoolTool, monitorPoolHandler)
 
 	s.server = srv
+}
+
+func (s *MCPServer) SendMessageToAiClient(messages []mcp.SamplingMessage) error {
+	samplingRequest := mcp.CreateMessageRequest{
+		CreateMessageParams: mcp.CreateMessageParams{
+			Messages: messages,
+		},
+	}
+
+	samplingCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	serverFromCtx := server.ServerFromContext(samplingCtx)
+	_, err := serverFromCtx.RequestSampling(samplingCtx, samplingRequest)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func getToolInstructions(category string) string {
@@ -137,39 +166,45 @@ func getToolInstructions(category string) string {
 		return `Deployment Tools:
 
 1. launch - Generate deployment URL with signing interface
-   Usage: Deploy contracts through a web interface that opens for wallet signing`
+   Usage: Deploy contracts through a web interface that opens for wallet signing
+
+2. list_deployments - List all token deployments with filtering options
+   Usage: View all deployed contracts with status, addresses, and transaction details`
 
 	case "uniswap":
 		return `Uniswap Integration Tools:
 
-1. set_uniswap_version - Configure Uniswap version (v2/v3/v4)
-   Usage: Set which Uniswap version to use for operations
+1. set_uniswap_version - Configure Uniswap version and contract addresses
+   Usage: Set Uniswap version (v2/v3/v4) and all required contract addresses
 
-2. create_liquidity_pool - Create new liquidity pool with signing interface
+2. get_uniswap_addresses - Get current Uniswap configuration
+   Usage: Retrieve the active Uniswap version and contract addresses
+
+3. create_liquidity_pool - Create new liquidity pool with signing interface
    Usage: Initialize new trading pairs on Uniswap
 
-3. add_liquidity - Add liquidity to existing pool with signing interface
+4. add_liquidity - Add liquidity to existing pool with signing interface
    Usage: Provide liquidity to earn trading fees
 
-4. remove_liquidity - Remove liquidity from pool with signing interface
+5. remove_liquidity - Remove liquidity from pool with signing interface
    Usage: Withdraw liquidity positions
 
-5. swap_tokens - Execute token swaps with signing interface
+6. swap_tokens - Execute token swaps with signing interface
    Usage: Trade tokens through Uniswap
 
-6. get_pool_info - Retrieve pool metrics (read-only)
+7. get_pool_info - Retrieve pool metrics (read-only)
    Usage: Get current pool statistics and information
 
-7. get_swap_quote - Get swap estimates and price impact (read-only)
+8. get_swap_quote - Get swap estimates and price impact (read-only)
    Usage: Calculate swap amounts and price impact before trading
 
-8. monitor_pool - Real-time pool monitoring and event tracking (read-only)
+9. monitor_pool - Real-time pool monitoring and event tracking (read-only)
    Usage: Track pool activity and events`
 
 	case "all":
 		return `Crypto Launchpad MCP Tools Overview:
 
-This MCP server provides 15 tools for managing cryptocurrency token deployments and Uniswap operations:
+This MCP server provides 17 tools for managing cryptocurrency token deployments and Uniswap operations:
 
 CHAIN MANAGEMENT (2 tools):
 - select_chain: Switch between ethereum/solana
@@ -181,11 +216,13 @@ TEMPLATE MANAGEMENT (4 tools):
 - update_template: Modify existing templates
 - delete_template: Delete templates by ID(s)
 
-DEPLOYMENT (1 tool):
+DEPLOYMENT (2 tools):
 - launch: Deploy contracts via web interface
+- list_deployments: View all deployed contracts
 
-UNISWAP INTEGRATION (8 tools):
-- set_uniswap_version: Configure Uniswap version
+UNISWAP INTEGRATION (9 tools):
+- set_uniswap_version: Configure Uniswap version and addresses
+- get_uniswap_addresses: Get current Uniswap configuration
 - create_liquidity_pool: Create new pools
 - add_liquidity: Provide liquidity
 - remove_liquidity: Withdraw liquidity
@@ -204,4 +241,43 @@ No private keys are handled by the server - all signing is client-side.`
 
 func (s *MCPServer) Start() error {
 	return server.ServeStdio(s.server)
+}
+
+// GetDatabase returns the database instance used by the MCP server
+func (s *MCPServer) GetDatabase() *database.Database {
+	return s.db
+}
+
+// CallMCPMethod provides a way to execute MCP tool functionality from the API server
+// This is a helper method that demonstrates how to access MCP functionality
+func (s *MCPServer) CallMCPMethod(method string, params map[string]interface{}) (interface{}, error) {
+	switch method {
+	case "list_templates":
+		// Example: get templates by chain type
+		chainType, ok := params["chain_type"].(string)
+		if !ok {
+			chainType = ""
+		}
+		keyword, _ := params["keyword"].(string)
+		limit, ok := params["limit"].(int)
+		if !ok {
+			limit = 0 // 0 means no limit
+		}
+		return s.db.ListTemplates(chainType, keyword, limit)
+
+	case "list_deployments":
+		// Example: get all deployments
+		return s.db.ListDeployments()
+
+	case "get_active_chain":
+		// Example: get active chain configuration
+		return s.db.GetActiveChain()
+
+	case "list_chains":
+		// Example: get all chain configurations
+		return s.db.ListChains()
+
+	default:
+		return nil, fmt.Errorf("unsupported MCP method: %s", method)
+	}
 }

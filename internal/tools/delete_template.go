@@ -69,10 +69,10 @@ func NewDeleteTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 
 		if len(existingTemplates) == 0 {
 			result := map[string]interface{}{
-				"requested_ids":   ids,
-				"deleted_count":   0,
-				"not_found_ids":   ids,
-				"message":         "No templates found with the provided IDs",
+				"requested_ids": ids,
+				"deleted_count": 0,
+				"not_found_ids": ids,
+				"message":       "No templates found with the provided IDs",
 			}
 			resultJSON, _ := json.Marshal(result)
 			return mcp.NewToolResultText(fmt.Sprintf("No templates deleted: %s", string(resultJSON))), nil

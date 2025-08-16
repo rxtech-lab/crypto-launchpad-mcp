@@ -51,11 +51,17 @@ type Deployment struct {
 
 // UniswapSettings represents Uniswap version and configuration
 type UniswapSettings struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Version   string    `gorm:"not null" json:"version"` // v2, v3, v4
-	IsActive  bool      `gorm:"default:false" json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	Version         string    `gorm:"not null" json:"version"` // v2, v3, v4
+	RouterAddress   string    `json:"router_address"`          // Uniswap router contract address
+	FactoryAddress  string    `json:"factory_address"`         // Uniswap factory contract address
+	WETHAddress     string    `json:"weth_address"`            // WETH contract address
+	QuoterAddress   string    `json:"quoter_address"`          // v3/v4 quoter contract address (optional)
+	PositionManager string    `json:"position_manager"`        // v3/v4 position manager address (optional)
+	SwapRouter02    string    `json:"swap_router02"`           // v3/v4 SwapRouter02 address (optional)
+	IsActive        bool      `gorm:"default:false" json:"is_active"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // LiquidityPool represents created pool information

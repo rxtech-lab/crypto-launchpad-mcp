@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"testing"
 	"time"
@@ -167,6 +168,25 @@ func TestAPIServer_TemplateWorkflow(t *testing.T) {
 
 	// 4. Test transaction confirmation
 	t.Run("TransactionConfirmation", func(t *testing.T) {
+		// Skip this test if anvil is not running
+		err := setup.VerifyEthereumConnection()
+		if err != nil {
+			t.Skipf("Skipping test: %v", err)
+			return
+		}
+
+		// Deploy a real contract to get a real transaction hash
+		account := setup.GetPrimaryTestAccount()
+		result, err := setup.DeployContract(
+			account,
+			GetSimpleERC20Contract(),
+			"SimpleERC20",
+			"APITestToken",     // name
+			"API",              // symbol
+			big.NewInt(100000), // totalSupply
+		)
+		require.NoError(t, err)
+
 		// Create a session for confirmation testing
 		sessionID, err := setup.DB.CreateTransactionSession(
 			"deploy",
@@ -176,10 +196,11 @@ func TestAPIServer_TemplateWorkflow(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		// Test successful confirmation
+		// Test successful confirmation with real transaction hash
 		confirmURL := fmt.Sprintf("/api/deploy/%s/confirm", sessionID)
 		confirmData := map[string]string{
-			"transaction_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			"transaction_hash": result.TransactionHash.Hex(),
+			"contract_address": result.ContractAddress.Hex(),
 			"status":           "confirmed",
 		}
 
@@ -207,6 +228,8 @@ func TestAPIServer_TemplateWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "confirmed", session.Status)
 		assert.Equal(t, confirmData["transaction_hash"], session.TransactionHash)
+
+		t.Logf("✓ Successfully confirmed transaction %s", result.TransactionHash.Hex())
 	})
 }
 

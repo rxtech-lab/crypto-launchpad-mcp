@@ -2,8 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // handleDeploymentPage serves the deployment signing page
@@ -104,15 +107,35 @@ func (s *APIServer) handleDeploymentConfirm(c *fiber.Ctx) error {
 		return c.Status(500).JSON(map[string]string{"error": "Failed to update session"})
 	}
 
-	// If confirmed, update deployment record
+	// If confirmed, verify transaction on-chain and update deployment record
 	if body.Status == "confirmed" && body.TransactionHash != "" {
 		session, err := s.db.GetTransactionSession(sessionID)
 		if err == nil {
 			var transactionData map[string]interface{}
 			if err := json.Unmarshal([]byte(session.TransactionData), &transactionData); err == nil {
 				if deploymentID, ok := transactionData["deployment_id"].(float64); ok {
-					// Update deployment with transaction hash and contract address
+					// Verify transaction on-chain before marking as confirmed
+					if err := s.verifyTransactionOnChain(body.TransactionHash, session.ChainID); err != nil {
+						log.Printf("Transaction verification failed for %s: %v", body.TransactionHash, err)
+						// Update deployment status as failed due to verification failure
+						s.db.UpdateDeploymentStatus(uint(deploymentID), "failed", "", body.TransactionHash)
+						return c.Status(400).JSON(map[string]string{"error": "Transaction verification failed: " + err.Error()})
+					}
+
+					// Transaction verified successfully - update deployment
 					s.db.UpdateDeploymentStatus(uint(deploymentID), "confirmed", body.ContractAddress, body.TransactionHash)
+					s.mcpServer.SendMessageToAiClient(
+						[]mcp.SamplingMessage{
+							{
+								Role: "user",
+								Content: mcp.TextContent{
+									Text: fmt.Sprintf("Deployment %d confirmed with transaction %s", uint(deploymentID), body.TransactionHash),
+									Type: "text",
+								},
+							},
+						},
+					)
+					log.Printf("Deployment %d confirmed with transaction %s", uint(deploymentID), body.TransactionHash)
 				}
 			}
 		}

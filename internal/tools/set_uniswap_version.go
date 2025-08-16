@@ -12,10 +12,31 @@ import (
 
 func NewSetUniswapVersionTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("set_uniswap_version",
-		mcp.WithDescription("Set Uniswap version for liquidity operations. Stores version in database as active configuration. Currently only v2 is fully supported."),
+		mcp.WithDescription("Set Uniswap version and contract addresses for liquidity operations. Stores configuration in database as active setting."),
 		mcp.WithString("version",
 			mcp.Required(),
-			mcp.Description("Uniswap version to use (v2, v3, v4). Currently only v2 is fully supported"),
+			mcp.Description("Uniswap version to use (v2, v3, v4)"),
+		),
+		mcp.WithString("router_address",
+			mcp.Required(),
+			mcp.Description("Uniswap router contract address"),
+		),
+		mcp.WithString("factory_address",
+			mcp.Required(),
+			mcp.Description("Uniswap factory contract address"),
+		),
+		mcp.WithString("weth_address",
+			mcp.Required(),
+			mcp.Description("WETH contract address"),
+		),
+		mcp.WithString("quoter_address",
+			mcp.Description("Quoter contract address (required for v3/v4, optional for v2)"),
+		),
+		mcp.WithString("position_manager",
+			mcp.Description("Position manager contract address (required for v3/v4, optional for v2)"),
+		),
+		mcp.WithString("swap_router02",
+			mcp.Description("SwapRouter02 contract address (optional for v3/v4)"),
 		),
 	)
 
@@ -24,6 +45,26 @@ func NewSetUniswapVersionTool(db *database.Database) (mcp.Tool, server.ToolHandl
 		if err != nil {
 			return nil, fmt.Errorf("version parameter is required: %w", err)
 		}
+
+		routerAddress, err := request.RequireString("router_address")
+		if err != nil {
+			return nil, fmt.Errorf("router_address parameter is required: %w", err)
+		}
+
+		factoryAddress, err := request.RequireString("factory_address")
+		if err != nil {
+			return nil, fmt.Errorf("factory_address parameter is required: %w", err)
+		}
+
+		wethAddress, err := request.RequireString("weth_address")
+		if err != nil {
+			return nil, fmt.Errorf("weth_address parameter is required: %w", err)
+		}
+
+		// Optional parameters
+		quoterAddress := request.GetString("quoter_address", "")
+		positionManager := request.GetString("position_manager", "")
+		swapRouter02 := request.GetString("swap_router02", "")
 
 		// Validate version
 		validVersions := []string{"v2", "v3", "v4"}
@@ -44,18 +85,22 @@ func NewSetUniswapVersionTool(db *database.Database) (mcp.Tool, server.ToolHandl
 			}, nil
 		}
 
-		// Show warning for v3 and v4
-		var warning string
-		if version == "v3" || version == "v4" {
-			warning = fmt.Sprintf("Warning: %s support is experimental. Only v2 is fully supported.", version)
-		}
-
-		// Set the Uniswap version
-		if err := db.SetUniswapVersion(version); err != nil {
+		// Validate v3/v4 requirements
+		if (version == "v3" || version == "v4") && (quoterAddress == "" || positionManager == "") {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error setting Uniswap version: %v", err)),
+					mcp.NewTextContent("quoter_address and position_manager are required for v3/v4"),
+				},
+			}, nil
+		}
+
+		// Set the Uniswap configuration
+		if err := db.SetUniswapConfiguration(version, routerAddress, factoryAddress, wethAddress, quoterAddress, positionManager, swapRouter02); err != nil {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.NewTextContent("Error: "),
+					mcp.NewTextContent(fmt.Sprintf("Error setting Uniswap configuration: %v", err)),
 				},
 			}, nil
 		}
@@ -72,14 +117,16 @@ func NewSetUniswapVersionTool(db *database.Database) (mcp.Tool, server.ToolHandl
 		}
 
 		result := map[string]interface{}{
-			"version":    settings.Version,
-			"is_active":  settings.IsActive,
-			"created_at": settings.CreatedAt,
-			"message":    fmt.Sprintf("Successfully set Uniswap version to %s", version),
-		}
-
-		if warning != "" {
-			result["warning"] = warning
+			"version":          settings.Version,
+			"router_address":   settings.RouterAddress,
+			"factory_address":  settings.FactoryAddress,
+			"weth_address":     settings.WETHAddress,
+			"quoter_address":   settings.QuoterAddress,
+			"position_manager": settings.PositionManager,
+			"swap_router02":    settings.SwapRouter02,
+			"is_active":        settings.IsActive,
+			"created_at":       settings.CreatedAt,
+			"message":          fmt.Sprintf("Successfully configured Uniswap %s with contract addresses", version),
 		}
 
 		resultJSON, _ := json.Marshal(result)

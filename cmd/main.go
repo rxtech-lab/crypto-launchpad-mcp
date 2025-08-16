@@ -75,6 +75,9 @@ func main() {
 	// Initialize MCP server with the API server port
 	mcpServer := mcp.NewMCPServer(db, port)
 
+	// Set MCP server reference in API server for cross-communication
+	apiServer.SetMCPServer(mcpServer)
+
 	// Start MCP server in a goroutine
 	go func() {
 		if err := mcpServer.Start(); err != nil {

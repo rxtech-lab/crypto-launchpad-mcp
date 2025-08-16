@@ -3,6 +3,8 @@ package e2e
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -12,13 +14,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rxtech-lab/launchpad-mcp/internal/api"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -105,6 +110,10 @@ func (s *TestSetup) initTestAccounts() {
 		chainID := big.NewInt(31337) // Anvil default
 		auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
 		require.NoError(s.t, err)
+
+		// Set reasonable gas limit and price for tests
+		auth.GasLimit = 5000000
+		auth.GasPrice = big.NewInt(1000000000) // 1 gwei
 
 		testAccount := &TestAccount{
 			PrivateKey: privateKey,
@@ -204,21 +213,21 @@ func (s *TestSetup) VerifyEthereumConnection() error {
 }
 
 // WaitForTransaction waits for a transaction to be mined
-func (s *TestSetup) WaitForTransaction(txHash common.Hash, timeout time.Duration) error {
+func (s *TestSetup) WaitForTransaction(txHash common.Hash, timeout time.Duration) (*types.Receipt, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for transaction %s", txHash.Hex())
+			return nil, fmt.Errorf("timeout waiting for transaction %s", txHash.Hex())
 		default:
 			receipt, err := s.EthClient.TransactionReceipt(ctx, txHash)
 			if err == nil {
 				if receipt.Status == 1 {
-					return nil
+					return receipt, nil
 				}
-				return fmt.Errorf("transaction %s failed", txHash.Hex())
+				return receipt, fmt.Errorf("transaction %s failed", txHash.Hex())
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -248,4 +257,137 @@ func (s *TestSetup) AssertServerHealth() {
 	defer resp.Body.Close()
 
 	require.Equal(s.t, http.StatusOK, resp.StatusCode)
+}
+
+// DeployContractResult holds the result of a contract deployment
+type DeployContractResult struct {
+	ContractAddress common.Address
+	TransactionHash common.Hash
+	Receipt         *types.Receipt
+	ABI             abi.ABI
+	BoundContract   *bind.BoundContract
+}
+
+// DeployContract compiles and deploys a Solidity contract to the testnet
+func (s *TestSetup) DeployContract(account *TestAccount, contractCode, contractName string, constructorArgs ...interface{}) (*DeployContractResult, error) {
+	ctx := context.Background()
+
+	// Compile the Solidity contract
+	compilationResult, err := utils.CompileSolidity("0.8.19", contractCode)
+	if err != nil {
+		return nil, fmt.Errorf("compilation failed: %w", err)
+	}
+
+	if _, exists := compilationResult.Bytecode[contractName]; !exists {
+		return nil, fmt.Errorf("contract %s not found in compilation result", contractName)
+	}
+
+	// Get bytecode and ABI for deployment
+	bytecodeHex := compilationResult.Bytecode[contractName]
+	bytecode, err := hex.DecodeString(strings.TrimPrefix(bytecodeHex, "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode bytecode: %w", err)
+	}
+
+	// Parse ABI - the compilation result returns ABI as an array, not object
+	abiData := compilationResult.Abi[contractName]
+	abiBytes, err := json.Marshal(abiData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal ABI: %w", err)
+	}
+	parsedABI, err := abi.JSON(strings.NewReader(string(abiBytes)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+
+	// Pack constructor arguments if provided
+	var constructorData []byte
+	if len(constructorArgs) > 0 {
+		constructorData, err = parsedABI.Pack("", constructorArgs...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to pack constructor arguments: %w", err)
+		}
+	}
+
+	// Combine bytecode with constructor arguments
+	fullBytecode := append(bytecode, constructorData...)
+
+	// Create deployment transaction
+	nonce, err := s.EthClient.PendingNonceAt(ctx, account.Address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get nonce: %w", err)
+	}
+
+	gasPrice, err := s.EthClient.SuggestGasPrice(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get gas price: %w", err)
+	}
+
+	// Estimate gas for deployment (generous limit)
+	gasLimit := uint64(5000000)
+
+	tx := types.NewContractCreation(nonce, big.NewInt(0), gasLimit, gasPrice, fullBytecode)
+
+	// Sign and send transaction
+	chainID := big.NewInt(31337)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), account.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
+	err = s.EthClient.SendTransaction(ctx, signedTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send transaction: %w", err)
+	}
+
+	// Wait for transaction to be mined
+	receipt, err := bind.WaitMined(ctx, s.EthClient, signedTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for transaction: %w", err)
+	}
+
+	if receipt.Status != 1 {
+		return nil, fmt.Errorf("transaction failed with status %d", receipt.Status)
+	}
+
+	// Create bound contract for easy interaction
+	boundContract := bind.NewBoundContract(receipt.ContractAddress, parsedABI, s.EthClient, s.EthClient, s.EthClient)
+
+	return &DeployContractResult{
+		ContractAddress: receipt.ContractAddress,
+		TransactionHash: signedTx.Hash(),
+		Receipt:         receipt,
+		ABI:             parsedABI,
+		BoundContract:   boundContract,
+	}, nil
+}
+
+// CallContractView calls a view function on a deployed contract
+func (s *TestSetup) CallContractView(result *DeployContractResult, functionName string, args ...interface{}) ([]interface{}, error) {
+	var output []interface{}
+	err := result.BoundContract.Call(&bind.CallOpts{}, &output, functionName, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call %s: %w", functionName, err)
+	}
+	return output, nil
+}
+
+// CallContractTx sends a transaction to a deployed contract
+func (s *TestSetup) CallContractTx(account *TestAccount, result *DeployContractResult, functionName string, args ...interface{}) (*types.Receipt, error) {
+	tx, err := result.BoundContract.Transact(account.Auth, functionName, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send transaction to %s: %w", functionName, err)
+	}
+
+	ctx := context.Background()
+	receipt, err := bind.WaitMined(ctx, s.EthClient, tx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for transaction: %w", err)
+	}
+
+	if receipt.Status != 1 {
+		return nil, fmt.Errorf("transaction failed with status %d", receipt.Status)
+	}
+
+	return receipt, nil
 }

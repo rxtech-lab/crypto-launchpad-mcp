@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +29,7 @@ func main() {
 		return nil
 	})
 	if err != nil {
-		fmt.Printf("Error walking directory: %v\n", err)
+		log.Printf("Error walking directory: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -53,9 +54,9 @@ import "embed"
 	// Write the file
 	err = os.WriteFile(outputFile, []byte(content), 0644)
 	if err != nil {
-		fmt.Printf("Error writing file: %v\n", err)
+		log.Printf("Error writing file: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Generated %s with %d embedded contracts\n", outputFile, len(embedPaths))
+	log.Printf("Generated %s with %d embedded contracts\n", outputFile, len(embedPaths))
 }

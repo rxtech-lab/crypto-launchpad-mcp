@@ -17,6 +17,7 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 ## Key Components
 
 ### Data Models
+
 - Chain configurations (blockchain RPC endpoints and chain IDs)
 - Smart contract templates by chain type (Ethereum/Solana)
 - Deployment records with transaction tracking
@@ -27,19 +28,23 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 ### MCP Tools (15 total)
 
 #### Chain Management (2 tools)
+
 - `select_chain` - Select active blockchain (ethereum/solana)
 - `set_chain` - Configure blockchain RPC and chain ID
 
 #### Template Management (4 tools)
+
 - `list_template` - List smart contract templates with search
 - `create_template` - Create new contract template with validation
 - `update_template` - Update existing template
 - `delete_template` - Delete templates by ID(s) with bulk deletion support
 
 #### Deployment (1 tool)
+
 - `launch` - Generate deployment URL with signing interface
 
 #### Uniswap Integration (8 tools)
+
 - `set_uniswap_version` - Configure Uniswap version (v2/v3/v4)
 - `create_liquidity_pool` - Create new liquidity pool with signing interface
 - `add_liquidity` - Add liquidity to existing pool with signing interface
@@ -50,6 +55,7 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 - `monitor_pool` - Real-time pool monitoring and event tracking (read-only)
 
 ### Transaction Signing Workflow
+
 1. AI tool creates transaction session in database
 2. Tool generates unique URL with session ID
 3. User opens URL in browser
@@ -89,6 +95,7 @@ make sec         # Run security scan with gosec
 ```
 
 ### Build System Features
+
 - **Version Information**: Build flags inject version, commit hash, and build time
 - **Cross-Platform Builds**: Support for darwin/linux/windows on amd64/arm64
 - **Code Signing**: macOS code signing with hardened runtime (requires certificates)
@@ -135,23 +142,28 @@ make sec         # Run security scan with gosec
 ## Architecture Decisions
 
 ### Database Design
+
 - **SQLite**: Local database for easy deployment and development
 - **GORM**: Type-safe ORM with automatic migrations
 - **Session Management**: 30-minute expiry for security
 
 ### HTTP Server Design
+
 - **Random Port**: Uses `net.Listen("tcp", ":0")` for automatic port assignment
 - **Session-based URLs**: Unique URLs for each transaction signing session
 - **RESTful API**: Clean separation between page serving and API endpoints
 
 ### Frontend Design
+
 - **EIP-6963**: Standard wallet discovery for maximum compatibility
 - **Progressive Enhancement**: Works without JavaScript for basic functionality
 - **Responsive Design**: Tailwind CSS for mobile-friendly interfaces
 - **Embedded Assets**: HTML templates and JavaScript assets embedded using Go's embed directive
 
 ### Tool Implementation Pattern
+
 All tools follow the exact structure from the example project:
+
 - Package `tools`
 - Function signature: `func NewXxxTool(db *database.Database, ...params) (mcp.Tool, server.ToolHandlerFunc)`
 - Parameter validation with required/optional parameters
@@ -159,6 +171,7 @@ All tools follow the exact structure from the example project:
 - JSON response formatting
 
 ### Asset Management
+
 - **Embedded Templates**: HTML templates stored in `internal/assets/` and embedded at compile time
 - **Template Engine**: Go's `text/template` package for dynamic content rendering
 - **Static Assets**: JavaScript files embedded and served via HTTP endpoints
@@ -182,19 +195,23 @@ All tools follow the exact structure from the example project:
 ## CI/CD and Release Process
 
 ### Continuous Integration
+
 - **GitHub Actions**: Automated testing on push/PR to main/develop branches
 - **Multi-Platform Testing**: Tests run on ubuntu-latest with Go 1.24
 - **Code Quality**: Formatting checks, linting, and security scanning
 - **Build Verification**: Cross-platform binary compilation
 
 ### Release Automation
+
 - **Semantic Versioning**: Automated version bumping based on commit messages
 - **Cross-Platform Builds**: Binaries for darwin/linux/windows (amd64/arm64)
 - **macOS Distribution**: Code-signed and notarized .pkg installer
 - **GitHub Releases**: Automatic asset uploads and release notes
 
 ### Code Signing and Notarization
+
 Required environment variables for production builds:
+
 ```bash
 # Code Signing (macOS)
 SIGNING_CERTIFICATE_NAME="Developer ID Application: Your Name"
@@ -214,6 +231,7 @@ P12_PASSWORD="certificate-password"
 ## Testing Strategy
 
 Write comprehensive tests for:
+
 - MCP tool implementations and parameter validation
 - Database operations and model relationships
 - Transaction session management
@@ -224,9 +242,10 @@ Write comprehensive tests for:
 
 ## OpenZeppelin Contracts Integration
 
-The project uses OpenZeppelin contracts as a git submodule located at `internal/contracts/openzeppelin-contracts/`. 
+The project uses OpenZeppelin contracts as a git submodule located at `internal/contracts/openzeppelin-contracts/`.
 
 ### Git Submodule Setup
+
 ```bash
 # Initialize and update the submodule
 git submodule init
@@ -237,6 +256,7 @@ git clone --recurse-submodules <repository-url>
 ```
 
 ### Embedding Contracts
+
 The OpenZeppelin contracts are embedded in the Go binary using Go's embed directive. The embedding is automated through code generation:
 
 1. **Generate embed directives**: Run `make generate` to scan all `.sol` files in the OpenZeppelin contracts submodule and generate the appropriate `//go:embed` directives in `internal/contracts/contracts.go`.
@@ -246,6 +266,7 @@ The OpenZeppelin contracts are embedded in the Go binary using Go's embed direct
 3. **Build Integration**: The generation step should be run whenever the OpenZeppelin submodule is updated or when setting up the project for the first time.
 
 ### Usage in Solidity Compilation
+
 The `utils/solidity.go` file includes an import callback for `@openzeppelin-contracts/` imports that resolves to the embedded filesystem, enabling seamless compilation of contracts that depend on OpenZeppelin libraries.
 
 ## Key Dependencies
@@ -260,6 +281,7 @@ The `utils/solidity.go` file includes an import callback for `@openzeppelin-cont
 ## Distribution and Installation
 
 ### Development Installation
+
 ```bash
 # Clone and build locally
 git clone <repository-url>
@@ -270,12 +292,15 @@ make install-local  # Installs to /usr/local/bin
 ```
 
 ### Production Distribution
+
 - **macOS**: Download signed .pkg installer from GitHub releases
 - **Linux/Windows**: Download appropriate binary from GitHub releases
 - **Manual Install**: Use `make install-local` after building from source
 
 ### Claude Desktop Integration
+
 Add to Claude Desktop MCP configuration:
+
 ```json
 {
   "launchpad-mcp": {
@@ -288,6 +313,7 @@ Add to Claude Desktop MCP configuration:
 ## Extension Points
 
 The architecture supports easy extension for:
+
 - Additional blockchain networks (Polygon, BSC, etc.)
 - More Uniswap versions (v3, v4 with concentrated liquidity)
 - Additional DEX integrations (SushiSwap, PancakeSwap)
@@ -296,3 +322,7 @@ The architecture supports easy extension for:
 - Multi-sig wallet support
 - Custom deployment templates and validation rules
 - Real-time price feeds and market data integration
+
+# Code guideline
+
+1. Never use fmt.Println to log something

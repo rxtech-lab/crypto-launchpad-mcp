@@ -75,7 +75,7 @@ func CompileSolidity(version string, code string) (CompilationResult, error) {
 		}
 		for contractName, contract := range contract {
 			bytecode := contract.EVM.Bytecode.Object
-			abi := contract.ABI[0]
+			abi := contract.ABI // Store the full ABI array, not just the first element
 
 			bytecodeMap[contractName] = bytecode
 			abiMap[contractName] = abi

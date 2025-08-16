@@ -32,7 +32,6 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			mcp.Required(),
 			mcp.Description("The smart contract source code template"),
 		),
-
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
