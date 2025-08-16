@@ -44,6 +44,7 @@ func (d *Database) migrate() error {
 		&models.Template{},
 		&models.Deployment{},
 		&models.UniswapSettings{},
+		&models.UniswapDeployment{},
 		&models.LiquidityPool{},
 		&models.LiquidityPosition{},
 		&models.SwapTransaction{},
@@ -367,6 +368,68 @@ func (d *Database) UpdateTransactionSessionStatus(sessionID, status, txHash stri
 	}
 
 	return d.DB.Model(&models.TransactionSession{}).Where("id = ?", sessionID).Updates(updates).Error
+}
+
+// UniswapDeployment operations
+func (d *Database) CreateUniswapDeployment(deployment *models.UniswapDeployment) error {
+	return d.DB.Create(deployment).Error
+}
+
+func (d *Database) GetUniswapDeploymentByChain(chainType, chainID string) (*models.UniswapDeployment, error) {
+	var deployment models.UniswapDeployment
+	err := d.DB.Where("chain_type = ? AND chain_id = ? AND status = ?", chainType, chainID, "confirmed").First(&deployment).Error
+	if err != nil {
+		return nil, err
+	}
+	return &deployment, nil
+}
+
+func (d *Database) GetUniswapDeploymentByID(id uint) (*models.UniswapDeployment, error) {
+	var deployment models.UniswapDeployment
+	err := d.DB.First(&deployment, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &deployment, nil
+}
+
+func (d *Database) UpdateUniswapDeploymentStatus(id uint, status string, addresses map[string]string, txHashes map[string]string) error {
+	updates := map[string]interface{}{
+		"status": status,
+	}
+
+	// Update addresses if provided
+	if factoryAddr, ok := addresses["factory"]; ok && factoryAddr != "" {
+		updates["factory_address"] = factoryAddr
+	}
+	if routerAddr, ok := addresses["router"]; ok && routerAddr != "" {
+		updates["router_address"] = routerAddr
+	}
+	if wethAddr, ok := addresses["weth"]; ok && wethAddr != "" {
+		updates["weth_address"] = wethAddr
+	}
+	if deployerAddr, ok := addresses["deployer"]; ok && deployerAddr != "" {
+		updates["deployer_address"] = deployerAddr
+	}
+
+	// Update transaction hashes if provided
+	if factoryTx, ok := txHashes["factory"]; ok && factoryTx != "" {
+		updates["factory_tx_hash"] = factoryTx
+	}
+	if routerTx, ok := txHashes["router"]; ok && routerTx != "" {
+		updates["router_tx_hash"] = routerTx
+	}
+	if wethTx, ok := txHashes["weth"]; ok && wethTx != "" {
+		updates["weth_tx_hash"] = wethTx
+	}
+
+	return d.DB.Model(&models.UniswapDeployment{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func (d *Database) ListUniswapDeployments() ([]models.UniswapDeployment, error) {
+	var deployments []models.UniswapDeployment
+	err := d.DB.Find(&deployments).Error
+	return deployments, err
 }
 
 func (d *Database) Close() error {

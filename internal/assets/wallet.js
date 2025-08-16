@@ -20,11 +20,17 @@ class WalletManager {
     window.dispatchEvent(new Event("eip6963:requestProvider"));
   }
 
-  updateWalletList() {
+  updateWalletList(retryCount = 0) {
     console.log("Updating wallet list...");
     const walletSelect = document.getElementById("wallet-select");
     if (!walletSelect) {
-      console.warn("wallet-select element not found");
+      if (retryCount < 10) { // Limit retries to prevent infinite loop
+        console.warn(`wallet-select element not found - retry ${retryCount + 1}/10`);
+        // Retry after a short delay in case the element is being created
+        setTimeout(() => this.updateWalletList(retryCount + 1), 100);
+      } else {
+        console.warn("wallet-select element not found after 10 retries");
+      }
       return;
     }
 
@@ -277,6 +283,9 @@ class TransactionManager {
       case "deploy":
         detailsHTML = this.generateDeploymentDetails(transaction_data);
         break;
+      case "deploy_uniswap":
+        detailsHTML = this.generateUniswapDeploymentDetails(transaction_data);
+        break;
       case "create_pool":
         detailsHTML = this.generateCreatePoolDetails(transaction_data);
         break;
@@ -289,6 +298,10 @@ class TransactionManager {
       case "swap":
         detailsHTML = this.generateSwapDetails(transaction_data);
         break;
+      case "balance_query":
+        // Balance query doesn't need transaction details, handle it differently
+        this.handleBalanceQuery();
+        return;
       default:
         detailsHTML = '<p class="text-red-600">Unknown transaction type</p>';
     }
@@ -403,6 +416,62 @@ class TransactionManager {
                 </div>
             </div>
         `;
+  }
+
+  generateUniswapDeploymentDetails(data) {
+    const deploymentData = data.deployment_data;
+    const metadata = data.metadata || [];
+    
+    let metadataHTML = '';
+    metadata.forEach(item => {
+      metadataHTML += `
+        <div class="bg-gray-50 rounded-xl p-4">
+          <span class="text-gray-600 text-sm font-medium">${item.title}</span>
+          <div class="font-semibold text-gray-900 text-lg mt-1">${item.value}</div>
+        </div>
+      `;
+    });
+    
+    return `
+      <div class="space-y-4">
+        <!-- Deployment Overview -->
+        <div class="bg-purple-50 border border-purple-200 rounded-xl p-4">
+          <h3 class="font-semibold text-purple-900 mb-2">Uniswap V2 Infrastructure Deployment</h3>
+          <p class="text-purple-700 text-sm">This will deploy 3 contracts in sequence: WETH9, Factory, and Router</p>
+        </div>
+        
+        <!-- Metadata Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${metadataHTML}
+        </div>
+        
+        <!-- Contract List -->
+        <div class="space-y-3">
+          <h4 class="font-medium text-gray-900">Contracts to Deploy:</h4>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <span class="font-medium">WETH9</span>
+              <span class="text-sm text-gray-600">Wrapped ETH Token</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <span class="font-medium">Factory</span>
+              <span class="text-sm text-gray-600">Pair Creation Contract</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <span class="font-medium">Router</span>
+              <span class="text-sm text-gray-600">Liquidity & Swap Contract</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Gas Estimate -->
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <span class="text-blue-600 text-sm font-medium">Estimated Gas Cost</span>
+          <div class="font-semibold text-blue-900 text-lg mt-1">~0.1 ETH total</div>
+          <p class="text-blue-700 text-xs mt-1">Actual cost depends on network conditions</p>
+        </div>
+      </div>
+    `;
   }
 
   generateCreatePoolDetails(data) {
@@ -582,6 +651,11 @@ class TransactionManager {
       await this.walletManager.switchNetwork(targetChainId);
     }
 
+    // Handle Uniswap deployment differently
+    if (this.sessionData.session_type === "deploy_uniswap") {
+      return await this.executeUniswapDeployment();
+    }
+
     // Prepare transaction based on type
     const transactionData = this.prepareTransactionData();
 
@@ -656,9 +730,14 @@ class TransactionManager {
   }
 
   prepareTransactionData() {
-    const { transaction_data } = this.sessionData;
+    const { transaction_data, session_type } = this.sessionData;
 
-    // This is a simplified transaction preparation
+    // Handle Uniswap deployment differently
+    if (session_type === "deploy_uniswap") {
+      return this.prepareUniswapDeploymentData();
+    }
+
+    // This is a simplified transaction preparation for regular deployments
     // In a real implementation, this would use proper contract ABIs and encoding
     return {
       from: this.walletManager.getAccount(),
@@ -670,6 +749,78 @@ class TransactionManager {
       gasPrice: "0x9184e72a000", // 10 gwei
       data: "0x", // Contract data would be encoded here
     };
+  }
+
+  prepareUniswapDeploymentData() {
+    const { deployment_data } = this.sessionData;
+    
+    // For Uniswap deployment, we return the deployment data structure
+    // This will be handled by custom deployment logic
+    return {
+      type: "uniswap_deployment",
+      contracts: deployment_data || {},
+      from: this.walletManager.getAccount(),
+      gas: "0x186a0", // 100000 gas limit per contract
+      gasPrice: "0x9184e72a000", // 10 gwei
+    };
+  }
+
+  async executeUniswapDeployment() {
+    const { deployment_data } = this.sessionData;
+    
+    // For now, return mock data to test the interface
+    // In a real implementation, this would deploy each contract in sequence
+    const mockResult = {
+      success: true,
+      contractAddresses: {
+        weth: "0x1234567890123456789012345678901234567890",
+        factory: "0x2345678901234567890123456789012345678901", 
+        router: "0x3456789012345678901234567890123456789012"
+      },
+      transactionHashes: {
+        weth: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+        factory: "0xbcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890a",
+        router: "0xcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab"
+      }
+    };
+
+    // Update session with multiple contract addresses and transaction hashes
+    await this.updateUniswapSessionStatus(mockResult);
+    
+    return mockResult;
+  }
+
+  async updateUniswapSessionStatus(deploymentResult) {
+    const requestBody = {
+      transaction_hashes: deploymentResult.transactionHashes,
+      contract_addresses: deploymentResult.contractAddresses,
+      deployer_address: this.walletManager.getAccount(),
+      status: "confirmed"
+    };
+
+    try {
+      let apiUrl = `/api${window.location.pathname}/confirm`;
+      console.log(`Updating Uniswap deployment status at: ${apiUrl}`);
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Uniswap deployment status updated successfully:", result);
+      return result;
+    } catch (error) {
+      console.error("Failed to update Uniswap deployment status:", error);
+      throw error;
+    }
   }
 
   async updateSessionStatus(txHash, status, contractAddress = null) {
@@ -728,6 +879,120 @@ class TransactionManager {
       throw error;
     }
   }
+
+  async handleBalanceQuery() {
+    console.log("Handling balance query session");
+    
+    // Always initialize the wallet interface first for balance queries
+    await this.initializeBalanceSession();
+    
+    // Check if we already have balance data from the server
+    if (this.sessionData.balance_data) {
+      // Display the balance data immediately
+      if (typeof updateBalance === 'function') {
+        updateBalance(this.sessionData.balance_data);
+      }
+      return;
+    }
+
+    // Check if a wallet address is already provided
+    const walletAddress = this.sessionData.wallet_address;
+    
+    if (walletAddress && walletAddress !== "") {
+      // Auto-fetch balance data if wallet address is provided
+      // But still show the wallet interface for manual refresh option
+      setTimeout(() => {
+        this.fetchBalanceData(walletAddress);
+      }, 500);
+    }
+  }
+
+  async initializeBalanceSession() {
+    const contentElement = document.getElementById("content");
+    if (!contentElement) return;
+
+    contentElement.innerHTML = `
+      <div class="max-w-2xl mx-auto space-y-6 p-6">
+        <!-- Header -->
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+          </div>
+          <h2 class="text-xl font-semibold text-gray-900 mb-2">Connect Your Wallet</h2>
+          <p class="text-gray-600 text-sm mb-6">Connect your wallet to view your balance</p>
+        </div>
+
+        <!-- Wallet Selection -->
+        <div class="space-y-4">
+          <div>
+            <label for="wallet-select" class="block text-sm font-medium text-gray-700 mb-2">Select Wallet</label>
+            <select id="wallet-select" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">Loading wallets...</option>
+            </select>
+          </div>
+          
+          <button id="connect-button" onclick="connectWallet()" class="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-medium hover:bg-blue-700 active:bg-blue-800 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg">
+            Connect Wallet
+          </button>
+        </div>
+
+        <!-- Connection Status -->
+        <div id="connection-status"></div>
+
+        <!-- Fetch Balance Button (replaces sign button for balance queries) -->
+        <button id="sign-button" onclick="fetchBalanceFromWallet()" style="display: none;" class="w-full bg-green-600 text-white py-4 px-6 rounded-xl font-medium hover:bg-green-700 active:bg-green-800 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg">
+          Fetch Balance
+        </button>
+      </div>
+    `;
+
+    // Update wallet manager to show correct UI elements
+    this.walletManager.updateConnectionStatus();
+  }
+
+  async fetchBalanceData(walletAddress) {
+    try {
+      // Make API call to get balance data
+      const response = await fetch(`${this.apiUrl}?wallet_address=${encodeURIComponent(walletAddress)}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.balance_data) {
+        // Update the balance display
+        if (typeof updateBalance === 'function') {
+          updateBalance(data.balance_data);
+        }
+      } else if (data.balance_error) {
+        throw new Error(data.balance_error);
+      }
+    } catch (error) {
+      console.error("Failed to fetch balance data:", error);
+      
+      // Show error state
+      const contentElement = document.getElementById("content");
+      if (contentElement) {
+        contentElement.innerHTML = `
+          <div class="text-center py-8">
+            <div class="w-16 h-16 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h2 class="text-xl font-semibold text-red-800 mb-2">Error Loading Balance</h2>
+            <p class="text-red-700 text-sm mb-6">${error.message}</p>
+            <button onclick="location.reload()" class="px-6 py-3 bg-red-100 text-red-700 rounded-xl font-semibold hover:bg-red-200 transition-all duration-200">
+              Try Again
+            </button>
+          </div>
+        `;
+      }
+    }
+  }
 }
 
 // Global instances
@@ -781,22 +1046,43 @@ async function signTransaction() {
     // If we have the new HTML structure (for deployment page)
     if (
       successState &&
-      transactionManager.sessionData.session_type === "deploy"
+      (transactionManager.sessionData.session_type === "deploy" ||
+       transactionManager.sessionData.session_type === "deploy_uniswap")
     ) {
       // Hide the main content and show success state
       const content = document.getElementById("content");
       if (content) content.style.display = "none";
 
-      // Update contract address and transaction hash
-      if (contractAddressDisplay && result.contractAddress) {
-        contractAddressDisplay.textContent = result.contractAddress;
-      } else if (contractAddressDisplay) {
-        // Check if the showContractAddressUnavailable function exists (from deploy.html)
-        if (typeof showContractAddressUnavailable === "function") {
-          showContractAddressUnavailable();
-        } else {
-          contractAddressDisplay.textContent = "Contract address not available";
-          contractAddressDisplay.parentElement.classList.add("opacity-50");
+      // Handle different deployment types
+      if (transactionManager.sessionData.session_type === "deploy_uniswap") {
+        // Update Uniswap contract addresses
+        if (result.contractAddresses) {
+          const wethAddress = document.getElementById("weth-address");
+          const factoryAddress = document.getElementById("factory-address");
+          const routerAddress = document.getElementById("router-address");
+          
+          if (wethAddress && result.contractAddresses.weth) {
+            wethAddress.textContent = result.contractAddresses.weth;
+          }
+          if (factoryAddress && result.contractAddresses.factory) {
+            factoryAddress.textContent = result.contractAddresses.factory;
+          }
+          if (routerAddress && result.contractAddresses.router) {
+            routerAddress.textContent = result.contractAddresses.router;
+          }
+        }
+      } else {
+        // Regular deployment - single contract
+        if (contractAddressDisplay && result.contractAddress) {
+          contractAddressDisplay.textContent = result.contractAddress;
+        } else if (contractAddressDisplay) {
+          // Check if the showContractAddressUnavailable function exists (from deploy.html)
+          if (typeof showContractAddressUnavailable === "function") {
+            showContractAddressUnavailable();
+          } else {
+            contractAddressDisplay.textContent = "Contract address not available";
+            contractAddressDisplay.parentElement.classList.add("opacity-50");
+          }
         }
       }
 
@@ -943,6 +1229,40 @@ async function executeTransactionWithFeedback() {
     return await transactionManager.executeTransaction();
   } catch (error) {
     throw error;
+  }
+}
+
+// Global function for balance query
+async function fetchBalanceFromWallet() {
+  try {
+    if (!walletManager || !walletManager.account) {
+      alert("Please connect your wallet first");
+      return;
+    }
+
+    const walletAddress = walletManager.account;
+    
+    // Update button state
+    const button = document.getElementById('sign-button');
+    if (button) {
+      const originalHTML = button.innerHTML;
+      button.innerHTML = '<div class="flex items-center justify-center"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>Fetching Balance...</div>';
+      button.disabled = true;
+    }
+
+    // Fetch balance data
+    await transactionManager.fetchBalanceData(walletAddress);
+
+  } catch (error) {
+    console.error("Failed to fetch balance:", error);
+    alert("Failed to fetch balance: " + error.message);
+    
+    // Reset button state
+    const button = document.getElementById('sign-button');
+    if (button) {
+      button.innerHTML = 'Fetch Balance';
+      button.disabled = false;
+    }
   }
 }
 

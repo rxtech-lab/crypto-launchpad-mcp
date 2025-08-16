@@ -113,10 +113,28 @@ type SwapTransaction struct {
 	UpdatedAt         time.Time `json:"updated_at"`
 }
 
+// UniswapDeployment represents deployed Uniswap infrastructure contracts
+type UniswapDeployment struct {
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	Version         string    `gorm:"not null" json:"version"`       // v2, v3, v4
+	FactoryAddress  string    `json:"factory_address"`               // Uniswap factory contract address
+	RouterAddress   string    `json:"router_address"`                // Uniswap router contract address
+	WETHAddress     string    `json:"weth_address"`                  // WETH contract address
+	DeployerAddress string    `json:"deployer_address"`              // Address that deployed the contracts
+	FactoryTxHash   string    `json:"factory_tx_hash"`               // Factory deployment transaction hash
+	RouterTxHash    string    `json:"router_tx_hash"`                // Router deployment transaction hash
+	WETHTxHash      string    `json:"weth_tx_hash"`                  // WETH deployment transaction hash
+	Status          string    `gorm:"default:pending" json:"status"` // pending, confirmed, failed
+	ChainType       string    `gorm:"not null" json:"chain_type"`    // ethereum, solana
+	ChainID         string    `gorm:"not null" json:"chain_id"`      // Chain ID
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
 // TransactionSession represents signing session management
 type TransactionSession struct {
 	ID              string    `gorm:"primaryKey" json:"id"`
-	SessionType     string    `gorm:"not null" json:"session_type"` // deploy, create_pool, add_liquidity, remove_liquidity, swap
+	SessionType     string    `gorm:"not null" json:"session_type"` // deploy, create_pool, add_liquidity, remove_liquidity, swap, deploy_uniswap, balance_query
 	ChainType       string    `gorm:"not null" json:"chain_type"`
 	ChainID         string    `gorm:"not null" json:"chain_id"`
 	TransactionData string    `gorm:"type:text;not null" json:"transaction_data"` // JSON data for the transaction

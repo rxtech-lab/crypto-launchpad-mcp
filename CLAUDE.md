@@ -22,10 +22,11 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 - Smart contract templates by chain type (Ethereum/Solana)
 - Deployment records with transaction tracking
 - Uniswap settings and pool management
+- Uniswap deployment tracking (factory, router, WETH contracts)
 - Liquidity positions and swap transaction history
-- Transaction sessions for signing interface management
+- Transaction sessions for signing interface management (deploy, deploy_uniswap, balance_query, pool operations)
 
-### MCP Tools (15 total)
+### MCP Tools (17 total)
 
 #### Chain Management (2 tools)
 
@@ -39,13 +40,16 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 - `update_template` - Update existing template
 - `delete_template` - Delete templates by ID(s) with bulk deletion support
 
-#### Deployment (1 tool)
+#### Deployment (2 tools)
 
 - `launch` - Generate deployment URL with signing interface
+- `list_deployments` - List all token deployments with filtering options
 
-#### Uniswap Integration (8 tools)
+#### Uniswap Integration (10 tools)
 
+- `deploy_uniswap` - Deploy Uniswap infrastructure contracts (factory, router, WETH)
 - `set_uniswap_version` - Configure Uniswap version (v2/v3/v4)
+- `get_uniswap_addresses` - Get current Uniswap configuration
 - `create_liquidity_pool` - Create new liquidity pool with signing interface
 - `add_liquidity` - Add liquidity to existing pool with signing interface
 - `remove_liquidity` - Remove liquidity from pool with signing interface
@@ -53,6 +57,10 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 - `get_pool_info` - Retrieve pool metrics (read-only)
 - `get_swap_quote` - Get swap estimates and price impact (read-only)
 - `monitor_pool` - Real-time pool monitoring and event tracking (read-only)
+
+#### Balance Query Tools (1 tool)
+
+- `query_balance` - Query wallet balance for native tokens and ERC-20 tokens with browser/direct modes
 
 ### Transaction Signing Workflow
 
@@ -133,7 +141,7 @@ make sec         # Run security scan with gosec
 ## Implementation Status
 
 - ✅ **Complete Implementation**: All core components implemented and ready
-- ✅ **MCP Server**: 14 tools registered and functional
+- ✅ **MCP Server**: 17 tools registered and functional
 - ✅ **Database Layer**: GORM with SQLite, automatic migrations
 - ✅ **HTTP Server**: Random port assignment, transaction signing interfaces
 - ✅ **Frontend**: EIP-6963 wallet integration, HTMX + Tailwind CSS
@@ -158,7 +166,58 @@ make sec         # Run security scan with gosec
 - **EIP-6963**: Standard wallet discovery for maximum compatibility
 - **Progressive Enhancement**: Works without JavaScript for basic functionality
 - **Responsive Design**: Tailwind CSS for mobile-friendly interfaces
+- **Modular JavaScript**: Split into focused, maintainable scripts
 - **Embedded Assets**: HTML templates and JavaScript assets embedded using Go's embed directive
+
+### JavaScript Architecture
+
+The frontend uses a modular JavaScript architecture with separated concerns:
+
+#### Core Scripts:
+
+1. **`wallet-connection.js`** - Shared wallet management
+   - EIP-6963 wallet discovery and connection
+   - Network switching and transaction signing
+   - Connection status management
+   - Used by all transaction interfaces
+
+2. **`deploy-tokens.js`** - Token deployment specific
+   - Token deployment session handling
+   - Transaction preparation for contract deployment
+   - Success state management for contract addresses
+
+3. **`deploy-uniswap.js`** - Uniswap deployment specific
+   - Multi-contract deployment handling (WETH9, Factory, Router)
+   - Uniswap-specific UI updates and progress tracking
+   - Mock deployment with actual contract structure
+
+4. **`balance-query.js`** - Balance query specific
+   - Wallet balance fetching for native and ERC-20 tokens
+   - Direct API calls to balance endpoints
+   - Balance display updates
+
+#### JavaScript Integration:
+
+```html
+<!-- Token Deployment -->
+<script src="/js/wallet-connection.js"></script>
+<script src="/js/deploy-tokens.js"></script>
+
+<!-- Uniswap Deployment -->
+<script src="/js/wallet-connection.js"></script>
+<script src="/js/deploy-uniswap.js"></script>
+
+<!-- Balance Queries -->
+<script src="/js/wallet-connection.js"></script>
+<script src="/js/balance-query.js"></script>
+```
+
+#### Benefits:
+
+- **Maintainability**: Each script handles specific functionality
+- **Debugging**: Easier to isolate issues to specific features
+- **Performance**: Only load required JavaScript for each page
+- **Reusability**: Shared wallet connection logic across all tools
 
 ### Tool Implementation Pattern
 
@@ -174,7 +233,12 @@ All tools follow the exact structure from the example project:
 
 - **Embedded Templates**: HTML templates stored in `internal/assets/` and embedded at compile time
 - **Template Engine**: Go's `text/template` package for dynamic content rendering
-- **Static Assets**: JavaScript files embedded and served via HTTP endpoints
+- **Modular JavaScript**: Multiple focused scripts served via HTTP endpoints:
+  - `/js/wallet-connection.js` - Core wallet functionality
+  - `/js/deploy-tokens.js` - Token deployment
+  - `/js/deploy-uniswap.js` - Uniswap deployment  
+  - `/js/balance-query.js` - Balance queries
+  - `/js/wallet.js` - Legacy monolithic script (deprecated)
 - **Build-time Inclusion**: All assets compiled into the binary for single-file distribution
 
 ## Security Considerations

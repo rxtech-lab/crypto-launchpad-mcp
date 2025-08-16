@@ -41,7 +41,7 @@ func main() {
 		log.Printf("  --help       Show this help message\n\n")
 		log.Printf("Description:\n")
 		log.Printf("  AI-powered crypto launchpad supporting Ethereum and Solana blockchains.\n")
-		log.Printf("  Provides 14 MCP tools for token deployment and Uniswap integration.\n\n")
+		log.Printf("  Provides 17 MCP tools for token deployment and Uniswap integration.\n\n")
 		log.Printf("Database: ~/launchpad.db (SQLite)\n")
 		log.Printf("Web Interface: http://localhost:[random-port]\n")
 		return

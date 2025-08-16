@@ -35,7 +35,7 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	srv.AddPrompt(mcp.NewPrompt("launchpad-mcp-usage",
 		mcp.WithPromptDescription("Instructions and guidance for using launchpad MCP tools"),
 		mcp.WithArgument("tool_category",
-			mcp.ArgumentDescription("Category of tools to get instructions for (chain, template, deployment, uniswap, or all)"),
+			mcp.ArgumentDescription("Category of tools to get instructions for (chain, template, deployment, uniswap, balance, or all)"),
 			mcp.RequiredArgument(),
 		),
 	), func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
@@ -115,6 +115,14 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	monitorPoolTool, monitorPoolHandler := tools.NewMonitorPoolTool(db)
 	srv.AddTool(monitorPoolTool, monitorPoolHandler)
 
+	// Uniswap Deployment Tools
+	deployUniswapTool, deployUniswapHandler := tools.NewDeployUniswapTool(db, serverPort)
+	srv.AddTool(deployUniswapTool, deployUniswapHandler)
+
+	// Balance Query Tools
+	queryBalanceTool, queryBalanceHandler := tools.NewQueryBalanceTool(db, serverPort)
+	srv.AddTool(queryBalanceTool, queryBalanceHandler)
+
 	s.server = srv
 }
 
@@ -174,32 +182,45 @@ func getToolInstructions(category string) string {
 	case "uniswap":
 		return `Uniswap Integration Tools:
 
-1. set_uniswap_version - Configure Uniswap version and contract addresses
+1. deploy_uniswap - Deploy Uniswap infrastructure contracts (factory, router, WETH)
+   Usage: Deploy complete Uniswap V2 infrastructure to enable trading
+
+2. set_uniswap_version - Configure Uniswap version and contract addresses
    Usage: Set Uniswap version (v2/v3/v4) and all required contract addresses
 
-2. get_uniswap_addresses - Get current Uniswap configuration
+3. get_uniswap_addresses - Get current Uniswap configuration
    Usage: Retrieve the active Uniswap version and contract addresses
 
-3. create_liquidity_pool - Create new liquidity pool with signing interface
+4. create_liquidity_pool - Create new liquidity pool with signing interface
    Usage: Initialize new trading pairs on Uniswap
 
-4. add_liquidity - Add liquidity to existing pool with signing interface
+5. add_liquidity - Add liquidity to existing pool with signing interface
    Usage: Provide liquidity to earn trading fees
 
-5. remove_liquidity - Remove liquidity from pool with signing interface
+6. remove_liquidity - Remove liquidity from pool with signing interface
    Usage: Withdraw liquidity positions
 
-6. swap_tokens - Execute token swaps with signing interface
+7. swap_tokens - Execute token swaps with signing interface
    Usage: Trade tokens through Uniswap
 
-7. get_pool_info - Retrieve pool metrics (read-only)
+8. get_pool_info - Retrieve pool metrics (read-only)
    Usage: Get current pool statistics and information
 
-8. get_swap_quote - Get swap estimates and price impact (read-only)
+9. get_swap_quote - Get swap estimates and price impact (read-only)
    Usage: Calculate swap amounts and price impact before trading
 
-9. monitor_pool - Real-time pool monitoring and event tracking (read-only)
-   Usage: Track pool activity and events`
+10. monitor_pool - Real-time pool monitoring and event tracking (read-only)
+    Usage: Track pool activity and events`
+
+	case "balance":
+		return `Balance Query Tools:
+
+1. query_balance - Query wallet balance for native tokens and ERC-20 tokens
+   Usage: Get wallet balances either directly in response or through web interface
+   Parameters:
+   - wallet_address (optional): Target wallet address 
+   - show_browser (required): true for web interface, false for direct response
+   - token_address (optional): ERC-20 token contract address for token balance`
 
 	case "all":
 		return `Crypto Launchpad MCP Tools Overview:
@@ -220,7 +241,8 @@ DEPLOYMENT (2 tools):
 - launch: Deploy contracts via web interface
 - list_deployments: View all deployed contracts
 
-UNISWAP INTEGRATION (9 tools):
+UNISWAP INTEGRATION (10 tools):
+- deploy_uniswap: Deploy Uniswap infrastructure contracts
 - set_uniswap_version: Configure Uniswap version and addresses
 - get_uniswap_addresses: Get current Uniswap configuration
 - create_liquidity_pool: Create new pools
@@ -231,11 +253,14 @@ UNISWAP INTEGRATION (9 tools):
 - get_swap_quote: Calculate swap estimates
 - monitor_pool: Track pool activity
 
+BALANCE QUERY (1 tool):
+- query_balance: Query wallet balances with browser/direct modes
+
 All signing operations open a web interface for secure wallet interaction.
 No private keys are handled by the server - all signing is client-side.`
 
 	default:
-		return `Invalid category. Available categories: chain, template, deployment, uniswap, all`
+		return `Invalid category. Available categories: chain, template, deployment, uniswap, balance, all`
 	}
 }
 

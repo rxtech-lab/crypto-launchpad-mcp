@@ -69,16 +69,45 @@ func (s *APIServer) initTemplates() {
 	} else {
 		s.templates["generic"] = genericTmpl
 	}
+
+	// Parse Uniswap deployment template
+	uniswapTmpl, err := template.New("deploy_uniswap").Parse(string(assets.DeployUniswapHTML))
+	if err != nil {
+		log.Printf("Error parsing deploy uniswap template: %v", err)
+	} else {
+		s.templates["deploy_uniswap"] = uniswapTmpl
+	}
+
+	// Parse balance query template
+	balanceTmpl, err := template.New("balance").Parse(string(assets.BalanceHTML))
+	if err != nil {
+		log.Printf("Error parsing balance template: %v", err)
+	} else {
+		s.templates["balance"] = balanceTmpl
+	}
 }
 
 func (s *APIServer) setupRoutes() {
 	// Static files
 	s.app.Get("/js/wallet.js", s.handleWalletJS)
+	s.app.Get("/js/wallet-connection.js", s.handleWalletConnectionJS)
+	s.app.Get("/js/deploy-tokens.js", s.handleDeployTokensJS)
+	s.app.Get("/js/deploy-uniswap.js", s.handleDeployUniswapJS)
+	s.app.Get("/js/balance-query.js", s.handleBalanceQueryJS)
 
 	// Deployment signing routes
 	s.app.Get("/deploy/:session_id", s.handleDeploymentPage)
 	s.app.Get("/api/deploy/:session_id", s.handleDeploymentAPI)
 	s.app.Post("/api/deploy/:session_id/confirm", s.handleDeploymentConfirm)
+
+	// Uniswap deployment routes
+	s.app.Get("/deploy-uniswap/:session_id", s.handleUniswapDeploymentPage)
+	s.app.Get("/api/deploy-uniswap/:session_id", s.handleUniswapDeploymentAPI)
+	s.app.Post("/api/deploy-uniswap/:session_id/confirm", s.handleUniswapDeploymentConfirm)
+
+	// Balance query routes
+	s.app.Get("/balance/:session_id", s.handleBalancePage)
+	s.app.Get("/api/balance/:session_id", s.handleBalanceAPI)
 
 	// Liquidity pool creation routes
 	s.app.Get("/pool/create/:session_id", s.handleCreatePoolPage)
@@ -152,6 +181,30 @@ func (s *APIServer) GetMCPServer() *mcp.MCPServer {
 func (s *APIServer) handleWalletJS(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/javascript")
 	return c.Send(assets.WalletJS)
+}
+
+// handleWalletConnectionJS serves the embedded wallet-connection.js file
+func (s *APIServer) handleWalletConnectionJS(c *fiber.Ctx) error {
+	c.Set("Content-Type", "application/javascript")
+	return c.Send(assets.WalletConnectionJS)
+}
+
+// handleDeployTokensJS serves the embedded deploy-tokens.js file
+func (s *APIServer) handleDeployTokensJS(c *fiber.Ctx) error {
+	c.Set("Content-Type", "application/javascript")
+	return c.Send(assets.DeployTokensJS)
+}
+
+// handleDeployUniswapJS serves the embedded deploy-uniswap.js file
+func (s *APIServer) handleDeployUniswapJS(c *fiber.Ctx) error {
+	c.Set("Content-Type", "application/javascript")
+	return c.Send(assets.DeployUniswapJS)
+}
+
+// handleBalanceQueryJS serves the embedded balance-query.js file
+func (s *APIServer) handleBalanceQueryJS(c *fiber.Ctx) error {
+	c.Set("Content-Type", "application/javascript")
+	return c.Send(assets.BalanceQueryJS)
 }
 
 // verifyTransactionOnChain verifies that a transaction exists and was successful on-chain

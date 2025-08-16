@@ -57,3 +57,5 @@ dist/
 build/
 bin
 internal/contracts/contracts.go
+launchpad-mcp
+main
