@@ -64,7 +64,7 @@ func (s *APIServer) handleDeploymentAPI(c *fiber.Ctx) error {
 	}
 
 	// Parse session data to get deployment ID
-	var sessionData map[string]interface{}
+	var sessionData map[string]any
 	if err := json.Unmarshal([]byte(session.TransactionData), &sessionData); err != nil {
 		return c.Status(500).JSON(map[string]string{"error": "Invalid session data"})
 	}

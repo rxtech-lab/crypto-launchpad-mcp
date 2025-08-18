@@ -26,7 +26,7 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 - Liquidity positions and swap transaction history
 - Transaction sessions for signing interface management (deploy, deploy_uniswap, balance_query, pool operations)
 
-### MCP Tools (17 total)
+### MCP Tools (18 total)
 
 #### Chain Management (2 tools)
 
@@ -45,9 +45,10 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 - `launch` - Generate deployment URL with signing interface
 - `list_deployments` - List all token deployments with filtering options
 
-#### Uniswap Integration (10 tools)
+#### Uniswap Integration (11 tools)
 
 - `deploy_uniswap` - Deploy Uniswap infrastructure contracts (factory, router, WETH)
+- `remove_uniswap_deployment` - Remove Uniswap deployments by ID(s) with bulk deletion support
 - `set_uniswap_version` - Configure Uniswap version (v2/v3/v4)
 - `get_uniswap_addresses` - Get current Uniswap configuration
 - `create_liquidity_pool` - Create new liquidity pool with signing interface
@@ -409,7 +410,12 @@ go test -v ./e2e -run TestContractDeployment -timeout 30s
 
 #### Database Testing
 ```go
-// Always use real SQLite database
+// E2E tests use in-memory databases for speed and isolation
+db, err := database.NewDatabase(":memory:")
+require.NoError(t, err)
+defer db.Close()
+
+// Unit tests can use temporary file databases when needed
 tempDir := t.TempDir()
 dbPath := filepath.Join(tempDir, "test.db")
 db, err := database.NewDatabase(dbPath)

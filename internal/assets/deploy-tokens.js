@@ -126,19 +126,25 @@ class TokenDeploymentManager {
         `;
   }
 
-  prepareTransactionData() {
+  async prepareTransactionData() {
     const { transaction_data } = this.sessionData;
 
     // For contract deployment, we don't specify 'to' address and use the compiled bytecode as data
     const isContractDeployment = !transaction_data.contract_address && !transaction_data.token_address;
+    
+    // Fetch dynamic gas price and estimate gas limit
+    const [gasPrice, estimatedGas] = await Promise.all([
+      this.fetchGasPrice(),
+      this.estimateGas(transaction_data, isContractDeployment)
+    ]);
     
     let txData = {
       from: this.walletManager.getAccount(),
       value: transaction_data.eth_amount
         ? `0x${parseInt(transaction_data.eth_amount).toString(16)}`
         : "0x0",
-      gas: "0x2dc6c0", // 3,000,000 gas limit for contract deployment
-      gasPrice: "0x3b9aca00", // 1 gwei
+      gas: estimatedGas,
+      gasPrice: gasPrice,
     };
 
     if (isContractDeployment && transaction_data.bytecode) {
@@ -163,6 +169,64 @@ class TokenDeploymentManager {
     return txData;
   }
 
+  async fetchGasPrice() {
+    try {
+      const gasPrice = await this.walletManager.selectedWallet.request({
+        method: "eth_gasPrice",
+        params: [],
+      });
+      
+      // Add 10% buffer to gas price for faster confirmation
+      const gasPriceNum = parseInt(gasPrice, 16);
+      const bufferedGasPrice = Math.floor(gasPriceNum * 1.1);
+      
+      console.log(`Fetched gas price: ${gasPrice} (${gasPriceNum} wei), buffered: 0x${bufferedGasPrice.toString(16)}`);
+      return `0x${bufferedGasPrice.toString(16)}`;
+    } catch (error) {
+      console.warn("Failed to fetch gas price, using fallback:", error);
+      return "0x3b9aca00"; // 1 gwei fallback
+    }
+  }
+
+  async estimateGas(transactionData, isContractDeployment) {
+    try {
+      let gasEstimateParams = {
+        from: this.walletManager.getAccount(),
+        value: transactionData.eth_amount
+          ? `0x${parseInt(transactionData.eth_amount).toString(16)}`
+          : "0x0",
+      };
+
+      if (isContractDeployment && transactionData.bytecode) {
+        // For contract deployment
+        const bytecode = (transactionData.bytecode && typeof transactionData.bytecode === 'string' && transactionData.bytecode.startsWith('0x')) 
+          ? transactionData.bytecode 
+          : '0x' + (transactionData.bytecode || '');
+        gasEstimateParams.data = bytecode;
+      } else {
+        // For contract calls
+        gasEstimateParams.to = transactionData.contract_address || transactionData.token_address;
+        gasEstimateParams.data = "0x";
+      }
+
+      const estimatedGas = await this.walletManager.selectedWallet.request({
+        method: "eth_estimateGas",
+        params: [gasEstimateParams],
+      });
+
+      // Add 20% buffer to gas limit for safety
+      const gasNum = parseInt(estimatedGas, 16);
+      const bufferedGas = Math.floor(gasNum * 1.2);
+      
+      console.log(`Estimated gas: ${estimatedGas} (${gasNum}), buffered: 0x${bufferedGas.toString(16)}`);
+      return `0x${bufferedGas.toString(16)}`;
+    } catch (error) {
+      console.warn("Failed to estimate gas, using fallback:", error);
+      // Use higher fallback for contract deployment vs regular transactions
+      return isContractDeployment ? "0x2dc6c0" : "0x5208"; // 3M for deployment, 21k for transfer
+    }
+  }
+
   async executeTransaction() {
     // Ensure chain is correct
     const targetChainId = this.sessionData.chain_id;
@@ -172,8 +236,8 @@ class TokenDeploymentManager {
       await this.walletManager.switchNetwork(targetChainId);
     }
 
-    // Prepare transaction
-    const transactionData = this.prepareTransactionData();
+    // Prepare transaction (now async)
+    const transactionData = await this.prepareTransactionData();
 
     // Sign and send transaction
     const txHash = await this.walletManager.signTransaction(transactionData);

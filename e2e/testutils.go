@@ -60,7 +60,7 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	require.NoError(t, err)
 	setup.TempDir = tempDir
 
-	// Initialize test database
+	// Initialize test database (use file database to ensure foreign keys work)
 	dbPath := filepath.Join(tempDir, "test.db")
 	db, err := database.NewDatabase(dbPath)
 	require.NoError(t, err)
@@ -152,6 +152,13 @@ func (s *TestSetup) CreateTestTemplate(name, description, contractCode string) *
 	require.NoError(s.t, err)
 
 	return template
+}
+
+// GetTestChainID returns the ID of the default test chain
+func (s *TestSetup) GetTestChainID() uint {
+	chain, err := s.DB.GetActiveChain()
+	require.NoError(s.t, err)
+	return chain.ID
 }
 
 // GetPrimaryTestAccount returns the first test account

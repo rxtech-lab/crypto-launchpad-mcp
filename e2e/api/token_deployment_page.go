@@ -134,8 +134,8 @@ func (p *TokenDeploymentPage) GetContractAddress() (string, error) {
 	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
 	defer cancel()
 	err := chromedp.Run(ctx,
-		chromedp.WaitVisible("#contract-address", chromedp.ByID),
-		chromedp.Text("#contract-address", &text, chromedp.ByID),
+		chromedp.WaitVisible("#contract-address-display", chromedp.ByID),
+		chromedp.Text("#contract-address-display", &text, chromedp.ByID),
 	)
 	if err != nil {
 		return "", fmt.Errorf("contract address not found: %w", err)

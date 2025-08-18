@@ -153,7 +153,7 @@ func (s *UniswapDeploymentChromedpTestSuite) testDatabaseVerification(sessionID 
 	// Find deployment by checking for our session's characteristics
 	found := false
 	for _, dep := range deployments {
-		if dep.ChainID == "31337" && dep.Status == "confirmed" {
+		if dep.Chain.ChainID == "31337" && dep.Status == "confirmed" {
 			deployment = &dep
 			found = true
 			break

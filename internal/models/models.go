@@ -35,11 +35,10 @@ type Template struct {
 type Deployment struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
 	TemplateID      uint      `gorm:"not null" json:"template_id"`
+	ChainID         uint      `gorm:"not null" json:"chain_id"`
 	ContractAddress string    `gorm:"not null" json:"contract_address"`
 	TokenName       string    `gorm:"not null" json:"token_name"`
 	TokenSymbol     string    `gorm:"not null" json:"token_symbol"`
-	ChainType       string    `gorm:"not null" json:"chain_type"`
-	ChainID         string    `gorm:"not null" json:"chain_id"`
 	DeployerAddress string    `gorm:"not null" json:"deployer_address"`
 	TransactionHash string    `gorm:"not null" json:"transaction_hash"`
 	Status          string    `gorm:"default:pending" json:"status"` // pending, confirmed, failed
@@ -47,6 +46,7 @@ type Deployment struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 
 	Template Template `gorm:"foreignKey:TemplateID" json:"template,omitempty"`
+	Chain    Chain    `gorm:"foreignKey:ChainID;references:ID" json:"chain,omitempty"`
 }
 
 // UniswapSettings represents Uniswap version and configuration
@@ -116,6 +116,7 @@ type SwapTransaction struct {
 // UniswapDeployment represents deployed Uniswap infrastructure contracts
 type UniswapDeployment struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
+	ChainID         uint      `gorm:"not null" json:"chain_id"`
 	Version         string    `gorm:"not null" json:"version"`       // v2, v3, v4
 	FactoryAddress  string    `json:"factory_address"`               // Uniswap factory contract address
 	RouterAddress   string    `json:"router_address"`                // Uniswap router contract address
@@ -125,10 +126,10 @@ type UniswapDeployment struct {
 	RouterTxHash    string    `json:"router_tx_hash"`                // Router deployment transaction hash
 	WETHTxHash      string    `json:"weth_tx_hash"`                  // WETH deployment transaction hash
 	Status          string    `gorm:"default:pending" json:"status"` // pending, confirmed, failed
-	ChainType       string    `gorm:"not null" json:"chain_type"`    // ethereum, solana
-	ChainID         string    `gorm:"not null" json:"chain_id"`      // Chain ID
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+
+	Chain Chain `gorm:"foreignKey:ChainID;references:ID" json:"chain,omitempty"`
 }
 
 // TransactionSession represents signing session management

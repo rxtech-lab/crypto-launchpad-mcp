@@ -259,17 +259,47 @@ func (s *ChromedpTestSetup) InitializeTestWallet() error {
 	return nil
 }
 
-// CreateUniswapDeploymentSession creates a Uniswap deployment session for testing
-func (s *ChromedpTestSetup) CreateUniswapDeploymentSession() (string, error) {
-	// First create the Uniswap deployment record
-	deployment := &models.UniswapDeployment{
-		Version:   "v2",
-		ChainType: "ethereum",
-		ChainID:   "31337",
-		Status:    "pending",
+// getOrCreateTestChain gets or creates a test chain for e2e testing
+func (s *ChromedpTestSetup) getOrCreateTestChain() (*models.Chain, error) {
+	// Try to get existing active chain
+	activeChain, err := s.DB.GetActiveChain()
+	if err == nil && activeChain != nil {
+		return activeChain, nil
 	}
 
-	err := s.DB.CreateUniswapDeployment(deployment)
+	// Create a test chain
+	testChain := &models.Chain{
+		ChainType: "ethereum",
+		RPC:       "http://localhost:8545",
+		ChainID:   "31337",
+		Name:      "Anvil Testnet",
+		IsActive:  true,
+	}
+
+	err = s.DB.CreateChain(testChain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create test chain: %w", err)
+	}
+
+	return testChain, nil
+}
+
+// CreateUniswapDeploymentSession creates a Uniswap deployment session for testing
+func (s *ChromedpTestSetup) CreateUniswapDeploymentSession() (string, error) {
+	// Get or create test chain
+	chain, err := s.getOrCreateTestChain()
+	if err != nil {
+		return "", fmt.Errorf("failed to get test chain: %w", err)
+	}
+
+	// First create the Uniswap deployment record
+	deployment := &models.UniswapDeployment{
+		Version: "v2",
+		ChainID: chain.ID,
+		Status:  "pending",
+	}
+
+	err = s.DB.CreateUniswapDeployment(deployment)
 	if err != nil {
 		return "", fmt.Errorf("failed to create uniswap deployment: %w", err)
 	}
@@ -401,13 +431,18 @@ func (s *ChromedpTestSetup) CreateTokenDeploymentSession(templateID uint) (strin
 		return "", fmt.Errorf("failed to get template: %w", err)
 	}
 
+	// Get or create test chain
+	chain, err := s.getOrCreateTestChain()
+	if err != nil {
+		return "", fmt.Errorf("failed to get test chain: %w", err)
+	}
+
 	// First create the deployment record
 	deployment := &models.Deployment{
 		TemplateID:  templateID,
+		ChainID:     chain.ID,
 		TokenName:   "Test Token",
 		TokenSymbol: "TEST",
-		ChainType:   "ethereum",
-		ChainID:     "31337",
 		Status:      "pending",
 	}
 

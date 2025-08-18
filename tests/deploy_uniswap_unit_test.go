@@ -152,10 +152,9 @@ func TestUniswapDatabaseIntegration(t *testing.T) {
 	t.Run("CreateUniswapDeployment", func(t *testing.T) {
 		// Test creating a Uniswap deployment record
 		deployment := &models.UniswapDeployment{
-			Version:   "v2",
-			ChainType: "ethereum",
-			ChainID:   testChainID,
-			Status:    "pending",
+			Version: "v2",
+			ChainID: chain.ID,
+			Status:  "pending",
 		}
 
 		err := db.CreateUniswapDeployment(deployment)
@@ -173,10 +172,9 @@ func TestUniswapDatabaseIntegration(t *testing.T) {
 	t.Run("GetUniswapDeploymentByChain", func(t *testing.T) {
 		// First create a deployment
 		deployment := &models.UniswapDeployment{
-			Version:   "v2",
-			ChainType: "ethereum",
-			ChainID:   testChainID,
-			Status:    "confirmed", // Important: must be confirmed to be found
+			Version: "v2",
+			ChainID: chain.ID,
+			Status:  "confirmed", // Important: must be confirmed to be found
 		}
 
 		err := db.CreateUniswapDeployment(deployment)
@@ -201,15 +199,27 @@ func TestUniswapDatabaseIntegration(t *testing.T) {
 	})
 
 	t.Run("PreventDuplicateDeployment", func(t *testing.T) {
-		// Create a confirmed deployment first
-		deployment := &models.UniswapDeployment{
-			Version:   "v2",
+		// Create another chain for this test
+		testChain2 := &models.Chain{
 			ChainType: "ethereum",
-			ChainID:   "9999", // Use different chain ID to avoid conflicts
-			Status:    "confirmed",
+			RPC:       "http://localhost:9999",
+			ChainID:   "9999",
+			Name:      "Test Chain 2",
+			IsActive:  false,
+		}
+		err := db.CreateChain(testChain2)
+		if err != nil {
+			t.Fatalf("Failed to create test chain 2: %v", err)
 		}
 
-		err := db.CreateUniswapDeployment(deployment)
+		// Create a confirmed deployment first
+		deployment := &models.UniswapDeployment{
+			Version: "v2",
+			ChainID: testChain2.ID,
+			Status:  "confirmed",
+		}
+
+		err = db.CreateUniswapDeployment(deployment)
 		if err != nil {
 			t.Fatalf("Failed to create first deployment: %v", err)
 		}

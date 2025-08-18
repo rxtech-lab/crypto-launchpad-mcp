@@ -103,10 +103,9 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 		// Create deployment record
 		deployment := &models.Deployment{
 			TemplateID:      uint(templateID),
+			ChainID:         activeChain.ID,
 			TokenName:       tokenName,
 			TokenSymbol:     tokenSymbol,
-			ChainType:       activeChain.ChainType,
-			ChainID:         activeChain.ChainID,
 			DeployerAddress: "", // Will be set by frontend when wallet connects
 			Status:          "pending",
 		}
