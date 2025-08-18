@@ -72,6 +72,19 @@ e2e-network:
 	killall anvil || true
 	anvil
 
+# Run browser E2E tests with chromedp
+e2e-browser:
+	go test -v ./e2e/api
+
+# Run all E2E tests including browser tests
+e2e-all: e2e-network
+	go test -v ./e2e
+	go test -v ./e2e/api
+
+# Run browser tests in headful mode (with visible browser)
+e2e-browser-headful:
+	HEADLESS=false go test -v ./e2e/api
+
 # Format code
 fmt:
 	go fmt ./...
@@ -100,4 +113,8 @@ help:
 	@echo "  fmt         - Format code"
 	@echo "  lint        - Lint code"
 	@echo "  sec         - Run security scan"
+	@echo "  e2e-network - Start anvil testnet for E2E tests"
+	@echo "  e2e-browser - Run browser E2E tests with chromedp"
+	@echo "  e2e-browser-headful - Run browser tests in headful mode"
+	@echo "  e2e-all     - Run all E2E tests including browser tests"
 	@echo "  help        - Show this help message"

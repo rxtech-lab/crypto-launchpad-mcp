@@ -11,6 +11,11 @@ This directory contains comprehensive end-to-end tests for the Launchpad MCP API
 - `ethereum_integration_test.go` - Ethereum blockchain integration tests
 - `address.go` - Test account private keys
 - `contracts/` - Sample Solidity contract files
+- `api/` - Playwright browser-based E2E tests
+  - `uniswap_test.go` - Uniswap deployment browser tests
+  - `page_objects.go` - Page object models for UI interactions
+  - `test_helpers.go` - Playwright-specific test utilities
+  - `wallet_provider.js` - EIP-6963 compliant test wallet provider
 
 ### Test Categories
 
@@ -25,12 +30,20 @@ This directory contains comprehensive end-to-end tests for the Launchpad MCP API
 - **Full Workflow**: End-to-end testing from template creation to deployment confirmation
 - **Blockchain Interaction**: Testing with real Ethereum testnet connections
 
+#### 3. Playwright Browser Tests (`api/uniswap_test.go`)
+- **Browser-based UI Testing**: Complete user workflow testing with real browser
+- **EIP-6963 Wallet Integration**: Test wallet discovery and connection
+- **Real Transaction Signing**: Test wallet transaction signing with real blockchain
+- **Visual Verification**: Test UI state changes and user interactions
+- **Error Handling**: Test browser-specific error scenarios
+
 ## Running the Tests
 
 ### Prerequisites
 
 1. **Go Dependencies**: All dependencies should be installed via `go mod tidy`
 2. **Local Ethereum Testnet**: For integration tests, anvil should be running on `localhost:8545`
+3. **Playwright Browsers**: For browser tests, install Playwright browsers with `make playwright-install`
 
 ### Basic Tests (No Blockchain Required)
 
@@ -66,6 +79,29 @@ make e2e-network
 
 # Run tests (in another terminal)
 make test
+
+# Run Playwright browser tests
+make e2e-playwright
+
+# Run all E2E tests including Playwright
+make e2e-all
+```
+
+### Playwright Browser Tests (Ethereum Required)
+
+```bash
+# Install Playwright browsers (one-time setup)
+make playwright-install
+
+# Start local Ethereum testnet (in separate terminal)
+make e2e-network
+
+# Run Playwright E2E tests
+make e2e-playwright
+
+# Run specific Playwright tests
+go test ./e2e/api -v -run "TestUniswapDeploymentPlaywright"
+go test ./e2e/api -v -run "TestUniswapDeploymentErrorHandling"
 ```
 
 ## Test Configuration
@@ -116,6 +152,14 @@ The API server starts on a random available port for each test, preventing port 
 - Simulate contract deployment transactions
 - Test transaction confirmation workflow
 
+### 6. Browser-based UI Testing (Playwright)
+- Complete Uniswap deployment workflow in browser
+- EIP-6963 wallet discovery and connection
+- Real transaction signing and blockchain interaction
+- Visual UI state verification
+- Error handling and edge cases
+- Screenshot capture on test failures
+
 ## Test Utilities
 
 ### TestSetup
@@ -133,6 +177,13 @@ The main test setup struct provides:
 - `VerifyEthereumConnection()` - Check testnet connectivity
 - `GetPrimaryTestAccount()` - Get funded test account
 
+### Playwright Test Utilities (api/)
+- `NewPlaywrightTestSetup(t)` - Create browser test environment
+- `NewUniswapDeploymentPage(page)` - Create page object for Uniswap deployment
+- `InitializeTestWallet()` - Set up EIP-6963 wallet provider
+- `CreateUniswapDeploymentSession()` - Create test session
+- `TakeScreenshotOnFailure()` - Capture screenshots on test failure
+
 ## Mock vs Real Testing
 
 ### Mock Testing (Default)
@@ -146,6 +197,14 @@ The main test setup struct provides:
 - Tests real blockchain interactions
 - Requires running anvil instance
 - More comprehensive but slower
+
+### Browser Testing (With Playwright)
+- Real browser automation with Chromium
+- Complete user workflow testing
+- EIP-6963 wallet provider simulation
+- Real transaction signing and blockchain submission
+- Visual verification of UI state changes
+- Most comprehensive but slowest execution
 
 ## Environment Variables
 
@@ -171,6 +230,16 @@ sqlite3 /tmp/launchpad-test-*/test.db
 ### API Server Logs
 The API server runs with logging enabled during tests. HTTP requests and responses are logged to help with debugging.
 
+### Playwright Debugging
+For browser tests:
+```bash
+# Run tests with visible browser (set headless: false in test_helpers.go)
+go test ./e2e/api -v -run "TestUniswapDeploymentPlaywright"
+
+# Screenshots are automatically captured on test failures
+# Look for files like: screenshot_uniswap_deployment_*.png
+```
+
 ## Best Practices
 
 1. **Test Isolation**: Each test creates its own database and server instance
@@ -186,9 +255,10 @@ To add new test scenarios:
 1. **New API Endpoints**: Add tests to `api_server_test.go`
 2. **New Contract Types**: Add contracts to `test_contracts.go` and `contracts/`
 3. **New Blockchain Features**: Add tests to `ethereum_integration_test.go`
-4. **New Utilities**: Add helper functions to `testutils.go`
+4. **New Browser Workflows**: Add tests to `api/uniswap_test.go` or create new test files
+5. **New Utilities**: Add helper functions to `testutils.go` or `api/test_helpers.go`
 
-Example:
+Example API Test:
 ```go
 func TestNewFeature(t *testing.T) {
     setup := NewTestSetup(t)
@@ -197,3 +267,36 @@ func TestNewFeature(t *testing.T) {
     // Your test logic here
 }
 ```
+
+Example Playwright Test:
+```go
+func TestNewBrowserFeature(t *testing.T) {
+    setup := NewPlaywrightTestSetup(t)
+    defer setup.Cleanup()
+    defer setup.TakeScreenshotOnFailure(t, "new_feature")
+    
+    // Browser test logic here
+}
+```
+
+## Playwright Test Architecture
+
+### EIP-6963 Wallet Provider
+The Playwright tests use a custom JavaScript wallet provider (`wallet_provider.js`) that:
+- Implements the EIP-6963 wallet discovery standard
+- Provides a complete Ethereum provider interface
+- Communicates with Go test code for transaction signing
+- Uses real private keys and blockchain interactions
+
+### Page Object Model
+Tests use page object models (`page_objects.go`) for:
+- Reusable UI interaction methods
+- Consistent element selectors
+- Better test maintainability
+- Separation of test logic from UI details
+
+### Browser Configuration
+- Headless mode by default (configurable)
+- 1280x720 viewport for consistent rendering
+- Chromium browser engine
+- Automatic screenshot capture on failures

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/rxtech-lab/launchpad-mcp/internal/contracts"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 )
 
@@ -86,6 +87,29 @@ func (s *APIServer) handleUniswapDeploymentAPI(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get contract artifacts for client-side deployment
+	contractData := make(map[string]interface{})
+	contractNames := []string{"WETH9", "Factory", "Router"}
+
+	for _, contractName := range contractNames {
+		artifact, err := contracts.GetContractArtifact(contractName)
+		if err != nil {
+			log.Printf("Warning: Could not get artifact for %s: %v", contractName, err)
+			continue
+		}
+
+		// Ensure bytecode has 0x prefix
+		bytecode := artifact.Bytecode
+		if !strings.HasPrefix(bytecode, "0x") {
+			bytecode = "0x" + bytecode
+		}
+
+		contractData[contractName] = map[string]interface{}{
+			"bytecode": bytecode,
+			"abi":      artifact.ABI,
+		}
+	}
+
 	// Prepare response data
 	response := map[string]interface{}{
 		"session_id":          sessionID,
@@ -97,8 +121,9 @@ func (s *APIServer) handleUniswapDeploymentAPI(c *fiber.Ctx) error {
 		"session_type":        session.SessionType,
 		"metadata":            sessionData["metadata"],
 		"deployment_data":     sessionData["deployment_data"],
-		"contracts_to_deploy": []string{"WETH9", "Factory", "Router"},
+		"contracts_to_deploy": contractNames,
 		"deployment_order":    "1. WETH9 → 2. Factory → 3. Router",
+		"contract_data":       contractData,
 	}
 
 	return c.JSON(response)

@@ -7,11 +7,7 @@ BINARIES=(
 
 # Define the list of architectures
 ARCHS=(
-  "darwin/amd64"
-  "darwin/arm64"
   "linux/amd64"
-  "linux/arm64"
-  "windows/amd64"
 )
 
 # Version and build info

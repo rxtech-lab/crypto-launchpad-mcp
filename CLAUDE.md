@@ -294,10 +294,224 @@ P12_PASSWORD="certificate-password"
 
 ## Testing Strategy
 
+### Testing Architecture
+
+All tests must use real infrastructure and follow production-like patterns:
+
+- **Real Database Connections**: Use SQLite databases, never mocks or in-memory databases
+- **Live Blockchain Testing**: Use Makefile testnet (`make e2e-network`) for all blockchain interactions
+- **Production-Like Environment**: Test with actual HTTP servers, real ports, and complete request/response cycles
+
+### Test Categories
+
+#### 1. E2E API Tests (`/e2e/`)
+
+Test complete API workflows with real blockchain integration:
+
+```bash
+# Start local testnet (required for all blockchain tests)
+make e2e-network  # Starts anvil on localhost:8545
+
+# Run specific API tests (30s timeout enforced)
+go test -v ./e2e -run TestUniswapDeploymentAPI -timeout 30s
+go test -v ./e2e -run TestAPIServer -timeout 30s
+```
+
+**Key Requirements:**
+- Use `NewTestSetup(t)` for consistent test environment
+- Verify Ethereum connection with `setup.VerifyEthereumConnection()`
+- Deploy real contracts using `setup.DeployContract()` 
+- Test complete request/response cycles including HTML pages and JSON APIs
+- Verify database updates and blockchain transaction confirmation
+
+#### 2. Unit Tests (`/tests/`, `/internal/tools/`)
+
+Test individual components with real dependencies:
+
+```bash
+# Run all unit tests (30s timeout enforced)
+go test -v ./... -timeout 30s
+
+# Run specific component tests
+go test -v ./internal/tools -run TestUniswapUtilities -timeout 30s
+go test -v ./tests -run TestUniswapDatabaseIntegration -timeout 30s
+```
+
+**Key Requirements:**
+- Use temporary SQLite databases (`t.TempDir()` + `database.NewDatabase()`)
+- Test actual Solidity compilation with `utils.CompileSolidity()`
+- Validate real contract ABI generation and bytecode compilation
+- Test database migrations and CRUD operations with real GORM
+
+#### 3. Integration Tests (`/e2e/`)
+
+Test cross-component interactions:
+
+```bash
+# Test complete deployment workflows (30s timeout enforced)
+go test -v ./e2e -run TestAPIServer_TemplateWorkflow -timeout 30s
+go test -v ./e2e -run TestContractDeployment -timeout 30s
+```
+
+### Required Test Infrastructure
+
+#### Database Testing
+```go
+// Always use real SQLite database
+tempDir := t.TempDir()
+dbPath := filepath.Join(tempDir, "test.db")
+db, err := database.NewDatabase(dbPath)
+require.NoError(t, err)
+defer db.Close()
+
+// Test with real migrations and constraints
+err = db.CreateTemplate(template)
+require.NoError(t, err)
+```
+
+#### Blockchain Testing
+```go
+// Verify testnet connectivity
+err := setup.VerifyEthereumConnection()
+require.NoError(t, err, "Ethereum testnet should be running on localhost:8545 (run 'make e2e-network')")
+
+// Deploy real contracts
+result, err := setup.DeployContract(account, contractCode, "ContractName", constructorArgs...)
+require.NoError(t, err)
+
+// Verify on-chain transaction success
+receipt, err := setup.WaitForTransaction(result.TransactionHash, 30*time.Second)
+require.NoError(t, err)
+assert.Equal(t, uint64(1), receipt.Status)
+```
+
+#### API Testing
+```go
+// Test complete HTTP workflows
+setup := NewTestSetup(t)
+defer setup.Cleanup()
+
+// Test HTML pages
+resp, err := setup.MakeAPIRequest("GET", "/deploy-uniswap/session-id")
+require.NoError(t, err)
+assert.Equal(t, http.StatusOK, resp.StatusCode)
+assert.Equal(t, "text/html", resp.Header.Get("Content-Type"))
+
+// Test JSON APIs
+resp, err := setup.MakeAPIRequest("GET", "/api/deploy-uniswap/session-id")
+require.NoError(t, err)
+assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+
+var apiResponse map[string]interface{}
+json.NewDecoder(resp.Body).Decode(&apiResponse)
+assert.Equal(t, "deploy_uniswap", apiResponse["session_type"])
+```
+
+### Test Development Commands
+
+```bash
+# Start testnet (keep running during development)
+make e2e-network
+
+# Run tests with verbose output (30s timeout enforced)
+go test -v ./e2e -run TestUniswapDeploymentAPI -timeout 30s
+
+# Run all tests (30s timeout enforced)
+make test
+
+# Run tests with coverage (30s timeout enforced)
+go test -v -cover ./... -timeout 30s
+
+# Run specific test categories (30s timeout enforced)
+go test -v ./e2e -timeout 30s          # API and integration tests
+go test -v ./tests -timeout 30s        # Unit tests
+go test -v ./internal/... -timeout 30s # Component tests
+```
+
+### Test Patterns and Best Practices
+
+#### Session-Based Testing
+```go
+// Create real transaction sessions
+sessionID, err := setup.DB.CreateTransactionSession(
+    "deploy_uniswap",
+    "ethereum", 
+    TESTNET_CHAIN_ID,
+    string(sessionDataJSON),
+)
+
+// Test session lifecycle
+session, err := setup.DB.GetTransactionSession(sessionID)
+assert.Equal(t, "pending", session.Status)
+
+// Test session updates
+err = setup.DB.UpdateTransactionSessionStatus(sessionID, "confirmed", txHash)
+assert.Equal(t, "confirmed", session.Status)
+```
+
+#### Contract Deployment Testing
+```go
+// Use real contracts for testing APIs
+wethResult, err := setup.DeployContract(
+    account,
+    GetSimpleERC20Contract(), // Real Solidity contract
+    "SimpleERC20",
+    "Wrapped ETH", "WETH", big.NewInt(0),
+)
+
+// Verify addresses are properly stored
+updatedDeployment, err := setup.DB.GetUniswapDeploymentByID(deploymentID)
+assert.Equal(t, wethResult.ContractAddress.Hex(), updatedDeployment.WETHAddress)
+assert.Equal(t, wethResult.TransactionHash.Hex(), updatedDeployment.WETHTxHash)
+```
+
+#### Error Handling Testing
+```go
+// Test API error responses
+resp, err := setup.MakeAPIRequest("GET", "/api/deploy-uniswap/invalid-session")
+assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+var errorResponse map[string]string
+json.NewDecoder(resp.Body).Decode(&errorResponse)
+assert.Contains(t, errorResponse["error"], "Session not found")
+```
+
+### Continuous Integration
+
+Tests run automatically in CI with the same infrastructure:
+
+- **GitHub Actions**: Automated testing on push/PR
+- **Anvil Testnet**: Ephemeral blockchain for each test run
+- **Real Databases**: SQLite files in temporary directories
+- **Complete Workflows**: End-to-end API and transaction testing
+
+### Testing Documentation
+
+Each test file should include:
+
+```go
+// TestUniswapDeploymentAPI tests the complete Uniswap deployment workflow
+// Requirements:
+// - Anvil testnet running on localhost:8545 (run 'make e2e-network')  
+// - Real SQLite database with migrations
+// - Complete HTTP request/response testing
+// - Blockchain transaction verification
+func TestUniswapDeploymentAPI(t *testing.T) {
+    setup := NewTestSetup(t)
+    defer setup.Cleanup()
+    
+    // Verify infrastructure
+    err := setup.VerifyEthereumConnection()
+    require.NoError(t, err, "Testnet required: run 'make e2e-network'")
+    
+    // Test implementation...
+}
+```
+
 Write comprehensive tests for:
 
 - MCP tool implementations and parameter validation
-- Database operations and model relationships
+- Database operations and model relationships  
 - Transaction session management
 - API endpoints and error handling
 - Frontend wallet integration (manual testing)
@@ -390,3 +604,4 @@ The architecture supports easy extension for:
 # Code guideline
 
 1. Never use fmt.Println to log something
+2. **Test Timeout Policy**: Never run tests longer than 30 seconds. Use `-timeout 30s` for all test commands to enforce this limit and prevent hanging tests.

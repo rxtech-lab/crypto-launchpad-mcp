@@ -128,6 +128,12 @@ func (s *APIServer) setupRoutes() {
 	s.app.Get("/api/swap/:session_id", s.handleSwapAPI)
 	s.app.Post("/api/swap/:session_id/confirm", s.handleSwapConfirm)
 
+	// Test API for E2E testing
+	s.app.Post("/api/test/sign-transaction", s.handleTestSignTransaction)
+
+	// Contract artifacts API
+	s.app.Get("/api/contracts/:name", s.handleContractArtifact)
+
 	// Health check
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(map[string]string{"status": "ok"})

@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/rxtech-lab/launchpad-mcp/internal/contracts"
 )
 
 // UniswapV2Contracts contains the contract ABIs and bytecode for Uniswap V2
@@ -35,118 +37,46 @@ type DeploymentMetadata struct {
 
 // FetchUniswapV2Contracts fetches the contract ABIs and bytecode for Uniswap V2
 func FetchUniswapV2Contracts() (*UniswapV2Contracts, error) {
-	// Use hardcoded contract data for reliability
-	// In production, these could be fetched from a reliable source or embedded
+	// Use embedded real contract artifacts from official Uniswap sources
 
-	factoryABI := []map[string]interface{}{
-		{
-			"inputs": []map[string]interface{}{
-				{"internalType": "address", "name": "_feeToSetter", "type": "address"},
-			},
-			"stateMutability": "nonpayable",
-			"type":            "constructor",
-		},
-		{
-			"anonymous": false,
-			"inputs": []map[string]interface{}{
-				{"indexed": true, "internalType": "address", "name": "token0", "type": "address"},
-				{"indexed": true, "internalType": "address", "name": "token1", "type": "address"},
-				{"indexed": false, "internalType": "address", "name": "pair", "type": "address"},
-				{"indexed": false, "internalType": "uint256", "name": "", "type": "uint256"},
-			},
-			"name": "PairCreated",
-			"type": "event",
-		},
-		{
-			"inputs": []map[string]interface{}{
-				{"internalType": "address", "name": "tokenA", "type": "address"},
-				{"internalType": "address", "name": "tokenB", "type": "address"},
-			},
-			"name": "createPair",
-			"outputs": []map[string]interface{}{
-				{"internalType": "address", "name": "pair", "type": "address"},
-			},
-			"stateMutability": "nonpayable",
-			"type":            "function",
-		},
+	// Get WETH9 artifact
+	wethArtifact, err := contracts.GetWETH9Artifact()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get WETH9 artifact: %w", err)
 	}
 
-	routerABI := []map[string]interface{}{
-		{
-			"inputs": []map[string]interface{}{
-				{"internalType": "address", "name": "_factory", "type": "address"},
-				{"internalType": "address", "name": "_WETH", "type": "address"},
-			},
-			"stateMutability": "nonpayable",
-			"type":            "constructor",
-		},
-		{
-			"inputs": []map[string]interface{}{
-				{"internalType": "address", "name": "tokenA", "type": "address"},
-				{"internalType": "address", "name": "tokenB", "type": "address"},
-				{"internalType": "uint256", "name": "amountADesired", "type": "uint256"},
-				{"internalType": "uint256", "name": "amountBDesired", "type": "uint256"},
-				{"internalType": "uint256", "name": "amountAMin", "type": "uint256"},
-				{"internalType": "uint256", "name": "amountBMin", "type": "uint256"},
-				{"internalType": "address", "name": "to", "type": "address"},
-				{"internalType": "uint256", "name": "deadline", "type": "uint256"},
-			},
-			"name": "addLiquidity",
-			"outputs": []map[string]interface{}{
-				{"internalType": "uint256", "name": "amountA", "type": "uint256"},
-				{"internalType": "uint256", "name": "amountB", "type": "uint256"},
-				{"internalType": "uint256", "name": "liquidity", "type": "uint256"},
-			},
-			"stateMutability": "nonpayable",
-			"type":            "function",
-		},
+	// Get Factory artifact
+	factoryArtifact, err := contracts.GetFactoryArtifact()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Factory artifact: %w", err)
 	}
 
-	wethABI := []map[string]interface{}{
-		{
-			"inputs":          []interface{}{},
-			"stateMutability": "nonpayable",
-			"type":            "constructor",
-		},
-		{
-			"inputs":          []interface{}{},
-			"name":            "deposit",
-			"outputs":         []interface{}{},
-			"stateMutability": "payable",
-			"type":            "function",
-		},
-		{
-			"inputs": []map[string]interface{}{
-				{"internalType": "uint256", "name": "wad", "type": "uint256"},
-			},
-			"name":            "withdraw",
-			"outputs":         []interface{}{},
-			"stateMutability": "nonpayable",
-			"type":            "function",
-		},
+	// Get Router artifact
+	routerArtifact, err := contracts.GetRouterArtifact()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Router artifact: %w", err)
 	}
 
-	// These are placeholder bytecodes - in production, use actual compiled bytecode
-	// For now, we'll return empty bytecode and let the frontend handle compilation
-	contracts := &UniswapV2Contracts{
+	// Build contracts struct with real artifacts
+	contractsData := &UniswapV2Contracts{
 		Factory: UniswapContract{
-			ABI:      factoryABI,
-			Bytecode: "", // Will be fetched or compiled separately
+			ABI:      factoryArtifact.ABI,
+			Bytecode: factoryArtifact.Bytecode,
 			Name:     "UniswapV2Factory",
 		},
 		Router: UniswapContract{
-			ABI:      routerABI,
-			Bytecode: "", // Will be fetched or compiled separately
+			ABI:      routerArtifact.ABI,
+			Bytecode: routerArtifact.Bytecode,
 			Name:     "UniswapV2Router02",
 		},
 		WETH9: UniswapContract{
-			ABI:      wethABI,
-			Bytecode: "", // Will be fetched or compiled separately
+			ABI:      wethArtifact.ABI,
+			Bytecode: wethArtifact.Bytecode,
 			Name:     "WETH9",
 		},
 	}
 
-	return contracts, nil
+	return contractsData, nil
 }
 
 // PrepareUniswapV2DeploymentData prepares all data needed for Uniswap V2 deployment

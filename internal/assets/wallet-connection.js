@@ -127,9 +127,15 @@ class WalletManager {
     }
 
     try {
+      // Ensure the transaction includes the from field
+      const txData = {
+        ...transactionData,
+        from: this.account,
+      };
+
       const txHash = await this.selectedWallet.request({
         method: "eth_sendTransaction",
-        params: [transactionData],
+        params: [txData],
       });
 
       return txHash;
@@ -238,4 +244,7 @@ async function connectWallet() {
 // Initialize wallet manager on page load
 document.addEventListener("DOMContentLoaded", function () {
   walletManager = new WalletManager();
+  
+  // Expose wallet manager globally for debugging
+  window.walletManager = walletManager;
 });
