@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -23,7 +24,13 @@ func main() {
 	// Command line flags
 	var showVersion = flag.Bool("version", false, "Show version information")
 	var showHelp = flag.Bool("help", false, "Show help information")
+	var enableLog = flag.Bool("log", false, "Enable logging output")
 	flag.Parse()
+
+	// Disable logging by default
+	if !*enableLog {
+		log.SetOutput(io.Discard)
+	}
 
 	if *showVersion {
 		log.Printf("Crypto Launchpad MCP Server\n")
@@ -38,7 +45,8 @@ func main() {
 		log.Printf("Usage: %s [options]\n\n", os.Args[0])
 		log.Printf("Options:\n")
 		log.Printf("  --version    Show version information\n")
-		log.Printf("  --help       Show this help message\n\n")
+		log.Printf("  --help       Show this help message\n")
+		log.Printf("  --log        Enable logging output\n\n")
 		log.Printf("Description:\n")
 		log.Printf("  AI-powered crypto launchpad supporting Ethereum and Solana blockchains.\n")
 		log.Printf("  Provides 17 MCP tools for token deployment and Uniswap integration.\n\n")

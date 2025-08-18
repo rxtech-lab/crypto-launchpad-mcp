@@ -36,7 +36,7 @@ binaries:
 
 # Run tests
 test:
-	go test -v ./...
+	go test -v -p 1 ./...
 
 # Run the MCP server directly (no build)
 run:

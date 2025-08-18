@@ -201,9 +201,11 @@ class UniswapDeploymentManager {
       }
 
       const transactionData = {
+        from: this.walletManager.getAccount(),
         data: data,
         value: "0x0",
         gas: "0x7A1200", // 8,000,000 gas (increased for complex contracts)
+        chainId: this.walletManager.getChainId(),
       };
 
       console.log(`Deploying ${contractName} with transaction data:`, {

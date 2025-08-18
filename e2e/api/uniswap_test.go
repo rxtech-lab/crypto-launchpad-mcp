@@ -26,9 +26,6 @@ func (s *UniswapDeploymentChromedpTestSuite) SetupSuite() {
 
 func (s *UniswapDeploymentChromedpTestSuite) TearDownSuite() {
 	if s.setup != nil {
-		// Add delay for debugging - allows manual inspection
-		fmt.Println("DEBUG: Delaying cleanup for 10 seconds to allow inspection...")
-		time.Sleep(10 * time.Second)
 		s.setup.Cleanup()
 	}
 }
