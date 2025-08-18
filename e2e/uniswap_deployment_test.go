@@ -44,10 +44,9 @@ func (s *UniswapDeploymentTestSuite) TearDownSuite() {
 func (s *UniswapDeploymentTestSuite) TestCreateUniswapDeploymentSession() {
 	// Create Uniswap deployment record
 	deployment := &models.UniswapDeployment{
-		Version:   "v2",
-		ChainType: "ethereum",
-		ChainID:   TESTNET_CHAIN_ID,
-		Status:    "pending",
+		Version: "v2",
+		ChainID: s.setup.GetTestChainID(),
+		Status:  "pending",
 	}
 
 	err := s.setup.DB.CreateUniswapDeployment(deployment)
@@ -379,10 +378,9 @@ func (s *ErrorHandlingTestSuite) TestNonexistentDeployment() {
 func (s *ErrorHandlingTestSuite) TestMalformedConfirmationData() {
 	// Create valid session first
 	deployment := &models.UniswapDeployment{
-		Version:   "v2",
-		ChainType: "ethereum",
-		ChainID:   TESTNET_CHAIN_ID,
-		Status:    "pending",
+		Version: "v2",
+		ChainID: s.setup.GetTestChainID(),
+		Status:  "pending",
 	}
 	err := s.setup.DB.CreateUniswapDeployment(deployment)
 	s.Require().NoError(err)
@@ -433,11 +431,12 @@ func (s *DatabaseIntegrationTestSuite) TearDownSuite() {
 
 func (s *DatabaseIntegrationTestSuite) TestDeploymentRecordManagement() {
 	// Create deployment
+	chainID := s.setup.GetTestChainID()
+
 	deployment := &models.UniswapDeployment{
-		Version:   "v2",
-		ChainType: "ethereum",
-		ChainID:   TESTNET_CHAIN_ID,
-		Status:    "pending",
+		Version: "v2",
+		ChainID: chainID,
+		Status:  "pending",
 	}
 
 	err := s.setup.DB.CreateUniswapDeployment(deployment)
@@ -447,9 +446,10 @@ func (s *DatabaseIntegrationTestSuite) TestDeploymentRecordManagement() {
 	// Retrieve deployment
 	retrieved, err := s.setup.DB.GetUniswapDeploymentByID(deployment.ID)
 	s.Require().NoError(err)
+
 	s.Assert().Equal(deployment.Version, retrieved.Version)
-	s.Assert().Equal(deployment.ChainType, retrieved.ChainType)
 	s.Assert().Equal(deployment.ChainID, retrieved.ChainID)
+	s.Assert().Equal("ethereum", retrieved.Chain.ChainType)
 
 	// Update deployment with contract addresses
 	contractAddresses := map[string]string{
@@ -480,15 +480,25 @@ func (s *DatabaseIntegrationTestSuite) TestDeploymentRecordManagement() {
 }
 
 func (s *DatabaseIntegrationTestSuite) TestPreventDuplicateDeployment() {
+	// Create another chain for this test
+	testChain2 := &models.Chain{
+		ChainType: "ethereum",
+		RPC:       "http://localhost:9999",
+		ChainID:   "9999",
+		Name:      "Test Chain 2",
+		IsActive:  false,
+	}
+	err := s.setup.DB.CreateChain(testChain2)
+	s.Require().NoError(err)
+
 	// Create confirmed deployment for a specific chain
 	deployment := &models.UniswapDeployment{
-		Version:   "v2",
-		ChainType: "ethereum",
-		ChainID:   "9999", // Use different chain ID to avoid conflicts
-		Status:    "confirmed",
+		Version: "v2",
+		ChainID: testChain2.ID,
+		Status:  "confirmed",
 	}
 
-	err := s.setup.DB.CreateUniswapDeployment(deployment)
+	err = s.setup.DB.CreateUniswapDeployment(deployment)
 	s.Require().NoError(err)
 
 	// Try to find existing deployment (simulating the tool's duplicate check)
@@ -504,10 +514,9 @@ func (s *DatabaseIntegrationTestSuite) TestPreventDuplicateDeployment() {
 func (s *DatabaseIntegrationTestSuite) TestSessionLifecycle() {
 	// Create deployment and session
 	deployment := &models.UniswapDeployment{
-		Version:   "v2",
-		ChainType: "ethereum",
-		ChainID:   TESTNET_CHAIN_ID,
-		Status:    "pending",
+		Version: "v2",
+		ChainID: s.setup.GetTestChainID(),
+		Status:  "pending",
 	}
 	err := s.setup.DB.CreateUniswapDeployment(deployment)
 	s.Require().NoError(err)

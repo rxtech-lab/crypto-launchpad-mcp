@@ -55,10 +55,9 @@ func TestAPIServer_TemplateWorkflow(t *testing.T) {
 		// Create deployment record directly
 		deployment := &models.Deployment{
 			TemplateID:      template.ID,
+			ChainID:         setup.GetTestChainID(),
 			TokenName:       "TestToken",
 			TokenSymbol:     "TEST",
-			ChainType:       "ethereum",
-			ChainID:         TESTNET_CHAIN_ID,
 			DeployerAddress: setup.GetPrimaryTestAccount().Address.Hex(),
 			Status:          "pending",
 		}
@@ -112,10 +111,9 @@ func TestAPIServer_TemplateWorkflow(t *testing.T) {
 		// Create deployment record with APIToken/API values
 		deployment := &models.Deployment{
 			TemplateID:      template.ID,
+			ChainID:         setup.GetTestChainID(),
 			TokenName:       "APIToken",
 			TokenSymbol:     "API",
-			ChainType:       "ethereum",
-			ChainID:         TESTNET_CHAIN_ID,
 			DeployerAddress: setup.GetPrimaryTestAccount().Address.Hex(),
 			Status:          "pending",
 		}
@@ -451,10 +449,9 @@ func TestAPIServer_DatabaseIntegration(t *testing.T) {
 		// Create deployment
 		deployment := &models.Deployment{
 			TemplateID:      template.ID,
+			ChainID:         setup.GetTestChainID(),
 			TokenName:       "DBTestToken",
 			TokenSymbol:     "DBT",
-			ChainType:       "ethereum",
-			ChainID:         TESTNET_CHAIN_ID,
 			DeployerAddress: setup.GetPrimaryTestAccount().Address.Hex(),
 			Status:          "pending",
 		}

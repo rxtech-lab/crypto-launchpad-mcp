@@ -142,10 +142,9 @@ func deploySimpleERC20Contract(t *testing.T, setup *TestSetup) {
 	// Create deployment record
 	deployment := &models.Deployment{
 		TemplateID:      template.ID,
+		ChainID:         setup.GetTestChainID(),
 		TokenName:       "TestToken",
 		TokenSymbol:     "TEST",
-		ChainType:       "ethereum",
-		ChainID:         TESTNET_CHAIN_ID,
 		DeployerAddress: account.Address.Hex(),
 		Status:          "pending",
 	}
@@ -259,10 +258,9 @@ func deployMintableTokenContract(t *testing.T, setup *TestSetup) {
 	// Create deployment
 	deployment := &models.Deployment{
 		TemplateID:      template.ID,
+		ChainID:         setup.GetTestChainID(),
 		TokenName:       "MintableTestToken",
 		TokenSymbol:     "MINT",
-		ChainType:       "ethereum",
-		ChainID:         TESTNET_CHAIN_ID,
 		DeployerAddress: account.Address.Hex(),
 		Status:          "pending",
 	}
@@ -426,10 +424,9 @@ func testFullDeploymentWorkflow(t *testing.T, setup *TestSetup) {
 	// Step 3: Launch deployment (simulate MCP launch tool)
 	deployment := &models.Deployment{
 		TemplateID:      template.ID,
+		ChainID:         setup.GetTestChainID(),
 		TokenName:       "WorkflowToken",
 		TokenSymbol:     "WORK",
-		ChainType:       "ethereum",
-		ChainID:         TESTNET_CHAIN_ID,
 		DeployerAddress: account.Address.Hex(),
 		Status:          "pending",
 	}

@@ -17,26 +17,72 @@ func (s *APIServer) handleUniswapDeploymentPage(c *fiber.Ctx) error {
 		return c.Status(400).SendString("Session ID is required")
 	}
 
-	// Get template
-	template := s.templates["deploy_uniswap"]
-	if template == nil {
-		return c.Status(500).SendString("Uniswap deployment template not found")
+	// Validate session
+	session, err := s.db.GetTransactionSession(sessionID)
+	if err != nil {
+		return c.Status(404).SendString("Session not found or expired")
 	}
 
-	// Template data
-	data := map[string]interface{}{
-		"SessionID": sessionID,
+	if session.SessionType != "deploy_uniswap" {
+		return c.Status(400).SendString("Invalid session type")
 	}
 
-	// Render template
-	var rendered strings.Builder
-	if err := template.Execute(&rendered, data); err != nil {
-		log.Printf("Error rendering Uniswap deployment template: %v", err)
-		return c.Status(500).SendString("Error rendering page")
+	// Parse session data and prepare transaction data for embedding
+	var sessionData map[string]interface{}
+	var transactionData map[string]interface{}
+
+	if err := json.Unmarshal([]byte(session.TransactionData), &sessionData); err == nil {
+		if deploymentIDFloat, ok := sessionData["uniswap_deployment_id"].(float64); ok {
+			deploymentID := uint(deploymentIDFloat)
+
+			// Get Uniswap deployment record
+			if deployment, err := s.db.GetUniswapDeploymentByID(deploymentID); err == nil {
+				// Get contract artifacts for client-side deployment
+				contractData := make(map[string]interface{})
+				contractNames := []string{"WETH9", "Factory", "Router"}
+
+				for _, contractName := range contractNames {
+					if artifact, err := contracts.GetContractArtifact(contractName); err == nil {
+						// Ensure bytecode has 0x prefix
+						bytecode := artifact.Bytecode
+						if !strings.HasPrefix(bytecode, "0x") {
+							bytecode = "0x" + bytecode
+						}
+
+						contractData[contractName] = map[string]interface{}{
+							"bytecode": bytecode,
+							"abi":      artifact.ABI,
+						}
+					}
+				}
+
+				// Prepare embedded transaction data
+				transactionData = map[string]interface{}{
+					"session_id":          sessionID,
+					"deployment_id":       deployment.ID,
+					"version":             deployment.Version,
+					"chain":               deployment.Chain,
+					"chain_type":          deployment.Chain.ChainType,
+					"chain_id":            deployment.Chain.ChainID,
+					"status":              deployment.Status,
+					"session_type":        session.SessionType,
+					"metadata":            sessionData["metadata"],
+					"deployment_data":     sessionData["deployment_data"],
+					"contracts_to_deploy": contractNames,
+					"deployment_order":    "1. WETH9 → 2. Factory → 3. Router",
+					"contract_data":       contractData,
+				}
+			}
+		}
 	}
 
+	// Serve HTML page with embedded transaction data
+	html := s.renderTemplate("deploy_uniswap", map[string]interface{}{
+		"SessionID":       session.ID,
+		"TransactionData": transactionData,
+	})
 	c.Set("Content-Type", "text/html")
-	return c.SendString(rendered.String())
+	return c.SendString(html)
 }
 
 // handleUniswapDeploymentAPI provides session data for the Uniswap deployment
@@ -115,8 +161,9 @@ func (s *APIServer) handleUniswapDeploymentAPI(c *fiber.Ctx) error {
 		"session_id":          sessionID,
 		"deployment_id":       deployment.ID,
 		"version":             deployment.Version,
-		"chain_type":          deployment.ChainType,
-		"chain_id":            deployment.ChainID,
+		"chain":               deployment.Chain,
+		"chain_type":          deployment.Chain.ChainType,
+		"chain_id":            deployment.Chain.ChainID,
 		"status":              deployment.Status,
 		"session_type":        session.SessionType,
 		"metadata":            sessionData["metadata"],

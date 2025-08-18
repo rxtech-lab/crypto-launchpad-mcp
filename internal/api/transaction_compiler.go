@@ -37,8 +37,36 @@ func (s *APIServer) generateTransactionData(deployment *models.Deployment, templ
 		// Compile the contract using utils/solidity.go
 		result, err := utils.CompileSolidity("0.8.20", processedCode)
 		if err == nil {
-			transactionData["bytecode"] = result.Bytecode
-			transactionData["abi"] = result.Abi
+			// Extract the bytecode for the specific contract name
+			if bytecode, exists := result.Bytecode[contractName]; exists {
+				// Ensure bytecode has 0x prefix for proper hex encoding
+				if bytecode != "" && !strings.HasPrefix(bytecode, "0x") {
+					bytecode = "0x" + bytecode
+				}
+
+				// For ERC20 contracts, encode constructor arguments (name, symbol)
+				if deployment.TokenName != "" && deployment.TokenSymbol != "" {
+					// Use utils to encode constructor arguments and append to bytecode
+					if encodedBytecode, err := utils.EncodeConstructorArgs(bytecode, deployment.TokenName, deployment.TokenSymbol); err == nil {
+						bytecode = encodedBytecode
+						log.Printf("Constructor arguments encoded for deployment %d", deployment.ID)
+					} else {
+						log.Printf("Failed to encode constructor arguments for deployment %d: %v", deployment.ID, err)
+						// Continue with raw bytecode - let the client handle it
+					}
+				}
+
+				transactionData["bytecode"] = bytecode
+			} else {
+				log.Printf("Contract %s not found in compilation result for deployment %d", contractName, deployment.ID)
+				transactionData["compilation_error"] = fmt.Sprintf("Contract %s not found in compilation result", contractName)
+			}
+
+			// Extract the ABI for the specific contract name
+			if abi, exists := result.Abi[contractName]; exists {
+				transactionData["abi"] = abi
+			}
+
 			transactionData["compiled"] = true
 			transactionData["processed_code"] = processedCode
 		} else {

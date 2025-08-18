@@ -76,6 +76,16 @@ func (d *Database) SetActiveChain(chainType string) error {
 	return d.DB.Model(&models.Chain{}).Where("chain_type = ?", chainType).Update("is_active", true).Error
 }
 
+func (d *Database) SetActiveChainByID(chainID uint) error {
+	// Deactivate all chains
+	if err := d.DB.Model(&models.Chain{}).Where("is_active = ?", true).Update("is_active", false).Error; err != nil {
+		return err
+	}
+
+	// Activate the selected chain by ID
+	return d.DB.Model(&models.Chain{}).Where("id = ?", chainID).Update("is_active", true).Error
+}
+
 func (d *Database) UpdateChainConfig(chainType, rpc, chainID string) error {
 	return d.DB.Model(&models.Chain{}).
 		Where("chain_type = ?", chainType).
@@ -149,6 +159,15 @@ func (d *Database) GetDeploymentByID(id uint) (*models.Deployment, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Manually load the Chain relationship
+	var chain models.Chain
+	err = d.DB.First(&chain, deployment.ChainID).Error
+	if err != nil {
+		return nil, err
+	}
+	deployment.Chain = chain
+
 	return &deployment, nil
 }
 
@@ -169,7 +188,21 @@ func (d *Database) UpdateDeploymentStatus(id uint, status, contractAddress, txHa
 func (d *Database) ListDeployments() ([]models.Deployment, error) {
 	var deployments []models.Deployment
 	err := d.DB.Preload("Template").Find(&deployments).Error
-	return deployments, err
+	if err != nil {
+		return nil, err
+	}
+
+	// Manually load Chain relationships
+	for i := range deployments {
+		var chain models.Chain
+		err = d.DB.First(&chain, deployments[i].ChainID).Error
+		if err != nil {
+			return nil, err
+		}
+		deployments[i].Chain = chain
+	}
+
+	return deployments, nil
 }
 
 // Uniswap Settings operations
@@ -377,10 +410,22 @@ func (d *Database) CreateUniswapDeployment(deployment *models.UniswapDeployment)
 
 func (d *Database) GetUniswapDeploymentByChain(chainType, chainID string) (*models.UniswapDeployment, error) {
 	var deployment models.UniswapDeployment
-	err := d.DB.Where("chain_type = ? AND chain_id = ? AND status = ?", chainType, chainID, "confirmed").First(&deployment).Error
+	err := d.DB.
+		Joins("JOIN chains ON chains.id = uniswap_deployments.chain_id").
+		Where("chains.chain_type = ? AND chains.chain_id = ? AND uniswap_deployments.status = ?", chainType, chainID, "confirmed").
+		First(&deployment).Error
 	if err != nil {
 		return nil, err
 	}
+
+	// Manually load the Chain relationship
+	var chain models.Chain
+	err = d.DB.First(&chain, deployment.ChainID).Error
+	if err != nil {
+		return nil, err
+	}
+	deployment.Chain = chain
+
 	return &deployment, nil
 }
 
@@ -390,6 +435,15 @@ func (d *Database) GetUniswapDeploymentByID(id uint) (*models.UniswapDeployment,
 	if err != nil {
 		return nil, err
 	}
+
+	// Manually load the Chain relationship
+	var chain models.Chain
+	err = d.DB.First(&chain, deployment.ChainID).Error
+	if err != nil {
+		return nil, err
+	}
+	deployment.Chain = chain
+
 	return &deployment, nil
 }
 
@@ -429,7 +483,35 @@ func (d *Database) UpdateUniswapDeploymentStatus(id uint, status string, address
 func (d *Database) ListUniswapDeployments() ([]models.UniswapDeployment, error) {
 	var deployments []models.UniswapDeployment
 	err := d.DB.Find(&deployments).Error
-	return deployments, err
+	if err != nil {
+		return nil, err
+	}
+
+	// Manually load Chain relationships
+	for i := range deployments {
+		var chain models.Chain
+		err = d.DB.First(&chain, deployments[i].ChainID).Error
+		if err != nil {
+			return nil, err
+		}
+		deployments[i].Chain = chain
+	}
+
+	return deployments, nil
+}
+
+func (d *Database) DeleteUniswapDeployments(ids []uint) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	result := d.DB.Where("id IN ?", ids).Delete(&models.UniswapDeployment{})
+	return result.RowsAffected, result.Error
+}
+
+func (d *Database) ClearUniswapConfiguration(version string) error {
+	// Delete all Uniswap settings for the specified version
+	return d.DB.Where("version = ?", version).Delete(&models.UniswapSettings{}).Error
 }
 
 func (d *Database) Close() error {

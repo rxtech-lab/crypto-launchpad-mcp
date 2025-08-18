@@ -58,6 +58,9 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	})
 
 	// Chain Management Tools
+	listChainsTool, listChainsHandler := tools.NewListChainsTool(db)
+	srv.AddTool(listChainsTool, listChainsHandler)
+
 	selectChainTool, selectChainHandler := tools.NewSelectChainTool(db)
 	srv.AddTool(selectChainTool, selectChainHandler)
 
@@ -119,6 +122,9 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	deployUniswapTool, deployUniswapHandler := tools.NewDeployUniswapTool(db, serverPort)
 	srv.AddTool(deployUniswapTool, deployUniswapHandler)
 
+	removeUniswapDeploymentTool, removeUniswapDeploymentHandler := tools.NewRemoveUniswapDeploymentTool(db)
+	srv.AddTool(removeUniswapDeploymentTool, removeUniswapDeploymentHandler)
+
 	// Balance Query Tools
 	queryBalanceTool, queryBalanceHandler := tools.NewQueryBalanceTool(db, serverPort)
 	srv.AddTool(queryBalanceTool, queryBalanceHandler)
@@ -149,10 +155,13 @@ func getToolInstructions(category string) string {
 	case "chain":
 		return `Chain Management Tools:
 
-1. select_chain - Select active blockchain (ethereum/solana)
-   Usage: Use this to switch between supported blockchains
+1. list_chains - List all available blockchain chains with their configurations
+   Usage: View all configured chains and identify the active one
 
-2. set_chain - Configure blockchain RPC and chain ID
+2. select_chain - Select active blockchain by chain_type or chain_id
+   Usage: Switch between configured blockchains using either legacy chain_type or precise chain_id
+
+3. set_chain - Configure blockchain RPC and chain ID
    Usage: Set up custom RPC endpoints and chain configurations`
 
 	case "template":
@@ -225,10 +234,11 @@ func getToolInstructions(category string) string {
 	case "all":
 		return `Crypto Launchpad MCP Tools Overview:
 
-This MCP server provides 17 tools for managing cryptocurrency token deployments and Uniswap operations:
+This MCP server provides 18 tools for managing cryptocurrency token deployments and Uniswap operations:
 
-CHAIN MANAGEMENT (2 tools):
-- select_chain: Switch between ethereum/solana
+CHAIN MANAGEMENT (3 tools):
+- list_chains: List all configured blockchain chains
+- select_chain: Switch between blockchains by type or ID
 - set_chain: Configure RPC endpoints
 
 TEMPLATE MANAGEMENT (4 tools):

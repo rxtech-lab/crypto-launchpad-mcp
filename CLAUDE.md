@@ -26,7 +26,7 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 - Liquidity positions and swap transaction history
 - Transaction sessions for signing interface management (deploy, deploy_uniswap, balance_query, pool operations)
 
-### MCP Tools (17 total)
+### MCP Tools (18 total)
 
 #### Chain Management (2 tools)
 
@@ -45,9 +45,10 @@ This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that 
 - `launch` - Generate deployment URL with signing interface
 - `list_deployments` - List all token deployments with filtering options
 
-#### Uniswap Integration (10 tools)
+#### Uniswap Integration (11 tools)
 
 - `deploy_uniswap` - Deploy Uniswap infrastructure contracts (factory, router, WETH)
+- `remove_uniswap_deployment` - Remove Uniswap deployments by ID(s) with bulk deletion support
 - `set_uniswap_version` - Configure Uniswap version (v2/v3/v4)
 - `get_uniswap_addresses` - Get current Uniswap configuration
 - `create_liquidity_pool` - Create new liquidity pool with signing interface
@@ -232,14 +233,60 @@ All tools follow the exact structure from the example project:
 ### Asset Management
 
 - **Embedded Templates**: HTML templates stored in `internal/assets/` and embedded at compile time
-- **Template Engine**: Go's `text/template` package for dynamic content rendering
+- **Template Engine**: Go's `html/template` package for dynamic content rendering with JSON support
+- **Embedded Transaction Data**: For improved performance, transaction data (including compiled bytecode) is embedded directly in HTML during template rendering instead of requiring separate API calls
+- **Template Functions**: Custom template functions available:
+  - `json`: Converts Go data structures to JSON for embedding in HTML data attributes
 - **Modular JavaScript**: Multiple focused scripts served via HTTP endpoints:
   - `/js/wallet-connection.js` - Core wallet functionality
-  - `/js/deploy-tokens.js` - Token deployment
-  - `/js/deploy-uniswap.js` - Uniswap deployment  
+  - `/js/deploy-tokens.js` - Token deployment with embedded data support
+  - `/js/deploy-uniswap.js` - Uniswap deployment with embedded data support  
   - `/js/balance-query.js` - Balance queries
   - `/js/wallet.js` - Legacy monolithic script (deprecated)
 - **Build-time Inclusion**: All assets compiled into the binary for single-file distribution
+
+#### Embedded Data Pattern
+
+For optimal performance, transaction data is compiled and embedded during HTML template rendering:
+
+**Backend (Template Rendering)**:
+```go
+// deployment_handlers.go & uniswap_handlers.go
+transactionData := s.generateTransactionData(deployment, template, activeChain)
+html := s.renderTemplate("deploy", map[string]interface{}{
+    "SessionID":       session.ID,
+    "TransactionData": transactionData, // Embedded with bytecode
+})
+```
+
+**Frontend (HTML Template)**:
+```html
+<div id="session-data" 
+     data-session-id="{{.SessionID}}" 
+     data-api-url="/api/deploy/{{.SessionID}}"
+     {{if .TransactionData}}data-transaction-data="{{.TransactionData | json}}"{{end}}>
+</div>
+```
+
+**JavaScript (Data Loading)**:
+```javascript
+// Check embedded data first, fallback to API
+async loadSessionData(sessionId, apiUrl, embeddedData = null) {
+    if (embeddedData) {
+        console.log("Using embedded transaction data");
+        this.sessionData = embeddedData;
+        this.displayTransactionDetails();
+        return;
+    }
+    // Fallback to API call...
+}
+```
+
+**Benefits**:
+- ⚡ **Performance**: Eliminates extra API calls for transaction data
+- 🔧 **Reliability**: Prevents JavaScript errors with defensive null/undefined checking  
+- 🔄 **Compatibility**: Maintains fallback to API calls for backward compatibility
+- 🚀 **User Experience**: Faster page loads with immediate data availability
 
 ## Security Considerations
 
@@ -313,8 +360,14 @@ Test complete API workflows with real blockchain integration:
 make e2e-network  # Starts anvil on localhost:8545
 
 # Run specific API tests (30s timeout enforced)
-go test -v ./e2e -run TestUniswapDeploymentAPI -timeout 30s
+go test -v ./e2e/api -run TestUniswapDeploymentChromedp -timeout 30s
+go test -v ./e2e/api -run TestTokenDeployment -timeout 30s
 go test -v ./e2e -run TestAPIServer -timeout 30s
+
+# Run token deployment tests
+go test -v ./e2e/api -run TestTokenDeploymentPageLoad -timeout 30s
+go test -v ./e2e/api -run TestTokenDeploymentErrorHandling -timeout 30s
+go test -v ./e2e/api -run TestTokenDeploymentWithoutWallet -timeout 30s
 ```
 
 **Key Requirements:**
@@ -357,7 +410,12 @@ go test -v ./e2e -run TestContractDeployment -timeout 30s
 
 #### Database Testing
 ```go
-// Always use real SQLite database
+// E2E tests use in-memory databases for speed and isolation
+db, err := database.NewDatabase(":memory:")
+require.NoError(t, err)
+defer db.Close()
+
+// Unit tests can use temporary file databases when needed
 tempDir := t.TempDir()
 dbPath := filepath.Join(tempDir, "test.db")
 db, err := database.NewDatabase(dbPath)
@@ -414,7 +472,8 @@ assert.Equal(t, "deploy_uniswap", apiResponse["session_type"])
 make e2e-network
 
 # Run tests with verbose output (30s timeout enforced)
-go test -v ./e2e -run TestUniswapDeploymentAPI -timeout 30s
+go test -v ./e2e/api -run TestUniswapDeploymentChromedp -timeout 30s
+go test -v ./e2e/api -run TestTokenDeployment -timeout 30s
 
 # Run all tests (30s timeout enforced)
 make test
@@ -423,9 +482,22 @@ make test
 go test -v -cover ./... -timeout 30s
 
 # Run specific test categories (30s timeout enforced)
-go test -v ./e2e -timeout 30s          # API and integration tests
+go test -v ./e2e/api -timeout 30s      # Browser-based E2E API tests
+go test -v ./e2e -timeout 30s          # General integration tests
 go test -v ./tests -timeout 30s        # Unit tests
 go test -v ./internal/... -timeout 30s # Component tests
+
+# Token deployment specific tests
+go test -v ./e2e/api -run TestTokenDeployment$ -timeout 30s           # Full deployment workflows
+go test -v ./e2e/api -run TestTokenDeploymentPageLoad -timeout 30s    # Page loading tests
+go test -v ./e2e/api -run TestTokenDeploymentErrorHandling -timeout 30s # Error scenarios
+go test -v ./e2e/api -run TestTokenDeploymentWithoutWallet -timeout 30s # Wallet edge cases
+
+# Uniswap deployment specific tests  
+go test -v ./e2e/api -run TestUniswapDeploymentChromedp -timeout 30s   # Full Uniswap workflow
+go test -v ./e2e/api -run TestUniswapDeploymentPageLoad -timeout 30s   # Uniswap page tests
+go test -v ./e2e/api -run TestUniswapDeploymentErrorHandling -timeout 30s # Uniswap errors
+go test -v ./e2e/api -run TestUniswapDeploymentWithoutWallet -timeout 30s # Uniswap wallet tests
 ```
 
 ### Test Patterns and Best Practices
@@ -517,6 +589,45 @@ Write comprehensive tests for:
 - Frontend wallet integration (manual testing)
 - Cross-platform binary compatibility
 - CI/CD pipeline validation
+
+### Token Deployment Test Architecture
+
+The token deployment E2E tests are located at `/e2e/api/token_deployment_test.go` and follow the same robust patterns as Uniswap deployment tests:
+
+#### Test Components
+
+1. **Test Suites**:
+   - `TokenDeploymentTestSuite` - Main deployment workflows (OpenZeppelin & Custom)
+   - `TokenDeploymentErrorTestSuite` - Error scenarios (invalid/expired sessions)
+   - `TokenDeploymentWalletTestSuite` - Wallet interaction edge cases
+   - `TokenDeploymentPageLoadTestSuite` - UI functionality tests
+
+2. **Page Object Model**: `/e2e/api/token_deployment_page.go`
+   - `TokenDeploymentPage` - Encapsulates all page interactions
+   - Methods for wallet selection, connection, transaction signing
+   - Screenshot and debugging utilities
+
+3. **Test Helpers**: Enhanced `/e2e/api/test_helpers.go`
+   - `CreateOpenZeppelinTemplate()` - Creates ERC20 template using OpenZeppelin
+   - `CreateCustomTemplate()` - Creates custom ERC20 implementation 
+   - `CreateTokenDeploymentSession()` - Proper session creation with deployment records
+
+#### Test Coverage
+
+- **Template Types**: Both OpenZeppelin-based and custom ERC20 contracts
+- **Full Workflow**: Page load → Wallet connection → Transaction signing → Blockchain verification → Database updates
+- **Error Handling**: Invalid sessions, expired sessions, missing wallets
+- **Contract Verification**: On-chain verification of deployed contracts
+- **Database Integration**: Proper session and deployment record management
+
+#### Key Test Requirements
+
+- Use real Anvil testnet (`make e2e-network`)
+- Test actual contract compilation and deployment
+- Verify bytecode generation and transaction data
+- Confirm database state updates
+- Browser automation with Chrome/Chromium
+- 30-second timeout enforcement for all tests
 
 ## OpenZeppelin Contracts Integration
 

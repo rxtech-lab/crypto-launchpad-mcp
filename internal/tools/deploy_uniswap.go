@@ -63,10 +63,9 @@ func NewDeployUniswapTool(db *database.Database, serverPort int) (mcp.Tool, serv
 
 		// Create Uniswap deployment record
 		uniswapDeployment := &models.UniswapDeployment{
-			Version:   version,
-			ChainType: activeChain.ChainType,
-			ChainID:   activeChain.ChainID,
-			Status:    "pending",
+			Version: version,
+			ChainID: activeChain.ID,
+			Status:  "pending",
 		}
 
 		if err := db.CreateUniswapDeployment(uniswapDeployment); err != nil {
