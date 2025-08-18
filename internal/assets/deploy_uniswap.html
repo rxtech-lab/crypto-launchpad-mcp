@@ -107,6 +107,7 @@
             id="session-data"
             data-session-id="{{.SessionID}}"
             data-api-url="/api/deploy-uniswap/{{.SessionID}}"
+            {{if .TransactionData}}data-transaction-data="{{.TransactionData | json}}"{{end}}
           ></div>
           <!-- Deployment Info State (Initially Hidden) -->
           <div id="deployment-info" class="hidden p-6">

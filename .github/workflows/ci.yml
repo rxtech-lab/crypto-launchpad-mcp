@@ -20,20 +20,8 @@ jobs:
         with:
           go-version: "1.24"
           check-latest: true
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
       - name: Download dependencies
         run: make deps
-
       - name: Install foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:

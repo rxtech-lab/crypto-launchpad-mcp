@@ -68,7 +68,7 @@ func NewListDeploymentsTool(db *database.Database) (mcp.Tool, server.ToolHandler
 			}
 
 			// Apply chain type filter
-			if chainType != "" && deployment.ChainType != chainType {
+			if chainType != "" && deployment.Chain.ChainType != chainType {
 				continue
 			}
 
@@ -79,8 +79,8 @@ func NewListDeploymentsTool(db *database.Database) (mcp.Tool, server.ToolHandler
 				"contract_address": deployment.ContractAddress,
 				"token_name":       deployment.TokenName,
 				"token_symbol":     deployment.TokenSymbol,
-				"chain_type":       deployment.ChainType,
 				"chain_id":         deployment.ChainID,
+				"chain":            deployment.Chain,
 				"deployer_address": deployment.DeployerAddress,
 				"transaction_hash": deployment.TransactionHash,
 				"status":           deployment.Status,

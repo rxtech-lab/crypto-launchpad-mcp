@@ -1,11 +1,13 @@
 package utils
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/rxtech-lab/launchpad-mcp/internal/contracts"
 	"github.com/rxtech-lab/solc-go"
 )
@@ -86,4 +88,28 @@ func CompileSolidity(version string, code string) (CompilationResult, error) {
 		Bytecode: bytecodeMap,
 		Abi:      abiMap,
 	}, nil
+}
+
+// EncodeConstructorArgs encodes constructor arguments for ERC20 contracts and appends them to bytecode
+func EncodeConstructorArgs(bytecode, tokenName, tokenSymbol string) (string, error) {
+	// Remove 0x prefix if present
+	cleanBytecode := strings.TrimPrefix(bytecode, "0x")
+
+	// Create a simple ABI for string constructor (name, symbol)
+	constructorABI := abi.Arguments{
+		{Type: abi.Type{T: abi.StringTy}}, // name
+		{Type: abi.Type{T: abi.StringTy}}, // symbol
+	}
+
+	// Pack the constructor arguments
+	encodedArgs, err := constructorABI.Pack(tokenName, tokenSymbol)
+	if err != nil {
+		return "", fmt.Errorf("failed to encode constructor arguments: %w", err)
+	}
+
+	// Convert to hex and append to bytecode
+	encodedArgsHex := hex.EncodeToString(encodedArgs)
+
+	// Return with 0x prefix
+	return "0x" + cleanBytecode + encodedArgsHex, nil
 }

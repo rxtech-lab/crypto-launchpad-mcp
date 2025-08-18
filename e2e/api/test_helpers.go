@@ -259,17 +259,47 @@ func (s *ChromedpTestSetup) InitializeTestWallet() error {
 	return nil
 }
 
-// CreateUniswapDeploymentSession creates a Uniswap deployment session for testing
-func (s *ChromedpTestSetup) CreateUniswapDeploymentSession() (string, error) {
-	// First create the Uniswap deployment record
-	deployment := &models.UniswapDeployment{
-		Version:   "v2",
-		ChainType: "ethereum",
-		ChainID:   "31337",
-		Status:    "pending",
+// getOrCreateTestChain gets or creates a test chain for e2e testing
+func (s *ChromedpTestSetup) getOrCreateTestChain() (*models.Chain, error) {
+	// Try to get existing active chain
+	activeChain, err := s.DB.GetActiveChain()
+	if err == nil && activeChain != nil {
+		return activeChain, nil
 	}
 
-	err := s.DB.CreateUniswapDeployment(deployment)
+	// Create a test chain
+	testChain := &models.Chain{
+		ChainType: "ethereum",
+		RPC:       "http://localhost:8545",
+		ChainID:   "31337",
+		Name:      "Anvil Testnet",
+		IsActive:  true,
+	}
+
+	err = s.DB.CreateChain(testChain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create test chain: %w", err)
+	}
+
+	return testChain, nil
+}
+
+// CreateUniswapDeploymentSession creates a Uniswap deployment session for testing
+func (s *ChromedpTestSetup) CreateUniswapDeploymentSession() (string, error) {
+	// Get or create test chain
+	chain, err := s.getOrCreateTestChain()
+	if err != nil {
+		return "", fmt.Errorf("failed to get test chain: %w", err)
+	}
+
+	// First create the Uniswap deployment record
+	deployment := &models.UniswapDeployment{
+		Version: "v2",
+		ChainID: chain.ID,
+		Status:  "pending",
+	}
+
+	err = s.DB.CreateUniswapDeployment(deployment)
 	if err != nil {
 		return "", fmt.Errorf("failed to create uniswap deployment: %w", err)
 	}
@@ -294,6 +324,157 @@ func (s *ChromedpTestSetup) CreateUniswapDeploymentSession() (string, error) {
 	// Create transaction session in database
 	sessionID, err := s.DB.CreateTransactionSession(
 		"deploy_uniswap",
+		"ethereum",
+		"31337",
+		string(sessionDataJSON),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create transaction session: %w", err)
+	}
+
+	return sessionID, nil
+}
+
+// CreateOpenZeppelinTemplate creates an OpenZeppelin ERC20 template for testing
+func (s *ChromedpTestSetup) CreateOpenZeppelinTemplate() (uint, error) {
+	template := &models.Template{
+		Name:        "Test OpenZeppelin ERC20",
+		Description: "OpenZeppelin ERC20 token for testing",
+		ChainType:   "ethereum",
+		TemplateCode: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract TestToken is ERC20 {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {
+        _mint(msg.sender, 1000000 * 10 ** decimals());
+    }
+}`,
+	}
+
+	err := s.DB.CreateTemplate(template)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create OpenZeppelin template: %w", err)
+	}
+
+	return template.ID, nil
+}
+
+// CreateCustomTemplate creates a custom ERC20 template for testing
+func (s *ChromedpTestSetup) CreateCustomTemplate() (uint, error) {
+	template := &models.Template{
+		Name:        "Test Custom ERC20",
+		Description: "Custom ERC20 token for testing",
+		ChainType:   "ethereum",
+		TemplateCode: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract CustomToken {
+    string public name;
+    string public symbol;
+    uint8 public decimals = 18;
+    uint256 public totalSupply;
+    
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+    
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    
+    constructor(string memory _name, string memory _symbol) {
+        name = _name;
+        symbol = _symbol;
+        totalSupply = 1000000 * 10 ** decimals;
+        balanceOf[msg.sender] = totalSupply;
+    }
+    
+    function transfer(address _to, uint256 _value) public returns (bool) {
+        require(balanceOf[msg.sender] >= _value, "Insufficient balance");
+        balanceOf[msg.sender] -= _value;
+        balanceOf[_to] += _value;
+        emit Transfer(msg.sender, _to, _value);
+        return true;
+    }
+    
+    function approve(address _spender, uint256 _value) public returns (bool) {
+        allowance[msg.sender][_spender] = _value;
+        emit Approval(msg.sender, _spender, _value);
+        return true;
+    }
+    
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+        require(balanceOf[_from] >= _value, "Insufficient balance");
+        require(allowance[_from][msg.sender] >= _value, "Insufficient allowance");
+        balanceOf[_from] -= _value;
+        balanceOf[_to] += _value;
+        allowance[_from][msg.sender] -= _value;
+        emit Transfer(_from, _to, _value);
+        return true;
+    }
+}`,
+	}
+
+	err := s.DB.CreateTemplate(template)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create custom template: %w", err)
+	}
+
+	return template.ID, nil
+}
+
+// CreateTokenDeploymentSession creates a token deployment session for testing
+func (s *ChromedpTestSetup) CreateTokenDeploymentSession(templateID uint) (string, error) {
+	// Get the template to include in session data
+	template, err := s.DB.GetTemplateByID(templateID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get template: %w", err)
+	}
+
+	// Get or create test chain
+	chain, err := s.getOrCreateTestChain()
+	if err != nil {
+		return "", fmt.Errorf("failed to get test chain: %w", err)
+	}
+
+	// First create the deployment record
+	deployment := &models.Deployment{
+		TemplateID:  templateID,
+		ChainID:     chain.ID,
+		TokenName:   "Test Token",
+		TokenSymbol: "TEST",
+		Status:      "pending",
+	}
+
+	err = s.DB.CreateDeployment(deployment)
+	if err != nil {
+		return "", fmt.Errorf("failed to create deployment record: %w", err)
+	}
+
+	// Create session data that matches the expected format
+	sessionData := map[string]interface{}{
+		"deployment_id": deployment.ID,
+		"template_id":   templateID,
+		"template_name": template.Name,
+		"chain_id":      "31337",
+		"parameters": map[string]interface{}{
+			"name":   "Test Token",
+			"symbol": "TEST",
+		},
+		"metadata": map[string]interface{}{
+			"chain":     "Ethereum Testnet",
+			"initiator": "E2E Test",
+		},
+	}
+
+	sessionDataJSON, err := json.Marshal(sessionData)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal session data: %w", err)
+	}
+
+	// Create transaction session in database
+	sessionID, err := s.DB.CreateTransactionSession(
+		"deploy",
 		"ethereum",
 		"31337",
 		string(sessionDataJSON),
