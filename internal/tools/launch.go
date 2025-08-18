@@ -70,6 +70,16 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			return mcp.NewToolResultError(fmt.Sprintf("Template chain type (%s) doesn't match active chain (%s)", template.ChainType, activeChain.ChainType)), nil
 		}
 
+		// Check for Uniswap deployment if this is an Ethereum ERC-20 token
+		var uniswapWarning string
+		if activeChain.ChainType == "ethereum" && isERC20Template(template.TemplateCode) {
+			_, err := db.GetUniswapDeploymentByChain(activeChain.ChainType, activeChain.ChainID)
+			if err != nil {
+				// No Uniswap deployment found - suggest deploying it
+				uniswapWarning = "Note: No Uniswap infrastructure found for this chain. Consider using the deploy_uniswap tool after token deployment to enable trading."
+			}
+		}
+
 		// Extract contract name for compilation
 		contractName := extractContractName(template.TemplateCode)
 		if contractName == "" {
@@ -141,6 +151,11 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			"chain_type":    activeChain.ChainType,
 			"chain_id":      activeChain.ChainID,
 			"message":       "Deployment session created. Use the signing URL to connect wallet and deploy contract.",
+		}
+
+		// Add Uniswap warning if applicable
+		if uniswapWarning != "" {
+			result["uniswap_warning"] = uniswapWarning
 		}
 
 		// Add compilation information
@@ -216,4 +231,30 @@ func replaceTemplatePlaceholders(templateCode, tokenName, tokenSymbol string) st
 	code = strings.ReplaceAll(code, "'MTK'", fmt.Sprintf("'%s'", tokenSymbol))
 
 	return code
+}
+
+// isERC20Template checks if a template is an ERC-20 token template
+func isERC20Template(templateCode string) bool {
+	// Check for common ERC-20 patterns
+	erc20Patterns := []string{
+		"function transfer(",
+		"function transferFrom(",
+		"function balanceOf(",
+		"function approve(",
+		"function allowance(",
+		"ERC20",
+		"IERC20",
+	}
+
+	codeLower := strings.ToLower(templateCode)
+
+	// Count matches - need at least 3 ERC-20 patterns to be confident
+	matches := 0
+	for _, pattern := range erc20Patterns {
+		if strings.Contains(codeLower, strings.ToLower(pattern)) {
+			matches++
+		}
+	}
+
+	return matches >= 3
 }

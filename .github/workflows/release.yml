@@ -12,14 +12,16 @@ on:
       - created
 
 jobs:
-  build-cross-platform:
-    name: Build Cross-Platform Binaries
+  build-ubuntu:
+    name: Build Ubuntu Binaries
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -27,13 +29,23 @@ jobs:
           go-version: "1.24"
           check-latest: true
 
-      - name: Install dependencies
-        run: make deps
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
 
-      - name: Build binaries for all platforms
-        run: make binaries
+      - name: Install dependencies
+        run: make deps && make generate
+
+      - name: Build Ubuntu binary
+        run: make build
         env:
           VERSION: ${{ github.event_name == 'release' && github.ref_name || format('dev-{0}', github.sha) }}
+
+      - name: Copy binary to expected location
+        run: |
+          mkdir -p bin
+          cp bin/launchpad-mcp bin/launchpad-mcp_linux_amd64
 
       - name: List built binaries
         run: ls -la bin/
@@ -41,7 +53,7 @@ jobs:
       - name: Upload binaries as artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: cross-platform-binaries
+          name: ubuntu-binaries
           path: bin/
           retention-days: 7
 
@@ -53,6 +65,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -61,7 +75,7 @@ jobs:
           check-latest: true
 
       - name: Install dependencies
-        run: make deps
+        run: make deps && make generate
 
       - name: Build the binary
         run: make build
@@ -122,24 +136,24 @@ jobs:
             assets/launchpad-mcp_macOS_arm64_*.pkg
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  upload-cross-platform-release:
-    name: Upload Cross-Platform Binaries to Release
-    needs: build-cross-platform
+  upload-ubuntu-release:
+    name: Upload Ubuntu Binaries to Release
+    needs: build-ubuntu
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     permissions:
       contents: write
     steps:
-      - name: Download cross-platform binaries
+      - name: Download Ubuntu binaries
         uses: actions/download-artifact@v4
         with:
-          name: cross-platform-binaries
+          name: ubuntu-binaries
           path: bin/
 
       - name: Create archives
         run: |
           mkdir -p release-assets
-          
+
           # Create archives for each platform
           cd bin
           for file in launchpad-mcp_*; do
@@ -153,11 +167,11 @@ jobs:
               tar -czf "../release-assets/launchpad-mcp_${platform}.tar.gz" "$file"
             fi
           done
-          
+
           cd ..
           ls -la release-assets/
 
-      - name: Upload cross-platform archives to release
+      - name: Upload Ubuntu archives to release
         uses: softprops/action-gh-release@v2
         with:
           files: release-assets/*
