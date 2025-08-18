@@ -242,9 +242,11 @@ class UniswapDeploymentManager {
       const artifact = await response.json();
 
       // Ensure bytecode has 0x prefix
-      let bytecode = artifact.bytecode;
-      if (!bytecode.startsWith("0x")) {
+      let bytecode = artifact.bytecode || '';
+      if (typeof bytecode === 'string' && !bytecode.startsWith("0x")) {
         bytecode = "0x" + bytecode;
+      } else if (typeof bytecode !== 'string') {
+        bytecode = '';
       }
 
       return {

@@ -1,10 +1,11 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"log"
 	"net"
-	"text/template"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -46,8 +47,16 @@ func NewAPIServer(db *database.Database) *APIServer {
 func (s *APIServer) initTemplates() {
 	s.templates = make(map[string]*template.Template)
 
-	// Parse deployment template
-	deployTmpl, err := template.New("deploy").Parse(string(assets.DeployHTML))
+	// Define custom functions
+	funcMap := template.FuncMap{
+		"json": func(v interface{}) (string, error) {
+			b, err := json.Marshal(v)
+			return string(b), err
+		},
+	}
+
+	// Parse deployment template with custom functions
+	deployTmpl, err := template.New("deploy").Funcs(funcMap).Parse(string(assets.DeployHTML))
 	if err != nil {
 		log.Printf("Error parsing deploy template: %v", err)
 	} else {

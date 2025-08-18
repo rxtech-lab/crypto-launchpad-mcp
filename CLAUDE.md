@@ -313,8 +313,14 @@ Test complete API workflows with real blockchain integration:
 make e2e-network  # Starts anvil on localhost:8545
 
 # Run specific API tests (30s timeout enforced)
-go test -v ./e2e -run TestUniswapDeploymentAPI -timeout 30s
+go test -v ./e2e/api -run TestUniswapDeploymentChromedp -timeout 30s
+go test -v ./e2e/api -run TestTokenDeployment -timeout 30s
 go test -v ./e2e -run TestAPIServer -timeout 30s
+
+# Run token deployment tests
+go test -v ./e2e/api -run TestTokenDeploymentPageLoad -timeout 30s
+go test -v ./e2e/api -run TestTokenDeploymentErrorHandling -timeout 30s
+go test -v ./e2e/api -run TestTokenDeploymentWithoutWallet -timeout 30s
 ```
 
 **Key Requirements:**
@@ -414,7 +420,8 @@ assert.Equal(t, "deploy_uniswap", apiResponse["session_type"])
 make e2e-network
 
 # Run tests with verbose output (30s timeout enforced)
-go test -v ./e2e -run TestUniswapDeploymentAPI -timeout 30s
+go test -v ./e2e/api -run TestUniswapDeploymentChromedp -timeout 30s
+go test -v ./e2e/api -run TestTokenDeployment -timeout 30s
 
 # Run all tests (30s timeout enforced)
 make test
@@ -423,9 +430,22 @@ make test
 go test -v -cover ./... -timeout 30s
 
 # Run specific test categories (30s timeout enforced)
-go test -v ./e2e -timeout 30s          # API and integration tests
+go test -v ./e2e/api -timeout 30s      # Browser-based E2E API tests
+go test -v ./e2e -timeout 30s          # General integration tests
 go test -v ./tests -timeout 30s        # Unit tests
 go test -v ./internal/... -timeout 30s # Component tests
+
+# Token deployment specific tests
+go test -v ./e2e/api -run TestTokenDeployment$ -timeout 30s           # Full deployment workflows
+go test -v ./e2e/api -run TestTokenDeploymentPageLoad -timeout 30s    # Page loading tests
+go test -v ./e2e/api -run TestTokenDeploymentErrorHandling -timeout 30s # Error scenarios
+go test -v ./e2e/api -run TestTokenDeploymentWithoutWallet -timeout 30s # Wallet edge cases
+
+# Uniswap deployment specific tests  
+go test -v ./e2e/api -run TestUniswapDeploymentChromedp -timeout 30s   # Full Uniswap workflow
+go test -v ./e2e/api -run TestUniswapDeploymentPageLoad -timeout 30s   # Uniswap page tests
+go test -v ./e2e/api -run TestUniswapDeploymentErrorHandling -timeout 30s # Uniswap errors
+go test -v ./e2e/api -run TestUniswapDeploymentWithoutWallet -timeout 30s # Uniswap wallet tests
 ```
 
 ### Test Patterns and Best Practices
@@ -517,6 +537,45 @@ Write comprehensive tests for:
 - Frontend wallet integration (manual testing)
 - Cross-platform binary compatibility
 - CI/CD pipeline validation
+
+### Token Deployment Test Architecture
+
+The token deployment E2E tests are located at `/e2e/api/token_deployment_test.go` and follow the same robust patterns as Uniswap deployment tests:
+
+#### Test Components
+
+1. **Test Suites**:
+   - `TokenDeploymentTestSuite` - Main deployment workflows (OpenZeppelin & Custom)
+   - `TokenDeploymentErrorTestSuite` - Error scenarios (invalid/expired sessions)
+   - `TokenDeploymentWalletTestSuite` - Wallet interaction edge cases
+   - `TokenDeploymentPageLoadTestSuite` - UI functionality tests
+
+2. **Page Object Model**: `/e2e/api/token_deployment_page.go`
+   - `TokenDeploymentPage` - Encapsulates all page interactions
+   - Methods for wallet selection, connection, transaction signing
+   - Screenshot and debugging utilities
+
+3. **Test Helpers**: Enhanced `/e2e/api/test_helpers.go`
+   - `CreateOpenZeppelinTemplate()` - Creates ERC20 template using OpenZeppelin
+   - `CreateCustomTemplate()` - Creates custom ERC20 implementation 
+   - `CreateTokenDeploymentSession()` - Proper session creation with deployment records
+
+#### Test Coverage
+
+- **Template Types**: Both OpenZeppelin-based and custom ERC20 contracts
+- **Full Workflow**: Page load → Wallet connection → Transaction signing → Blockchain verification → Database updates
+- **Error Handling**: Invalid sessions, expired sessions, missing wallets
+- **Contract Verification**: On-chain verification of deployed contracts
+- **Database Integration**: Proper session and deployment record management
+
+#### Key Test Requirements
+
+- Use real Anvil testnet (`make e2e-network`)
+- Test actual contract compilation and deployment
+- Verify bytecode generation and transaction data
+- Confirm database state updates
+- Browser automation with Chrome/Chromium
+- 30-second timeout enforcement for all tests
 
 ## OpenZeppelin Contracts Integration
 

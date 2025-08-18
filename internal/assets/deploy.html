@@ -51,7 +51,10 @@
             
             <!-- Main Content Card -->
             <div class="bg-white/80 glass-effect border border-gray-200/50 rounded-3xl shadow-xl fade-in">
-                <div id="session-data" data-session-id="{{.SessionID}}" data-api-url="/api/deploy/{{.SessionID}}"></div>
+                <div id="session-data" 
+                     data-session-id="{{.SessionID}}" 
+                     data-api-url="/api/deploy/{{.SessionID}}"
+                     {{if .TransactionData}}data-transaction-data="{{.TransactionData | json}}"{{end}}></div>
                 <div id="content" class="p-6">
                     <!-- Loading State -->
                     <div class="text-center py-8">

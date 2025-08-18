@@ -23,9 +23,28 @@ func (s *APIServer) handleDeploymentPage(c *fiber.Ctx) error {
 		return c.Status(400).SendString("Invalid session type")
 	}
 
+	// Parse session data to get deployment ID and compile transaction data
+	var sessionData map[string]interface{}
+	var transactionData map[string]interface{}
+
+	if err := json.Unmarshal([]byte(session.TransactionData), &sessionData); err == nil {
+		if deploymentID, ok := sessionData["deployment_id"].(float64); ok {
+			// Get deployment and template data for compilation
+			if deployment, err := s.db.GetDeploymentByID(uint(deploymentID)); err == nil {
+				if template, err := s.db.GetTemplateByID(deployment.TemplateID); err == nil {
+					if activeChain, err := s.db.GetActiveChain(); err == nil {
+						// Generate transaction data with bytecode during template rendering
+						transactionData = s.generateTransactionData(deployment, template, activeChain)
+					}
+				}
+			}
+		}
+	}
+
 	// Serve HTML page with embedded transaction data
 	html := s.renderTemplate("deploy", map[string]interface{}{
-		"SessionID": session.ID,
+		"SessionID":       session.ID,
+		"TransactionData": transactionData,
 	})
 	c.Set("Content-Type", "text/html")
 	return c.SendString(html)
