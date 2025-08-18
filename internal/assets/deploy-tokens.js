@@ -145,6 +145,7 @@ class TokenDeploymentManager {
         : "0x0",
       gas: estimatedGas,
       gasPrice: gasPrice,
+      chainId: this.walletManager.getChainId(),
     };
 
     if (isContractDeployment && transaction_data.bytecode) {
@@ -232,8 +233,15 @@ class TokenDeploymentManager {
     const targetChainId = this.sessionData.chain_id;
     const currentChainId = this.walletManager.getChainId();
 
-    if (currentChainId !== targetChainId) {
-      await this.walletManager.switchNetwork(targetChainId);
+    // Convert target chain ID to hex format if needed
+    let targetChainIdHex = targetChainId;
+    if (targetChainId && !targetChainId.startsWith('0x')) {
+      targetChainIdHex = '0x' + parseInt(targetChainId, 10).toString(16);
+    }
+
+    // Only switch network if we have a valid target chain ID and they differ
+    if (targetChainIdHex && currentChainId !== targetChainIdHex) {
+      await this.walletManager.switchNetwork(targetChainIdHex);
     }
 
     // Prepare transaction (now async)

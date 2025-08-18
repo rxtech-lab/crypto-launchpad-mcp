@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
@@ -98,7 +99,7 @@ func NewRemoveUniswapDeploymentTool(db *database.Database) (mcp.Tool, server.Too
 			// Clear configuration if it matches any of the removed deployments
 			if err := db.ClearUniswapConfiguration(version); err != nil {
 				// Log error but don't fail the operation
-				fmt.Printf("Warning: Failed to clear Uniswap configuration for version %s: %v\n", version, err)
+				log.Printf("Warning: Failed to clear Uniswap configuration for version %s: %v\n", version, err)
 			}
 		}
 

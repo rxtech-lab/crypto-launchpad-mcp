@@ -32,7 +32,11 @@ func NewAPIServer(db *database.Database) *APIServer {
 
 	// Add middleware
 	app.Use(cors.New())
-	app.Use(logger.New())
+	app.Use(logger.New(logger.Config{
+		Format:     "[${time}] ${status} - ${latency} ${method} ${path}\n",
+		TimeFormat: "15:04:05",
+		TimeZone:   "Local",
+	}))
 
 	server := &APIServer{
 		app: app,

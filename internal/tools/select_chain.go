@@ -13,45 +13,28 @@ import (
 
 func NewSelectChainTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("select_chain",
-		mcp.WithDescription("Select blockchain for token operations. Can select by chain_type (legacy) or chain_id (recommended). Sets the selection as active in database."),
+		mcp.WithDescription("Select blockchain for token operations. Can select by uuid (recommended). Sets the selection as active in database."),
 		mcp.WithString("chain_type",
 			mcp.Description("The blockchain type to select (ethereum or solana). Legacy parameter."),
 		),
-		mcp.WithString("chain_id",
-			mcp.Description("The chain ID from the database. Use this for precise selection."),
+		mcp.WithString("uuid",
+			mcp.Description("The uuid from the database. Use this for precise selection."),
 		),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		chainType := request.GetString("chain_type", "")
-		chainIDStr := request.GetString("chain_id", "")
+		chainIDStr := request.GetString("uuid", "")
 
 		// Validate that at least one parameter is provided
 		if chainType == "" && chainIDStr == "" {
 			return mcp.NewToolResultError("Either chain_type or chain_id parameter is required"), nil
 		}
-
-		// Prefer chain_id if provided
-		if chainIDStr != "" {
-			chainID, err := strconv.ParseUint(chainIDStr, 10, 32)
-			if err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("Invalid chain_id format: %v", err)), nil
-			}
-			if err := db.SetActiveChainByID(uint(chainID)); err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("Error setting active chain by ID: %v", err)), nil
-			}
-		} else {
-			// Validate chain type
-			if chainType != "ethereum" && chainType != "solana" {
-				return mcp.NewToolResultError("Invalid chain_type. Supported values: ethereum, solana"), nil
-			}
-
-			// Set the active chain by type
-			if err := db.SetActiveChain(chainType); err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("Error setting active chain: %v", err)), nil
-			}
+		uuid, err := strconv.ParseUint(chainIDStr, 10, 32)
+		// Set the active chain by uuid
+		if err := db.SetActiveChainByID(uint(uuid)); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Error setting active chain: %v", err)), nil
 		}
-
 		// Get the active chain to return current state
 		activeChain, err := db.GetActiveChain()
 		if err != nil {

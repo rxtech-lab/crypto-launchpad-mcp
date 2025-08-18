@@ -24,7 +24,6 @@ func (s *TokenDeploymentTestSuite) SetupSuite() {
 
 func (s *TokenDeploymentTestSuite) TearDownSuite() {
 	if s.setup != nil {
-		fmt.Println("DEBUG: Delaying cleanup for 10 seconds to allow inspection...")
 		s.setup.Cleanup()
 	}
 }

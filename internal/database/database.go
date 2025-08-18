@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Database struct {
@@ -23,8 +25,20 @@ func NewDatabase(dbPath string) (*Database, error) {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
+	// Configure GORM logger - only log errors and slow queries
+	gormLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+		logger.Config{
+			SlowThreshold:             time.Second,  // Slow SQL threshold
+			LogLevel:                  logger.Error, // Only log errors and slow queries
+			IgnoreRecordNotFoundError: true,         // Ignore ErrRecordNotFound error for logger
+			ParameterizedQueries:      false,        // Include params in SQL log
+			Colorful:                  false,        // Disable color
+		},
+	)
+
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
-		Logger: nil, // Disable GORM logging to prevent color output
+		Logger: gormLogger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
