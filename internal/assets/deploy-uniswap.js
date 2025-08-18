@@ -7,8 +7,19 @@ class UniswapDeploymentManager {
     this.contractData = null;
   }
 
-  async loadSessionData(sessionId, apiUrl) {
+  async loadSessionData(sessionId, apiUrl, embeddedData = null) {
     this.apiUrl = apiUrl;
+    
+    // Check for embedded transaction data first
+    if (embeddedData) {
+      console.log("Using embedded transaction data for Uniswap deployment");
+      this.sessionData = embeddedData;
+      this.contractData = this.sessionData.contract_data || {};
+      this.displayTransactionDetails();
+      return;
+    }
+    
+    // Fallback to API call
     try {
       const response = await fetch(apiUrl);
       if (!response.ok) {
@@ -477,9 +488,21 @@ document.addEventListener("DOMContentLoaded", function () {
     if (sessionData) {
       const sessionId = sessionData.dataset.sessionId;
       const apiUrl = sessionData.dataset.apiUrl;
+      const embeddedTransactionData = sessionData.dataset.transactionData;
 
       if (sessionId && apiUrl) {
-        uniswapDeploymentManager.loadSessionData(sessionId, apiUrl);
+        // Parse embedded transaction data if available
+        let parsedEmbeddedData = null;
+        if (embeddedTransactionData) {
+          try {
+            parsedEmbeddedData = JSON.parse(embeddedTransactionData);
+            console.log("Found embedded Uniswap transaction data:", parsedEmbeddedData);
+          } catch (error) {
+            console.error("Error parsing embedded Uniswap transaction data:", error);
+          }
+        }
+        
+        uniswapDeploymentManager.loadSessionData(sessionId, apiUrl, parsedEmbeddedData);
       }
     }
   }

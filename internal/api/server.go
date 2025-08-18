@@ -79,8 +79,8 @@ func (s *APIServer) initTemplates() {
 		s.templates["generic"] = genericTmpl
 	}
 
-	// Parse Uniswap deployment template
-	uniswapTmpl, err := template.New("deploy_uniswap").Parse(string(assets.DeployUniswapHTML))
+	// Parse Uniswap deployment template with custom functions
+	uniswapTmpl, err := template.New("deploy_uniswap").Funcs(funcMap).Parse(string(assets.DeployUniswapHTML))
 	if err != nil {
 		log.Printf("Error parsing deploy uniswap template: %v", err)
 	} else {

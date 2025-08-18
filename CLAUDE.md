@@ -232,14 +232,60 @@ All tools follow the exact structure from the example project:
 ### Asset Management
 
 - **Embedded Templates**: HTML templates stored in `internal/assets/` and embedded at compile time
-- **Template Engine**: Go's `text/template` package for dynamic content rendering
+- **Template Engine**: Go's `html/template` package for dynamic content rendering with JSON support
+- **Embedded Transaction Data**: For improved performance, transaction data (including compiled bytecode) is embedded directly in HTML during template rendering instead of requiring separate API calls
+- **Template Functions**: Custom template functions available:
+  - `json`: Converts Go data structures to JSON for embedding in HTML data attributes
 - **Modular JavaScript**: Multiple focused scripts served via HTTP endpoints:
   - `/js/wallet-connection.js` - Core wallet functionality
-  - `/js/deploy-tokens.js` - Token deployment
-  - `/js/deploy-uniswap.js` - Uniswap deployment  
+  - `/js/deploy-tokens.js` - Token deployment with embedded data support
+  - `/js/deploy-uniswap.js` - Uniswap deployment with embedded data support  
   - `/js/balance-query.js` - Balance queries
   - `/js/wallet.js` - Legacy monolithic script (deprecated)
 - **Build-time Inclusion**: All assets compiled into the binary for single-file distribution
+
+#### Embedded Data Pattern
+
+For optimal performance, transaction data is compiled and embedded during HTML template rendering:
+
+**Backend (Template Rendering)**:
+```go
+// deployment_handlers.go & uniswap_handlers.go
+transactionData := s.generateTransactionData(deployment, template, activeChain)
+html := s.renderTemplate("deploy", map[string]interface{}{
+    "SessionID":       session.ID,
+    "TransactionData": transactionData, // Embedded with bytecode
+})
+```
+
+**Frontend (HTML Template)**:
+```html
+<div id="session-data" 
+     data-session-id="{{.SessionID}}" 
+     data-api-url="/api/deploy/{{.SessionID}}"
+     {{if .TransactionData}}data-transaction-data="{{.TransactionData | json}}"{{end}}>
+</div>
+```
+
+**JavaScript (Data Loading)**:
+```javascript
+// Check embedded data first, fallback to API
+async loadSessionData(sessionId, apiUrl, embeddedData = null) {
+    if (embeddedData) {
+        console.log("Using embedded transaction data");
+        this.sessionData = embeddedData;
+        this.displayTransactionDetails();
+        return;
+    }
+    // Fallback to API call...
+}
+```
+
+**Benefits**:
+- ⚡ **Performance**: Eliminates extra API calls for transaction data
+- 🔧 **Reliability**: Prevents JavaScript errors with defensive null/undefined checking  
+- 🔄 **Compatibility**: Maintains fallback to API calls for backward compatibility
+- 🚀 **User Experience**: Faster page loads with immediate data availability
 
 ## Security Considerations
 
