@@ -26,6 +26,7 @@ type Template struct {
 	Description  string         `json:"description"`
 	ChainType    string         `gorm:"not null" json:"chain_type"` // ethereum, solana
 	TemplateCode string         `gorm:"type:text;not null" json:"template_code"`
+	Metadata     string         `gorm:"type:text" json:"metadata"` // JSON object containing template variable definitions
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`

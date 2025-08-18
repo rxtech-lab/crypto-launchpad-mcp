@@ -15,7 +15,7 @@ import (
 
 func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("create_template",
-		mcp.WithDescription("Create new smart contract template with syntax validation. Template code should be valid Solidity (for Ethereum) or Rust (for Solana) and there is no template language in use when rendering the template. OpenZeppelin contracts are available to use."),
+		mcp.WithDescription("Create new smart contract template with syntax validation. Template code should be valid Solidity (for Ethereum) or Rust (for Solana) and can use Go template variables like {{.TokenName}}. OpenZeppelin contracts are available to use."),
 		mcp.WithString("name",
 			mcp.Required(),
 			mcp.Description("Name of the template (e.g., 'ERC20 Basic Token', 'SPL Token')"),
@@ -30,7 +30,10 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		),
 		mcp.WithString("template_code",
 			mcp.Required(),
-			mcp.Description("The smart contract source code template"),
+			mcp.Description("The smart contract source code template with Go template variables like {{.TokenName}}"),
+		),
+		mcp.WithString("metadata",
+			mcp.Description("JSON object defining template variables (e.g., {\"TokenName\": \"\", \"TokenSymbol\": \"\"}). Values should be empty - they will be provided during deployment."),
 		),
 	)
 
@@ -53,6 +56,21 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		templateCode, err := request.RequireString("template_code")
 		if err != nil {
 			return nil, fmt.Errorf("template_code parameter is required: %w", err)
+		}
+
+		metadata := request.GetString("metadata", "")
+
+		// Validate metadata JSON if provided
+		if metadata != "" {
+			var metadataObj map[string]interface{}
+			if err := json.Unmarshal([]byte(metadata), &metadataObj); err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						mcp.NewTextContent("Error: "),
+						mcp.NewTextContent(fmt.Sprintf("Invalid metadata JSON: %v", err)),
+					},
+				}, nil
+			}
 		}
 
 		// Validate chain type
@@ -97,6 +115,7 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			Description:  description,
 			ChainType:    chainType,
 			TemplateCode: templateCode,
+			Metadata:     metadata,
 		}
 
 		if err := db.CreateTemplate(template); err != nil {

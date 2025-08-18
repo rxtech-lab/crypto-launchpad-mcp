@@ -15,7 +15,7 @@ import (
 
 func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("update_template",
-		mcp.WithDescription("Update existing smart contract template with new description, chain type, or template code. Performs syntax validation on updated code."),
+		mcp.WithDescription("Update existing smart contract template with new description, chain type, template code, or metadata. Performs syntax validation on updated code."),
 		mcp.WithString("template_id",
 			mcp.Required(),
 			mcp.Description("ID of the template to update"),
@@ -27,7 +27,10 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			mcp.Description("New chain type (ethereum or solana)"),
 		),
 		mcp.WithString("template_code",
-			mcp.Description("New template code"),
+			mcp.Description("New template code with Go template variables"),
+		),
+		mcp.WithString("metadata",
+			mcp.Description("JSON object defining template variables (e.g., {\"TokenName\": \"\", \"TokenSymbol\": \"\"}). Values should be empty - they will be provided during deployment."),
 		),
 	)
 
@@ -50,6 +53,20 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		description := request.GetString("description", "")
 		chainType := request.GetString("chain_type", "")
 		templateCode := request.GetString("template_code", "")
+		metadata := request.GetString("metadata", "")
+
+		// Validate metadata JSON if provided
+		if metadata != "" {
+			var metadataObj map[string]interface{}
+			if err := json.Unmarshal([]byte(metadata), &metadataObj); err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						mcp.NewTextContent("Error: "),
+						mcp.NewTextContent(fmt.Sprintf("Invalid metadata JSON: %v", err)),
+					},
+				}, nil
+			}
+		}
 
 		// OpenZeppelin configuration
 		useOpenZeppelinStr := request.GetString("use_openzeppelin", "")
@@ -105,6 +122,12 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			}
 			template.ChainType = chainType
 			updates = append(updates, "chain_type")
+		}
+
+		// Update metadata if provided
+		if metadata != "" {
+			template.Metadata = metadata
+			updates = append(updates, "metadata")
 		}
 
 		// Update template code if provided

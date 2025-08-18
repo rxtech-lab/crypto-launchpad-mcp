@@ -1,12 +1,14 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -22,13 +24,9 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			mcp.Required(),
 			mcp.Description("ID of the template to deploy"),
 		),
-		mcp.WithString("token_name",
+		mcp.WithString("metadata",
 			mcp.Required(),
-			mcp.Description("Name of the token to deploy"),
-		),
-		mcp.WithString("token_symbol",
-			mcp.Required(),
-			mcp.Description("Symbol of the token to deploy"),
+			mcp.Description("JSON object containing values for template variables (e.g., {\"TokenName\": \"MyToken\", \"TokenSymbol\": \"MTK\"})"),
 		),
 	)
 
@@ -38,19 +36,20 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			return nil, fmt.Errorf("template_id parameter is required: %w", err)
 		}
 
-		tokenName, err := request.RequireString("token_name")
+		metadataStr, err := request.RequireString("metadata")
 		if err != nil {
-			return nil, fmt.Errorf("token_name parameter is required: %w", err)
-		}
-
-		tokenSymbol, err := request.RequireString("token_symbol")
-		if err != nil {
-			return nil, fmt.Errorf("token_symbol parameter is required: %w", err)
+			return nil, fmt.Errorf("metadata parameter is required: %w", err)
 		}
 
 		templateID, err := strconv.ParseUint(templateIDStr, 10, 32)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Invalid template_id: %v", err)), nil
+		}
+
+		// Parse and validate metadata JSON
+		var metadata map[string]interface{}
+		if err := json.Unmarshal([]byte(metadataStr), &metadata); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid metadata JSON: %v", err)), nil
 		}
 
 		// Get template
@@ -86,18 +85,33 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			return mcp.NewToolResultError("Could not extract contract name from template code"), nil
 		}
 
+		// Process template with provided metadata values
+		processedCode, err := renderTemplate(template.TemplateCode, metadata)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Template rendering failed: %v", err)), nil
+		}
+
 		// Compile contract for validation and bytecode generation (Ethereum only)
 		var compilationResult *utils.CompilationResult
 		if activeChain.ChainType == "ethereum" {
-			// Replace template placeholders with actual values
-			processedCode := replaceTemplatePlaceholders(template.TemplateCode, tokenName, tokenSymbol)
-
 			// Compile the contract using utils/solidity.go
 			result, err := utils.CompileSolidity("0.8.20", processedCode)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Contract compilation failed: %v", err)), nil
 			}
 			compilationResult = &result
+		}
+
+		// Extract token name and symbol from metadata for deployment record
+		tokenName, _ := metadata["TokenName"].(string)
+		tokenSymbol, _ := metadata["TokenSymbol"].(string)
+		
+		// Use fallback values if not provided in metadata
+		if tokenName == "" {
+			tokenName = "Token"
+		}
+		if tokenSymbol == "" {
+			tokenSymbol = "TKN"
 		}
 
 		// Create deployment record
@@ -213,7 +227,22 @@ func extractContractName(sourceCode string) string {
 	return ""
 }
 
-// replaceTemplatePlaceholders replaces common template placeholders with actual values
+// renderTemplate processes Go template code with provided data
+func renderTemplate(templateCode string, data map[string]interface{}) (string, error) {
+	tmpl, err := template.New("contract").Parse(templateCode)
+	if err != nil {
+		return "", fmt.Errorf("template parsing failed: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("template execution failed: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// replaceTemplatePlaceholders replaces common template placeholders with actual values (legacy function)
 func replaceTemplatePlaceholders(templateCode, tokenName, tokenSymbol string) string {
 	// Replace common placeholders
 	code := strings.ReplaceAll(templateCode, "{{TOKEN_NAME}}", tokenName)
