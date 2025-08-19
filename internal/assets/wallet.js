@@ -24,8 +24,11 @@ class WalletManager {
     console.log("Updating wallet list...");
     const walletSelect = document.getElementById("wallet-select");
     if (!walletSelect) {
-      if (retryCount < 10) { // Limit retries to prevent infinite loop
-        console.warn(`wallet-select element not found - retry ${retryCount + 1}/10`);
+      if (retryCount < 10) {
+        // Limit retries to prevent infinite loop
+        console.warn(
+          `wallet-select element not found - retry ${retryCount + 1}/10`
+        );
         // Retry after a short delay in case the element is being created
         setTimeout(() => this.updateWalletList(retryCount + 1), 100);
       } else {
@@ -421,9 +424,9 @@ class TransactionManager {
   generateUniswapDeploymentDetails(data) {
     const deploymentData = data.deployment_data;
     const metadata = data.metadata || [];
-    
-    let metadataHTML = '';
-    metadata.forEach(item => {
+
+    let metadataHTML = "";
+    metadata.forEach((item) => {
       metadataHTML += `
         <div class="bg-gray-50 rounded-xl p-4">
           <span class="text-gray-600 text-sm font-medium">${item.title}</span>
@@ -431,7 +434,7 @@ class TransactionManager {
         </div>
       `;
     });
-    
+
     return `
       <div class="space-y-4">
         <!-- Deployment Overview -->
@@ -674,7 +677,11 @@ class TransactionManager {
     }
 
     // Update session status
-    await this.updateSessionStatus(txHash, "confirmed", contractAddress);
+    await this.updateSessionStatus(
+      txHash,
+      "confirmed",
+      contractAddress
+    );
 
     return { txHash, contractAddress };
   }
@@ -753,7 +760,7 @@ class TransactionManager {
 
   prepareUniswapDeploymentData() {
     const { deployment_data } = this.sessionData;
-    
+
     // For Uniswap deployment, we return the deployment data structure
     // This will be handled by custom deployment logic
     return {
@@ -767,26 +774,28 @@ class TransactionManager {
 
   async executeUniswapDeployment() {
     const { deployment_data } = this.sessionData;
-    
+
     // For now, return mock data to test the interface
     // In a real implementation, this would deploy each contract in sequence
     const mockResult = {
       success: true,
       contractAddresses: {
         weth: "0x1234567890123456789012345678901234567890",
-        factory: "0x2345678901234567890123456789012345678901", 
-        router: "0x3456789012345678901234567890123456789012"
+        factory: "0x2345678901234567890123456789012345678901",
+        router: "0x3456789012345678901234567890123456789012",
       },
       transactionHashes: {
         weth: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-        factory: "0xbcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890a",
-        router: "0xcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab"
-      }
+        factory:
+          "0xbcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890a",
+        router:
+          "0xcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
+      },
     };
 
     // Update session with multiple contract addresses and transaction hashes
     await this.updateUniswapSessionStatus(mockResult);
-    
+
     return mockResult;
   }
 
@@ -795,7 +804,7 @@ class TransactionManager {
       transaction_hashes: deploymentResult.transactionHashes,
       contract_addresses: deploymentResult.contractAddresses,
       deployer_address: this.walletManager.getAccount(),
-      status: "confirmed"
+      status: "confirmed",
     };
 
     try {
@@ -882,14 +891,14 @@ class TransactionManager {
 
   async handleBalanceQuery() {
     console.log("Handling balance query session");
-    
+
     // Always initialize the wallet interface first for balance queries
     await this.initializeBalanceSession();
-    
+
     // Check if we already have balance data from the server
     if (this.sessionData.balance_data) {
       // Display the balance data immediately
-      if (typeof updateBalance === 'function') {
+      if (typeof updateBalance === "function") {
         updateBalance(this.sessionData.balance_data);
       }
       return;
@@ -897,7 +906,7 @@ class TransactionManager {
 
     // Check if a wallet address is already provided
     const walletAddress = this.sessionData.wallet_address;
-    
+
     if (walletAddress && walletAddress !== "") {
       // Auto-fetch balance data if wallet address is provided
       // But still show the wallet interface for manual refresh option
@@ -955,16 +964,18 @@ class TransactionManager {
   async fetchBalanceData(walletAddress) {
     try {
       // Make API call to get balance data
-      const response = await fetch(`${this.apiUrl}?wallet_address=${encodeURIComponent(walletAddress)}`);
+      const response = await fetch(
+        `${this.apiUrl}?wallet_address=${encodeURIComponent(walletAddress)}`
+      );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.balance_data) {
         // Update the balance display
-        if (typeof updateBalance === 'function') {
+        if (typeof updateBalance === "function") {
           updateBalance(data.balance_data);
         }
       } else if (data.balance_error) {
@@ -972,7 +983,7 @@ class TransactionManager {
       }
     } catch (error) {
       console.error("Failed to fetch balance data:", error);
-      
+
       // Show error state
       const contentElement = document.getElementById("content");
       if (contentElement) {
@@ -1047,7 +1058,7 @@ async function signTransaction() {
     if (
       successState &&
       (transactionManager.sessionData.session_type === "deploy" ||
-       transactionManager.sessionData.session_type === "deploy_uniswap")
+        transactionManager.sessionData.session_type === "deploy_uniswap")
     ) {
       // Hide the main content and show success state
       const content = document.getElementById("content");
@@ -1060,7 +1071,7 @@ async function signTransaction() {
           const wethAddress = document.getElementById("weth-address");
           const factoryAddress = document.getElementById("factory-address");
           const routerAddress = document.getElementById("router-address");
-          
+
           if (wethAddress && result.contractAddresses.weth) {
             wethAddress.textContent = result.contractAddresses.weth;
           }
@@ -1080,7 +1091,8 @@ async function signTransaction() {
           if (typeof showContractAddressUnavailable === "function") {
             showContractAddressUnavailable();
           } else {
-            contractAddressDisplay.textContent = "Contract address not available";
+            contractAddressDisplay.textContent =
+              "Contract address not available";
             contractAddressDisplay.parentElement.classList.add("opacity-50");
           }
         }
@@ -1241,26 +1253,26 @@ async function fetchBalanceFromWallet() {
     }
 
     const walletAddress = walletManager.account;
-    
+
     // Update button state
-    const button = document.getElementById('sign-button');
+    const button = document.getElementById("sign-button");
     if (button) {
       const originalHTML = button.innerHTML;
-      button.innerHTML = '<div class="flex items-center justify-center"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>Fetching Balance...</div>';
+      button.innerHTML =
+        '<div class="flex items-center justify-center"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>Fetching Balance...</div>';
       button.disabled = true;
     }
 
     // Fetch balance data
     await transactionManager.fetchBalanceData(walletAddress);
-
   } catch (error) {
     console.error("Failed to fetch balance:", error);
     alert("Failed to fetch balance: " + error.message);
-    
+
     // Reset button state
-    const button = document.getElementById('sign-button');
+    const button = document.getElementById("sign-button");
     if (button) {
-      button.innerHTML = 'Fetch Balance';
+      button.innerHTML = "Fetch Balance";
       button.disabled = false;
     }
   }

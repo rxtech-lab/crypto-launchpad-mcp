@@ -15,7 +15,7 @@ func NewListDeploymentsTool(db *database.Database) (mcp.Tool, server.ToolHandler
 	tool := mcp.NewTool("list_deployments",
 		mcp.WithDescription("List all token deployments with pagination support and filtering options including status, contract addresses, and transaction hashes."),
 		mcp.WithString("status",
-			mcp.Description("Filter by deployment status (pending, confirmed, failed). Leave empty to get all deployments"),
+			mcp.Description("Filter by deployment status (pending, models.TransactionStatusConfirmed, failed). Leave empty to get all deployments"),
 		),
 		mcp.WithString("chain_type",
 			mcp.Description("Filter by blockchain type (ethereum, solana). Leave empty to get deployments from all chains"),

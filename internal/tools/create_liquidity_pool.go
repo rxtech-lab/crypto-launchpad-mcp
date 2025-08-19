@@ -9,6 +9,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
@@ -26,10 +27,6 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 			mcp.Required(),
 			mcp.Description("Initial amount of ETH to add to the pool"),
 		),
-		mcp.WithString("creator_address",
-			mcp.Required(),
-			mcp.Description("Address that will create the pool"),
-		),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -46,11 +43,6 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 		initialETHAmount, err := request.RequireString("initial_eth_amount")
 		if err != nil {
 			return nil, fmt.Errorf("initial_eth_amount parameter is required: %w", err)
-		}
-
-		creatorAddress, err := request.RequireString("creator_address")
-		if err != nil {
-			return nil, fmt.Errorf("creator_address parameter is required: %w", err)
 		}
 
 		// Get active chain configuration
@@ -88,15 +80,38 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 		// Check if pool already exists
 		existingPool, err := db.GetLiquidityPoolByTokenAddress(tokenAddress)
 		if err == nil && existingPool != nil {
+			// delete the pool if not models.TransactionStatusConfirmed
+			if existingPool.Status != models.TransactionStatusConfirmed {
+				if err := db.DeleteLiquidityPool(existingPool.ID); err != nil {
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{
+							mcp.NewTextContent("Error: "),
+							mcp.NewTextContent(fmt.Sprintf("Failed to delete pending pool: %v", err)),
+						},
+					}, nil
+				}
+			} else {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						mcp.NewTextContent("Error: "),
+						mcp.NewTextContent("Liquidity pool already exists for this token"),
+					},
+				}, nil
+			}
+		}
+
+		// Create liquidity pool record
+		// Creator address will be set when wallet connects on the web interface
+		initialPrice, _, err := utils.CalculateInitialTokenPrice(initialTokenAmount, initialETHAmount, 18)
+		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("Liquidity pool already exists for this token"),
+					mcp.NewTextContent(fmt.Sprintf("Error calculating initial price: %v", err)),
 				},
 			}, nil
 		}
 
-		// Create liquidity pool record
 		pool := &models.LiquidityPool{
 			TokenAddress:   tokenAddress,
 			UniswapVersion: uniswapSettings.Version,
@@ -104,7 +119,7 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 			Token1:         "0x0000000000000000000000000000000000000000", // ETH placeholder
 			InitialToken0:  initialTokenAmount,
 			InitialToken1:  initialETHAmount,
-			CreatorAddress: creatorAddress,
+			CreatorAddress: "", // Will be populated when wallet connects
 			Status:         "pending",
 		}
 
@@ -152,23 +167,24 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 		signingURL := fmt.Sprintf("http://localhost:%d/pool/create/%s", serverPort, sessionID)
 
 		result := map[string]interface{}{
-			"pool_id":              pool.ID,
-			"session_id":           sessionID,
-			"signing_url":          signingURL,
-			"token_address":        tokenAddress,
-			"initial_token_amount": initialTokenAmount,
-			"initial_eth_amount":   initialETHAmount,
-			"uniswap_version":      uniswapSettings.Version,
-			"chain_type":           activeChain.ChainType,
-			"creator_address":      creatorAddress,
-			"message":              "Liquidity pool creation session created. Use the signing URL to connect wallet and create pool.",
-			"instructions":         "1. Open the signing URL in your browser\n2. Connect your wallet using EIP-6963\n3. Review the pool creation details\n4. Sign and send the transaction to create the pool",
+			"pool_id":                     pool.ID,
+			"session_id":                  sessionID,
+			"signing_url":                 signingURL,
+			"token_address":               tokenAddress,
+			"initial_token_amount":        initialTokenAmount,
+			"initial_eth_amount":          initialETHAmount,
+			"uniswap_version":             uniswapSettings.Version,
+			"chain_type":                  activeChain.ChainType,
+			"initial_price_per_token_eth": initialPrice,
+			"message":                     "Liquidity pool creation session created. Use the signing URL to connect wallet and create pool.",
+			"instructions":                "1. Open the signing URL in your browser\n2. Connect your wallet using EIP-6963\n3. Review the pool creation details\n4. Sign and send the transaction to create the pool",
 		}
 
 		resultJSON, _ := json.Marshal(result)
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				mcp.NewTextContent("Success message: "),
+				mcp.NewTextContent("Your pool creation session has been created. Use the signing URL to connect wallet and create pool."),
+				mcp.NewTextContent(fmt.Sprintf("Initial price per token: %v ETH", initialPrice)),
 				mcp.NewTextContent(string(resultJSON)),
 			},
 		}, nil

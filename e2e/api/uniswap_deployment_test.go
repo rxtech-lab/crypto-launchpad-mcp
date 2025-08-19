@@ -46,7 +46,7 @@ func (s *UniswapDeploymentTestSuite) TestCreateUniswapDeploymentSession() {
 	deployment := &models.UniswapDeployment{
 		Version: "v2",
 		ChainID: s.setup.GetTestChainID(),
-		Status:  "pending",
+		Status:  models.TransactionStatusPending,
 	}
 
 	err := s.setup.DB.CreateUniswapDeployment(deployment)
@@ -259,18 +259,18 @@ func (s *UniswapDeploymentTestSuite) testDeploymentConfirmation(sessionID string
 
 	s.Assert().True(response["success"].(bool))
 	s.Assert().Equal(sessionID, response["session_id"])
-	s.Assert().Equal("confirmed", response["status"])
+	s.Assert().Equal(string(models.TransactionStatusConfirmed), response["status"])
 
 	// Verify session was updated
 	session, err := s.setup.DB.GetTransactionSession(sessionID)
 	s.Require().NoError(err)
-	s.Assert().Equal("confirmed", session.Status)
+	s.Assert().Equal(models.TransactionStatusConfirmed, session.Status)
 	s.Assert().NotEmpty(session.TransactionHash)
 
 	// Verify deployment record was updated
 	updatedDeployment, err := s.setup.DB.GetUniswapDeploymentByID(deployment.ID)
 	s.Require().NoError(err)
-	s.Assert().Equal("confirmed", updatedDeployment.Status)
+	s.Assert().Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 	s.Assert().Equal(wethResult.ContractAddress.Hex(), updatedDeployment.WETHAddress)
 	s.Assert().Equal(factoryResult.ContractAddress.Hex(), updatedDeployment.FactoryAddress)
 	s.Assert().Equal(routerResult.ContractAddress.Hex(), updatedDeployment.RouterAddress)
@@ -281,7 +281,7 @@ func (s *UniswapDeploymentTestSuite) testDeploymentConfirmation(sessionID string
 	s.Assert().Equal(factoryResult.TransactionHash.Hex(), updatedDeployment.FactoryTxHash)
 	s.Assert().Equal(routerResult.TransactionHash.Hex(), updatedDeployment.RouterTxHash)
 
-	s.T().Logf("✓ Successfully confirmed Uniswap deployment")
+	s.T().Logf("✓ Successfully models.TransactionStatusConfirmed Uniswap deployment")
 	s.T().Logf("  WETH9: %s (tx: %s)", updatedDeployment.WETHAddress, updatedDeployment.WETHTxHash)
 	s.T().Logf("  Factory: %s (tx: %s)", updatedDeployment.FactoryAddress, updatedDeployment.FactoryTxHash)
 	s.T().Logf("  Router: %s (tx: %s)", updatedDeployment.RouterAddress, updatedDeployment.RouterTxHash)
@@ -470,7 +470,7 @@ func (s *DatabaseIntegrationTestSuite) TestDeploymentRecordManagement() {
 	// Verify update
 	updated, err := s.setup.DB.GetUniswapDeploymentByID(deployment.ID)
 	s.Require().NoError(err)
-	s.Assert().Equal("confirmed", updated.Status)
+	s.Assert().Equal(models.TransactionStatus("confirmed"), updated.Status)
 	s.Assert().Equal(contractAddresses["weth"], updated.WETHAddress)
 	s.Assert().Equal(contractAddresses["factory"], updated.FactoryAddress)
 	s.Assert().Equal(contractAddresses["router"], updated.RouterAddress)
@@ -491,11 +491,11 @@ func (s *DatabaseIntegrationTestSuite) TestPreventDuplicateDeployment() {
 	err := s.setup.DB.CreateChain(testChain2)
 	s.Require().NoError(err)
 
-	// Create confirmed deployment for a specific chain
+	// Create models.TransactionStatusConfirmed deployment for a specific chain
 	deployment := &models.UniswapDeployment{
 		Version: "v2",
 		ChainID: testChain2.ID,
-		Status:  "confirmed",
+		Status:  models.TransactionStatusConfirmed,
 	}
 
 	err = s.setup.DB.CreateUniswapDeployment(deployment)
@@ -506,7 +506,7 @@ func (s *DatabaseIntegrationTestSuite) TestPreventDuplicateDeployment() {
 	s.Require().NoError(err)
 	s.Require().NotNil(found)
 	s.Assert().Equal(deployment.ID, found.ID)
-	s.Assert().Equal("confirmed", found.Status)
+	s.Assert().Equal(models.TransactionStatus("confirmed"), found.Status)
 
 	s.T().Logf("✓ Correctly found existing deployment: ID=%d", found.ID)
 }
@@ -541,7 +541,7 @@ func (s *DatabaseIntegrationTestSuite) TestSessionLifecycle() {
 	// Test initial session state
 	session, err := s.setup.DB.GetTransactionSession(sessionID)
 	s.Require().NoError(err)
-	s.Assert().Equal("pending", session.Status)
+	s.Assert().Equal(models.TransactionStatusPending, session.Status)
 	s.Assert().Equal("deploy_uniswap", session.SessionType)
 	s.Assert().True(time.Now().Before(session.ExpiresAt))
 
@@ -552,7 +552,7 @@ func (s *DatabaseIntegrationTestSuite) TestSessionLifecycle() {
 
 	session, err = s.setup.DB.GetTransactionSession(sessionID)
 	s.Require().NoError(err)
-	s.Assert().Equal("confirmed", session.Status)
+	s.Assert().Equal(models.TransactionStatusConfirmed, session.Status)
 	s.Assert().Equal(testTxHash, session.TransactionHash)
 
 	s.T().Logf("✓ Session lifecycle completed successfully")

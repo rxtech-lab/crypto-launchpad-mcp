@@ -34,10 +34,6 @@ func NewAddLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, serve
 			mcp.Required(),
 			mcp.Description("Minimum amount of ETH (slippage protection)"),
 		),
-		mcp.WithString("user_address",
-			mcp.Required(),
-			mcp.Description("Address that will add liquidity"),
-		),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -64,11 +60,6 @@ func NewAddLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, serve
 		minETHAmount, err := request.RequireString("min_eth_amount")
 		if err != nil {
 			return nil, fmt.Errorf("min_eth_amount parameter is required: %w", err)
-		}
-
-		userAddress, err := request.RequireString("user_address")
-		if err != nil {
-			return nil, fmt.Errorf("user_address parameter is required: %w", err)
 		}
 
 		// Get active chain configuration
@@ -103,6 +94,16 @@ func NewAddLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, serve
 			}, nil
 		}
 
+		// check if pool is confirmed
+		if pool.Status != models.TransactionStatusConfirmed {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.NewTextContent("Error: "),
+					mcp.NewTextContent("Liquidity pool is not confirmed. Create pool first using create_liquidity_pool"),
+				},
+			}, nil
+		}
+
 		// Get active Uniswap settings
 		uniswapSettings, err := db.GetActiveUniswapSettings()
 		if err != nil {
@@ -115,9 +116,10 @@ func NewAddLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, serve
 		}
 
 		// Create liquidity position record
+		// User address will be set when wallet connects on the web interface
 		position := &models.LiquidityPosition{
 			PoolID:       pool.ID,
-			UserAddress:  userAddress,
+			UserAddress:  "", // Will be populated when wallet connects
 			Token0Amount: tokenAmount,
 			Token1Amount: ethAmount,
 			Action:       "add",
@@ -142,7 +144,6 @@ func NewAddLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, serve
 			"eth_amount":       ethAmount,
 			"min_token_amount": minTokenAmount,
 			"min_eth_amount":   minETHAmount,
-			"user_address":     userAddress,
 			"uniswap_version":  uniswapSettings.Version,
 			"chain_type":       activeChain.ChainType,
 			"chain_id":         activeChain.ChainID,
@@ -188,7 +189,6 @@ func NewAddLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, serve
 			"min_token_amount": minTokenAmount,
 			"min_eth_amount":   minETHAmount,
 			"uniswap_version":  uniswapSettings.Version,
-			"user_address":     userAddress,
 			"message":          "Add liquidity session created. Use the signing URL to connect wallet and add liquidity.",
 			"instructions":     "1. Open the signing URL in your browser\n2. Connect your wallet using EIP-6963\n3. Review the liquidity addition details\n4. Sign and send the transaction to add liquidity",
 		}

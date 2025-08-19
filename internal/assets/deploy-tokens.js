@@ -8,7 +8,7 @@ class TokenDeploymentManager {
 
   async loadSessionData(sessionId, apiUrl, embeddedData = null) {
     this.apiUrl = apiUrl;
-    
+
     // Check for embedded transaction data first
     if (embeddedData) {
       console.log("Using embedded transaction data");
@@ -16,12 +16,12 @@ class TokenDeploymentManager {
         session_id: sessionId,
         session_type: "deploy",
         transaction_data: embeddedData,
-        status: "pending"
+        status: "pending",
       };
       this.displayTransactionDetails();
       return;
     }
-    
+
     // Fallback to API call
     try {
       const response = await fetch(apiUrl);
@@ -130,14 +130,15 @@ class TokenDeploymentManager {
     const { transaction_data } = this.sessionData;
 
     // For contract deployment, we don't specify 'to' address and use the compiled bytecode as data
-    const isContractDeployment = !transaction_data.contract_address && !transaction_data.token_address;
-    
+    const isContractDeployment =
+      !transaction_data.contract_address && !transaction_data.token_address;
+
     // Fetch dynamic gas price and estimate gas limit
     const [gasPrice, estimatedGas] = await Promise.all([
       this.fetchGasPrice(),
-      this.estimateGas(transaction_data, isContractDeployment)
+      this.estimateGas(transaction_data, isContractDeployment),
     ]);
-    
+
     let txData = {
       from: this.walletManager.getAccount(),
       value: transaction_data.eth_amount
@@ -150,10 +151,13 @@ class TokenDeploymentManager {
 
     if (isContractDeployment && transaction_data.bytecode) {
       // Contract deployment - no 'to' address, use bytecode as data
-      const bytecode = (transaction_data.bytecode && typeof transaction_data.bytecode === 'string' && transaction_data.bytecode.startsWith('0x')) 
-        ? transaction_data.bytecode 
-        : '0x' + (transaction_data.bytecode || '');
-      
+      const bytecode =
+        transaction_data.bytecode &&
+        typeof transaction_data.bytecode === "string" &&
+        transaction_data.bytecode.startsWith("0x")
+          ? transaction_data.bytecode
+          : "0x" + (transaction_data.bytecode || "");
+
       // If we have constructor parameters, we need to encode them and append to bytecode
       if (transaction_data.token_name && transaction_data.token_symbol) {
         // For now, use the bytecode directly - ABI encoding would be more complex
@@ -163,7 +167,8 @@ class TokenDeploymentManager {
       }
     } else {
       // Contract call or transfer - specify recipient and minimal data
-      txData.to = transaction_data.contract_address || transaction_data.token_address;
+      txData.to =
+        transaction_data.contract_address || transaction_data.token_address;
       txData.data = "0x";
     }
 
@@ -176,12 +181,16 @@ class TokenDeploymentManager {
         method: "eth_gasPrice",
         params: [],
       });
-      
+
       // Add 10% buffer to gas price for faster confirmation
       const gasPriceNum = parseInt(gasPrice, 16);
       const bufferedGasPrice = Math.floor(gasPriceNum * 1.1);
-      
-      console.log(`Fetched gas price: ${gasPrice} (${gasPriceNum} wei), buffered: 0x${bufferedGasPrice.toString(16)}`);
+
+      console.log(
+        `Fetched gas price: ${gasPrice} (${gasPriceNum} wei), buffered: 0x${bufferedGasPrice.toString(
+          16
+        )}`
+      );
       return `0x${bufferedGasPrice.toString(16)}`;
     } catch (error) {
       console.warn("Failed to fetch gas price, using fallback:", error);
@@ -200,13 +209,17 @@ class TokenDeploymentManager {
 
       if (isContractDeployment && transactionData.bytecode) {
         // For contract deployment
-        const bytecode = (transactionData.bytecode && typeof transactionData.bytecode === 'string' && transactionData.bytecode.startsWith('0x')) 
-          ? transactionData.bytecode 
-          : '0x' + (transactionData.bytecode || '');
+        const bytecode =
+          transactionData.bytecode &&
+          typeof transactionData.bytecode === "string" &&
+          transactionData.bytecode.startsWith("0x")
+            ? transactionData.bytecode
+            : "0x" + (transactionData.bytecode || "");
         gasEstimateParams.data = bytecode;
       } else {
         // For contract calls
-        gasEstimateParams.to = transactionData.contract_address || transactionData.token_address;
+        gasEstimateParams.to =
+          transactionData.contract_address || transactionData.token_address;
         gasEstimateParams.data = "0x";
       }
 
@@ -218,8 +231,12 @@ class TokenDeploymentManager {
       // Add 20% buffer to gas limit for safety
       const gasNum = parseInt(estimatedGas, 16);
       const bufferedGas = Math.floor(gasNum * 1.2);
-      
-      console.log(`Estimated gas: ${estimatedGas} (${gasNum}), buffered: 0x${bufferedGas.toString(16)}`);
+
+      console.log(
+        `Estimated gas: ${estimatedGas} (${gasNum}), buffered: 0x${bufferedGas.toString(
+          16
+        )}`
+      );
       return `0x${bufferedGas.toString(16)}`;
     } catch (error) {
       console.warn("Failed to estimate gas, using fallback:", error);
@@ -235,8 +252,8 @@ class TokenDeploymentManager {
 
     // Convert target chain ID to hex format if needed
     let targetChainIdHex = targetChainId;
-    if (targetChainId && !targetChainId.startsWith('0x')) {
-      targetChainIdHex = '0x' + parseInt(targetChainId, 10).toString(16);
+    if (targetChainId && !targetChainId.startsWith("0x")) {
+      targetChainIdHex = "0x" + parseInt(targetChainId, 10).toString(16);
     }
 
     // Only switch network if we have a valid target chain ID and they differ
@@ -259,7 +276,11 @@ class TokenDeploymentManager {
     }
 
     // Update session status
-    await this.updateSessionStatus(txHash, "confirmed", contractAddress);
+    await this.updateSessionStatus(
+      txHash,
+      "confirmed",
+      contractAddress
+    );
 
     return { txHash, contractAddress };
   }
@@ -360,8 +381,12 @@ async function signTransaction() {
 
   // Check if we have the new HTML structure
   const successState = document.getElementById("success-state");
-  const contractAddressDisplay = document.getElementById("contract-address-display");
-  const transactionHashDisplay = document.getElementById("transaction-hash-display");
+  const contractAddressDisplay = document.getElementById(
+    "contract-address-display"
+  );
+  const transactionHashDisplay = document.getElementById(
+    "transaction-hash-display"
+  );
 
   try {
     if (statusElement) {
@@ -415,7 +440,8 @@ async function signTransaction() {
         statusMessage.innerHTML = `✅ Transaction confirmed! Hash: <code class="bg-green-100 px-2 py-1 rounded text-green-800 text-xs break-all">${result.txHash}</code>`;
       }
       if (statusElement) {
-        statusElement.className = "bg-green-50 border border-green-200 text-green-800 px-6 py-4 rounded-xl shadow-sm";
+        statusElement.className =
+          "bg-green-50 border border-green-200 text-green-800 px-6 py-4 rounded-xl shadow-sm";
       }
     }
 
@@ -424,7 +450,8 @@ async function signTransaction() {
     if (statusMessage)
       statusMessage.innerHTML = `❌ Transaction failed: ${error.message}`;
     if (statusElement) {
-      statusElement.className = "bg-red-50 border border-red-200 text-red-800 px-6 py-4 rounded-xl shadow-sm";
+      statusElement.className =
+        "bg-red-50 border border-red-200 text-red-800 px-6 py-4 rounded-xl shadow-sm";
     }
   }
 }
@@ -432,7 +459,7 @@ async function signTransaction() {
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", function () {
   // Only initialize if walletManager exists (from wallet-connection.js)
-  if (typeof walletManager !== 'undefined') {
+  if (typeof walletManager !== "undefined") {
     tokenDeploymentManager = new TokenDeploymentManager(walletManager);
 
     // Load session data if available
@@ -453,8 +480,12 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error("Error parsing embedded transaction data:", error);
           }
         }
-        
-        tokenDeploymentManager.loadSessionData(sessionId, apiUrl, parsedEmbeddedData);
+
+        tokenDeploymentManager.loadSessionData(
+          sessionId,
+          apiUrl,
+          parsedEmbeddedData
+        );
       }
     }
   }

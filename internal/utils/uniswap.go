@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -233,4 +234,120 @@ func GenerateUniswapV2Metadata(chainType, chainID string, gasEstimates map[strin
 			Value: "Uniswap settings will be auto-configured after deployment",
 		},
 	}
+}
+
+// CalculateInitialTokenPrice calculates the initial token price based on liquidity pool parameters
+// Returns the price of 1 token in ETH and the price of 1 ETH in tokens
+func CalculateInitialTokenPrice(tokenAmount, ethAmount string, tokenDecimals uint8) (pricePerTokenInETH, pricePerETHInTokens *big.Float, err error) {
+	// Parse token amount
+	tokenAmountBig, ok := new(big.Int).SetString(tokenAmount, 10)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid token amount: %s", tokenAmount)
+	}
+
+	// Parse ETH amount (assuming wei units)
+	ethAmountBig, ok := new(big.Int).SetString(ethAmount, 10)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid ETH amount: %s", ethAmount)
+	}
+
+	// Convert to float for price calculation
+	tokenAmountFloat := new(big.Float).SetInt(tokenAmountBig)
+	ethAmountFloat := new(big.Float).SetInt(ethAmountBig)
+
+	// Account for decimals
+	tokenDivisor := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(tokenDecimals)), nil))
+	ethDivisor := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)) // ETH has 18 decimals
+
+	// Convert to actual amounts (not wei/smallest units)
+	actualTokenAmount := new(big.Float).Quo(tokenAmountFloat, tokenDivisor)
+	actualETHAmount := new(big.Float).Quo(ethAmountFloat, ethDivisor)
+
+	// Calculate price of 1 token in ETH: ETH_amount / token_amount
+	pricePerTokenInETH = new(big.Float).Quo(actualETHAmount, actualTokenAmount)
+
+	// Calculate price of 1 ETH in tokens: token_amount / ETH_amount
+	pricePerETHInTokens = new(big.Float).Quo(actualTokenAmount, actualETHAmount)
+
+	return pricePerTokenInETH, pricePerETHInTokens, nil
+}
+
+// FormatTokenPrice formats a token price for display
+func FormatTokenPrice(price *big.Float, decimals int) string {
+	if price == nil {
+		return "0"
+	}
+	return price.Text('f', decimals)
+}
+
+// CalculatePriceImpact calculates the price impact of a swap
+// Returns the price impact as a percentage
+func CalculatePriceImpact(inputAmount, outputAmount, inputReserve, outputReserve string) (*big.Float, error) {
+	// Parse all amounts
+	inputBig, ok := new(big.Int).SetString(inputAmount, 10)
+	if !ok {
+		return nil, fmt.Errorf("invalid input amount: %s", inputAmount)
+	}
+
+	outputBig, ok := new(big.Int).SetString(outputAmount, 10)
+	if !ok {
+		return nil, fmt.Errorf("invalid output amount: %s", outputAmount)
+	}
+
+	inputReserveBig, ok := new(big.Int).SetString(inputReserve, 10)
+	if !ok {
+		return nil, fmt.Errorf("invalid input reserve: %s", inputReserve)
+	}
+
+	outputReserveBig, ok := new(big.Int).SetString(outputReserve, 10)
+	if !ok {
+		return nil, fmt.Errorf("invalid output reserve: %s", outputReserve)
+	}
+
+	// Convert to float for calculation
+	inputFloat := new(big.Float).SetInt(inputBig)
+	outputFloat := new(big.Float).SetInt(outputBig)
+	inputReserveFloat := new(big.Float).SetInt(inputReserveBig)
+	outputReserveFloat := new(big.Float).SetInt(outputReserveBig)
+
+	// Calculate spot price before swap: outputReserve / inputReserve
+	spotPrice := new(big.Float).Quo(outputReserveFloat, inputReserveFloat)
+
+	// Calculate execution price: outputAmount / inputAmount
+	executionPrice := new(big.Float).Quo(outputFloat, inputFloat)
+
+	// Calculate price impact: ((spotPrice - executionPrice) / spotPrice) * 100
+	priceDiff := new(big.Float).Sub(spotPrice, executionPrice)
+	impact := new(big.Float).Quo(priceDiff, spotPrice)
+	impactPercentage := new(big.Float).Mul(impact, big.NewFloat(100))
+
+	return impactPercentage, nil
+}
+
+// CalculateMinimumLiquidityAmounts calculates minimum amounts for adding liquidity with slippage
+func CalculateMinimumLiquidityAmounts(amount0, amount1 string, slippagePercent float64) (min0, min1 string, err error) {
+	// Parse amounts
+	amount0Big, ok := new(big.Int).SetString(amount0, 10)
+	if !ok {
+		return "", "", fmt.Errorf("invalid amount0: %s", amount0)
+	}
+
+	amount1Big, ok := new(big.Int).SetString(amount1, 10)
+	if !ok {
+		return "", "", fmt.Errorf("invalid amount1: %s", amount1)
+	}
+
+	// Calculate slippage factor (e.g., 0.5% slippage = 0.995 factor)
+	slippageFactor := 1.0 - (slippagePercent / 100.0)
+
+	// Apply slippage
+	min0Float := new(big.Float).SetInt(amount0Big)
+	min0Float.Mul(min0Float, big.NewFloat(slippageFactor))
+	min0Big, _ := min0Float.Int(nil)
+
+	min1Float := new(big.Float).SetInt(amount1Big)
+	min1Float.Mul(min1Float, big.NewFloat(slippageFactor))
+	min1Big, _ := min1Float.Int(nil)
+
+	return min0Big.String(), min1Big.String(), nil
 }

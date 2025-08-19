@@ -12,7 +12,7 @@ import (
 	"github.com/chromedp/chromedp"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/rxtech-lab/launchpad-mcp/e2e"
+	e2e "github.com/rxtech-lab/launchpad-mcp/e2e/api"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/stretchr/testify/require"
 )
@@ -33,12 +33,9 @@ func NewChromedpTestSetup(t *testing.T) *ChromedpTestSetup {
 		t:         t,
 	}
 
-	// Check if headless mode should be disabled via environment variable
-	headless := os.Getenv("HEADLESS") != "false"
-
 	// Setup Chrome options
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", headless),
+		chromedp.Flag("headless", true),
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("disable-dev-shm-usage", true),
 		chromedp.Flag("disable-web-security", true),
@@ -520,7 +517,7 @@ func (s *ChromedpTestSetup) VerifyContractDeployment(contractAddress string) err
 	return nil
 }
 
-// WaitForTransactionConfirmation waits for a transaction to be confirmed
+// WaitForTransactionConfirmation waits for a transaction to be models.TransactionStatusConfirmed
 func (s *ChromedpTestSetup) WaitForTransactionConfirmation(txHash string) error {
 	hash := common.HexToHash(txHash)
 	receipt, err := s.WaitForTransaction(hash, 60) // 60 second timeout

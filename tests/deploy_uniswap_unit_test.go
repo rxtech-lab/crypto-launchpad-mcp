@@ -154,7 +154,7 @@ func TestUniswapDatabaseIntegration(t *testing.T) {
 		deployment := &models.UniswapDeployment{
 			Version: "v2",
 			ChainID: chain.ID,
-			Status:  "pending",
+			Status:  models.TransactionStatusPending,
 		}
 
 		err := db.CreateUniswapDeployment(deployment)
@@ -174,7 +174,7 @@ func TestUniswapDatabaseIntegration(t *testing.T) {
 		deployment := &models.UniswapDeployment{
 			Version: "v2",
 			ChainID: chain.ID,
-			Status:  "confirmed", // Important: must be confirmed to be found
+			Status:  models.TransactionStatusConfirmed, // Important: must be models.TransactionStatusConfirmed to be found
 		}
 
 		err := db.CreateUniswapDeployment(deployment)
@@ -212,11 +212,11 @@ func TestUniswapDatabaseIntegration(t *testing.T) {
 			t.Fatalf("Failed to create test chain 2: %v", err)
 		}
 
-		// Create a confirmed deployment first
+		// Create a models.TransactionStatusConfirmed deployment first
 		deployment := &models.UniswapDeployment{
 			Version: "v2",
 			ChainID: testChain2.ID,
-			Status:  "confirmed",
+			Status:  models.TransactionStatusConfirmed,
 		}
 
 		err = db.CreateUniswapDeployment(deployment)

@@ -133,7 +133,7 @@ func (s *UniswapDeploymentChromedpTestSuite) testDatabaseVerification(sessionID 
 	s.Require().NoError(err, "Failed to get transaction session")
 
 	// Verify session status
-	s.Assert().Equal("confirmed", session.Status, "Session status should be confirmed")
+	s.Assert().Equal(models.TransactionStatusConfirmed, session.Status, "Session status should be models.TransactionStatusConfirmed")
 
 	// Verify Uniswap deployment record was created
 	deployments, err := s.setup.DB.ListUniswapDeployments()
@@ -143,7 +143,7 @@ func (s *UniswapDeploymentChromedpTestSuite) testDatabaseVerification(sessionID 
 	var deployment *models.UniswapDeployment
 
 	// Parse session data to get deployment info
-	var sessionData map[string]interface{}
+	var sessionData map[string]any
 	err = json.Unmarshal([]byte(session.TransactionData), &sessionData)
 	s.Require().NoError(err, "Failed to parse session data")
 
@@ -167,7 +167,7 @@ func (s *UniswapDeploymentChromedpTestSuite) testDatabaseVerification(sessionID 
 	s.Assert().NotEmpty(deployment.RouterAddress, "Router address should be populated")
 	s.Assert().NotEmpty(deployment.RouterTxHash, "Router transaction hash should be populated")
 	s.Assert().Equal("v2", deployment.Version, "Version should be v2")
-	s.Assert().Equal("confirmed", deployment.Status, "Status should be confirmed")
+	s.Assert().Equal(models.TransactionStatusConfirmed, deployment.Status, "Status should be models.TransactionStatusConfirmed")
 }
 
 // ErrorHandlingTestSuite tests error scenarios
@@ -333,28 +333,6 @@ func (s *PageLoadTestSuite) TestUniswapDeploymentPageLoad() {
 	}
 }
 
-// BenchmarkTestSuite for performance testing
-type BenchmarkTestSuite struct {
-	suite.Suite
-	setup *ChromedpTestSetup
-}
-
-func (s *BenchmarkTestSuite) SetupSuite() {
-	s.setup = NewChromedpTestSetup(s.T())
-
-	// Verify Ethereum connection
-	err := s.setup.VerifyEthereumConnection()
-	if err != nil {
-		s.T().Skipf("Ethereum testnet not available: %v", err)
-	}
-}
-
-func (s *BenchmarkTestSuite) TearDownSuite() {
-	if s.setup != nil {
-		s.setup.Cleanup()
-	}
-}
-
 // Test runner functions that testify expects
 func TestUniswapDeploymentChromedp(t *testing.T) {
 	suite.Run(t, new(UniswapDeploymentChromedpTestSuite))
@@ -370,8 +348,4 @@ func TestUniswapDeploymentWithoutWallet(t *testing.T) {
 
 func TestUniswapDeploymentPageLoad(t *testing.T) {
 	suite.Run(t, new(PageLoadTestSuite))
-}
-
-func TestBenchmarkUniswapDeployment(t *testing.T) {
-	suite.Run(t, new(BenchmarkTestSuite))
 }
