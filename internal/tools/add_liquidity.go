@@ -94,6 +94,16 @@ func NewAddLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, serve
 			}, nil
 		}
 
+		// check if pool is confirmed
+		if pool.Status != models.TransactionStatusConfirmed {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.NewTextContent("Error: "),
+					mcp.NewTextContent("Liquidity pool is not confirmed. Create pool first using create_liquidity_pool"),
+				},
+			}, nil
+		}
+
 		// Get active Uniswap settings
 		uniswapSettings, err := db.GetActiveUniswapSettings()
 		if err != nil {

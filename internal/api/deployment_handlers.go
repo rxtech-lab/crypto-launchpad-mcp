@@ -7,6 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 )
 
 // handleDeploymentPage serves the deployment signing page
@@ -112,9 +113,9 @@ func (s *APIServer) handleDeploymentConfirm(c *fiber.Ctx) error {
 	sessionID := c.Params("session_id")
 
 	var body struct {
-		TransactionHash string `json:"transaction_hash"`
-		Status          string `json:"status"`
-		ContractAddress string `json:"contract_address"`
+		TransactionHash string                   `json:"transaction_hash"`
+		Status          models.TransactionStatus `json:"status"`
+		ContractAddress string                   `json:"contract_address"`
 	}
 
 	if err := c.BodyParser(&body); err != nil {
@@ -126,14 +127,14 @@ func (s *APIServer) handleDeploymentConfirm(c *fiber.Ctx) error {
 		return c.Status(500).JSON(map[string]string{"error": "Failed to update session"})
 	}
 
-	// If confirmed, verify transaction on-chain and update deployment record
-	if body.Status == "confirmed" && body.TransactionHash != "" {
+	// If models.TransactionStatusConfirmed, verify transaction on-chain and update deployment record
+	if body.Status == models.TransactionStatusConfirmed && body.TransactionHash != "" {
 		session, err := s.db.GetTransactionSession(sessionID)
 		if err == nil {
 			var transactionData map[string]interface{}
 			if err := json.Unmarshal([]byte(session.TransactionData), &transactionData); err == nil {
 				if deploymentID, ok := transactionData["deployment_id"].(float64); ok {
-					// Verify transaction on-chain before marking as confirmed
+					// Verify transaction on-chain before marking as models.TransactionStatusConfirmed
 					if err := s.verifyTransactionOnChain(body.TransactionHash, session.ChainID); err != nil {
 						log.Printf("Transaction verification failed for %s: %v", body.TransactionHash, err)
 						// Update deployment status as failed due to verification failure
@@ -142,26 +143,26 @@ func (s *APIServer) handleDeploymentConfirm(c *fiber.Ctx) error {
 					}
 
 					// Transaction verified successfully - update deployment
-					s.db.UpdateDeploymentStatus(uint(deploymentID), "confirmed", body.ContractAddress, body.TransactionHash)
+					s.db.UpdateDeploymentStatus(uint(deploymentID), models.TransactionStatusConfirmed, body.ContractAddress, body.TransactionHash)
 					s.mcpServer.SendMessageToAiClient(
 						[]mcp.SamplingMessage{
 							{
 								Role: "user",
 								Content: mcp.TextContent{
-									Text: fmt.Sprintf("Deployment %d confirmed with transaction %s", uint(deploymentID), body.TransactionHash),
+									Text: fmt.Sprintf("Deployment %d models.TransactionStatusConfirmed with transaction %s", uint(deploymentID), body.TransactionHash),
 									Type: "text",
 								},
 							},
 						},
 					)
-					log.Printf("Deployment %d confirmed with transaction %s", uint(deploymentID), body.TransactionHash)
+					log.Printf("Deployment %d models.TransactionStatusConfirmed with transaction %s", uint(deploymentID), body.TransactionHash)
 				}
 			}
 		}
 	}
 
 	response := map[string]interface{}{
-		"status": "success",
+		"status": models.TransactionStatusConfirmed,
 	}
 
 	if body.ContractAddress != "" {

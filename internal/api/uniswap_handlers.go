@@ -187,10 +187,10 @@ func (s *APIServer) handleUniswapDeploymentConfirm(c *fiber.Ctx) error {
 
 	// Parse request body
 	var req struct {
-		TransactionHashes map[string]string `json:"transaction_hashes"`
-		ContractAddresses map[string]string `json:"contract_addresses"`
-		DeployerAddress   string            `json:"deployer_address"`
-		Status            string            `json:"status"`
+		TransactionHashes map[string]string        `json:"transaction_hashes"`
+		ContractAddresses map[string]string        `json:"contract_addresses"`
+		DeployerAddress   string                   `json:"deployer_address"`
+		Status            models.TransactionStatus `json:"status"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -255,7 +255,7 @@ func (s *APIServer) handleUniswapDeploymentConfirm(c *fiber.Ctx) error {
 
 	// Update session status
 	var sessionTxHash string
-	if req.TransactionHashes != nil && len(req.TransactionHashes) > 0 {
+	if len(req.TransactionHashes) > 0 {
 		// Use factory transaction as the primary one
 		if factoryTx, ok := req.TransactionHashes["factory"]; ok {
 			sessionTxHash = factoryTx
@@ -276,7 +276,7 @@ func (s *APIServer) handleUniswapDeploymentConfirm(c *fiber.Ctx) error {
 		// Don't return error - deployment was updated successfully
 	}
 
-	// If deployment is confirmed, auto-configure Uniswap settings
+	// If deployment is models.TransactionStatusConfirmed, auto-configure Uniswap settings
 	if req.Status == "confirmed" && req.ContractAddresses != nil {
 		deployment, err := s.db.GetUniswapDeploymentByID(deploymentID)
 		if err == nil {

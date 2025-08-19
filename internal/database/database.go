@@ -185,7 +185,7 @@ func (d *Database) GetDeploymentByID(id uint) (*models.Deployment, error) {
 	return &deployment, nil
 }
 
-func (d *Database) UpdateDeploymentStatus(id uint, status, contractAddress, txHash string) error {
+func (d *Database) UpdateDeploymentStatus(id uint, status models.TransactionStatus, contractAddress, txHash string) error {
 	updates := map[string]interface{}{
 		"status": status,
 	}
@@ -335,6 +335,10 @@ func (d *Database) ListLiquidityPools() ([]models.LiquidityPool, error) {
 	return pools, err
 }
 
+func (d *Database) DeleteLiquidityPool(id uint) error {
+	return d.DB.Delete(&models.LiquidityPool{}, id).Error
+}
+
 // Liquidity Position operations
 func (d *Database) CreateLiquidityPosition(position *models.LiquidityPosition) error {
 	return d.DB.Create(position).Error
@@ -349,7 +353,7 @@ func (d *Database) GetLiquidityPositionByID(id uint) (*models.LiquidityPosition,
 	return &position, nil
 }
 
-func (d *Database) UpdateLiquidityPositionStatus(id uint, status, txHash string) error {
+func (d *Database) UpdateLiquidityPositionStatus(id uint, status models.TransactionStatus, txHash string) error {
 	updates := map[string]interface{}{
 		"status": status,
 	}
@@ -433,7 +437,7 @@ func (d *Database) GetTransactionSession(sessionID string) (*models.TransactionS
 	return &session, nil
 }
 
-func (d *Database) UpdateTransactionSessionStatus(sessionID, status, txHash string) error {
+func (d *Database) UpdateTransactionSessionStatus(sessionID string, status models.TransactionStatus, txHash string) error {
 	updates := map[string]interface{}{
 		"status": status,
 	}
@@ -453,7 +457,7 @@ func (d *Database) GetUniswapDeploymentByChain(chainType, chainID string) (*mode
 	var deployment models.UniswapDeployment
 	err := d.DB.
 		Joins("JOIN chains ON chains.id = uniswap_deployments.chain_id").
-		Where("chains.chain_type = ? AND chains.chain_id = ? AND uniswap_deployments.status = ?", chainType, chainID, "confirmed").
+		Where("chains.chain_type = ? AND chains.chain_id = ? AND uniswap_deployments.status = ?", chainType, chainID, models.TransactionStatusConfirmed).
 		First(&deployment).Error
 	if err != nil {
 		return nil, err
@@ -488,7 +492,7 @@ func (d *Database) GetUniswapDeploymentByID(id uint) (*models.UniswapDeployment,
 	return &deployment, nil
 }
 
-func (d *Database) UpdateUniswapDeploymentStatus(id uint, status string, addresses map[string]string, txHashes map[string]string) error {
+func (d *Database) UpdateUniswapDeploymentStatus(id uint, status models.TransactionStatus, addresses map[string]string, txHashes map[string]string) error {
 	updates := map[string]interface{}{
 		"status": status,
 	}

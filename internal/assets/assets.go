@@ -17,6 +17,12 @@ var DeployUniswapJS []byte
 //go:embed balance-query.js
 var BalanceQueryJS []byte
 
+//go:embed create-pool.js
+var CreatePoolJS []byte
+
+//go:embed liquidity.js
+var LiquidityJS []byte
+
 //go:embed deploy.html
 var DeployHTML []byte
 
@@ -31,3 +37,12 @@ var DeployUniswapHTML []byte
 
 //go:embed balance.html
 var BalanceHTML []byte
+
+//go:embed add_liquidity.html
+var AddLiquidityHTML []byte
+
+//go:embed remove_liquidity.html
+var RemoveLiquidityHTML []byte
+
+//go:embed swap.html
+var SwapHTML []byte

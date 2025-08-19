@@ -67,8 +67,8 @@ func (s *APIServer) initTemplates() {
 		s.templates["deploy"] = deployTmpl
 	}
 
-	// Parse create pool template
-	poolTmpl, err := template.New("create_pool").Parse(string(assets.CreatePoolHTML))
+	// Parse create pool template with custom functions
+	poolTmpl, err := template.New("create_pool").Funcs(funcMap).Parse(string(assets.CreatePoolHTML))
 	if err != nil {
 		log.Printf("Error parsing create pool template: %v", err)
 	} else {
@@ -98,6 +98,30 @@ func (s *APIServer) initTemplates() {
 	} else {
 		s.templates["balance"] = balanceTmpl
 	}
+
+	// Parse add liquidity template with custom functions
+	addLiquidityTmpl, err := template.New("add_liquidity").Funcs(funcMap).Parse(string(assets.AddLiquidityHTML))
+	if err != nil {
+		log.Printf("Error parsing add liquidity template: %v", err)
+	} else {
+		s.templates["add_liquidity"] = addLiquidityTmpl
+	}
+
+	// Parse remove liquidity template with custom functions
+	removeLiquidityTmpl, err := template.New("remove_liquidity").Funcs(funcMap).Parse(string(assets.RemoveLiquidityHTML))
+	if err != nil {
+		log.Printf("Error parsing remove liquidity template: %v", err)
+	} else {
+		s.templates["remove_liquidity"] = removeLiquidityTmpl
+	}
+
+	// Parse swap template with custom functions
+	swapTmpl, err := template.New("swap").Funcs(funcMap).Parse(string(assets.SwapHTML))
+	if err != nil {
+		log.Printf("Error parsing swap template: %v", err)
+	} else {
+		s.templates["swap"] = swapTmpl
+	}
 }
 
 func (s *APIServer) setupRoutes() {
@@ -107,6 +131,8 @@ func (s *APIServer) setupRoutes() {
 	s.app.Get("/js/deploy-tokens.js", s.handleDeployTokensJS)
 	s.app.Get("/js/deploy-uniswap.js", s.handleDeployUniswapJS)
 	s.app.Get("/js/balance-query.js", s.handleBalanceQueryJS)
+	s.app.Get("/js/create-pool.js", s.handleCreatePoolJS)
+	s.app.Get("/js/liquidity.js", s.handleLiquidityJS)
 
 	// Deployment signing routes
 	s.app.Get("/deploy/:session_id", s.handleDeploymentPage)
@@ -224,6 +250,18 @@ func (s *APIServer) handleDeployUniswapJS(c *fiber.Ctx) error {
 func (s *APIServer) handleBalanceQueryJS(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/javascript")
 	return c.Send(assets.BalanceQueryJS)
+}
+
+// handleCreatePoolJS serves the embedded create-pool.js file
+func (s *APIServer) handleCreatePoolJS(c *fiber.Ctx) error {
+	c.Set("Content-Type", "application/javascript")
+	return c.Send(assets.CreatePoolJS)
+}
+
+// handleLiquidityJS serves the embedded liquidity.js file
+func (s *APIServer) handleLiquidityJS(c *fiber.Ctx) error {
+	c.Set("Content-Type", "application/javascript")
+	return c.Send(assets.LiquidityJS)
 }
 
 // verifyTransactionOnChain verifies that a transaction exists and was successful on-chain

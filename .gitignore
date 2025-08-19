@@ -64,3 +64,4 @@ debug_*.html
 e2e/api/debug_page_load_verification.html
 e2e/api/debug_no_wallet_available.html
 e2e/api/debug_expired_session.html
+e2e/page/__debug_bin3599109147

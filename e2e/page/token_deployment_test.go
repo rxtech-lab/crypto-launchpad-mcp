@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -175,7 +176,7 @@ func (s *TokenDeploymentTestSuite) testDatabaseVerification(sessionID, contractA
 	s.Require().NoError(err, "Failed to get transaction session")
 
 	// Verify session status
-	s.Assert().Equal("confirmed", session.Status, "Session status should be confirmed")
+	s.Assert().Equal(models.TransactionStatusConfirmed, session.Status, "Session status should be models.TransactionStatusConfirmed")
 
 	// Verify deployment record was created
 	deployments, err := s.setup.DB.ListDeployments()

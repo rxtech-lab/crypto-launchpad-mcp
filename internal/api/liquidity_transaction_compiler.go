@@ -11,12 +11,25 @@ func (s *APIServer) generateCreatePoolTransactionData(pool *models.LiquidityPool
 	// Get Uniswap settings
 	uniswapSettings, _ := s.db.GetActiveUniswapSettings()
 
+	uniswapVersion := "v2" // default
+	var routerAddress, factoryAddress string
+	if uniswapSettings != nil {
+		uniswapVersion = uniswapSettings.Version
+		// Get the Uniswap deployment addresses
+		if deployment, err := s.db.GetUniswapDeploymentByChain(activeChain.ChainType, activeChain.ChainID); err == nil && deployment != nil {
+			routerAddress = deployment.RouterAddress
+			factoryAddress = deployment.FactoryAddress
+		}
+	}
+
 	transactionData := map[string]interface{}{
 		"pool_id":              pool.ID,
 		"token_address":        pool.TokenAddress,
 		"initial_token_amount": pool.InitialToken0,
 		"initial_eth_amount":   pool.InitialToken1,
-		"uniswap_version":      uniswapSettings.Version,
+		"uniswap_version":      uniswapVersion,
+		"router_address":       routerAddress,
+		"factory_address":      factoryAddress,
 		"chain_type":           activeChain.ChainType,
 		"chain_id":             activeChain.ChainID,
 		"rpc":                  activeChain.RPC,
@@ -38,13 +51,26 @@ func (s *APIServer) generateAddLiquidityTransactionData(position *models.Liquidi
 	// Get Uniswap settings
 	uniswapSettings, _ := s.db.GetActiveUniswapSettings()
 
+	uniswapVersion := "v2" // default
+	var routerAddress, factoryAddress string
+	if uniswapSettings != nil {
+		uniswapVersion = uniswapSettings.Version
+		// Get the Uniswap deployment addresses
+		if deployment, err := s.db.GetUniswapDeploymentByChain(activeChain.ChainType, activeChain.ChainID); err == nil && deployment != nil {
+			routerAddress = deployment.RouterAddress
+			factoryAddress = deployment.FactoryAddress
+		}
+	}
+
 	transactionData := map[string]interface{}{
 		"position_id":     position.ID,
 		"pool_id":         pool.ID,
 		"token_address":   pool.TokenAddress,
 		"token_amount":    position.Token0Amount,
 		"eth_amount":      position.Token1Amount,
-		"uniswap_version": uniswapSettings.Version,
+		"uniswap_version": uniswapVersion,
+		"router_address":  routerAddress,
+		"factory_address": factoryAddress,
 		"chain_type":      activeChain.ChainType,
 		"chain_id":        activeChain.ChainID,
 		"rpc":             activeChain.RPC,
@@ -67,12 +93,25 @@ func (s *APIServer) generateRemoveLiquidityTransactionData(position *models.Liqu
 	// Get Uniswap settings
 	uniswapSettings, _ := s.db.GetActiveUniswapSettings()
 
+	uniswapVersion := "v2" // default
+	var routerAddress, factoryAddress string
+	if uniswapSettings != nil {
+		uniswapVersion = uniswapSettings.Version
+		// Get the Uniswap deployment addresses
+		if deployment, err := s.db.GetUniswapDeploymentByChain(activeChain.ChainType, activeChain.ChainID); err == nil && deployment != nil {
+			routerAddress = deployment.RouterAddress
+			factoryAddress = deployment.FactoryAddress
+		}
+	}
+
 	transactionData := map[string]interface{}{
 		"position_id":      position.ID,
 		"pool_id":          pool.ID,
 		"token_address":    pool.TokenAddress,
 		"liquidity_amount": sessionData["liquidity_amount"],
-		"uniswap_version":  uniswapSettings.Version,
+		"uniswap_version":  uniswapVersion,
+		"router_address":   routerAddress,
+		"factory_address":  factoryAddress,
 		"chain_type":       activeChain.ChainType,
 		"chain_id":         activeChain.ChainID,
 		"rpc":              activeChain.RPC,
@@ -95,13 +134,26 @@ func (s *APIServer) generateSwapTransactionData(swap *models.SwapTransaction, se
 	// Get Uniswap settings
 	uniswapSettings, _ := s.db.GetActiveUniswapSettings()
 
+	uniswapVersion := "v2" // default
+	var routerAddress, factoryAddress string
+	if uniswapSettings != nil {
+		uniswapVersion = uniswapSettings.Version
+		// Get the Uniswap deployment addresses
+		if deployment, err := s.db.GetUniswapDeploymentByChain(activeChain.ChainType, activeChain.ChainID); err == nil && deployment != nil {
+			routerAddress = deployment.RouterAddress
+			factoryAddress = deployment.FactoryAddress
+		}
+	}
+
 	transactionData := map[string]interface{}{
 		"swap_id":         swap.ID,
 		"token_in":        swap.FromToken,
 		"token_out":       swap.ToToken,
 		"amount_in":       swap.FromAmount,
 		"amount_out_min":  sessionData["amount_out_min"],
-		"uniswap_version": uniswapSettings.Version,
+		"uniswap_version": uniswapVersion,
+		"router_address":  routerAddress,
+		"factory_address": factoryAddress,
 		"chain_type":      activeChain.ChainType,
 		"chain_id":        activeChain.ChainID,
 		"rpc":             activeChain.RPC,

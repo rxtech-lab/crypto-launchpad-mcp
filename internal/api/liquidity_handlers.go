@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 )
 
 // Pool creation handlers
@@ -74,9 +75,15 @@ func (s *APIServer) handleAddLiquidityPage(c *fiber.Ctx) error {
 		}
 	}
 
+	// Serialize transactionData to JSON for embedding
+	var transactionDataJSON interface{}
+	if transactionData != nil {
+		transactionDataJSON = transactionData
+	}
+
 	html := s.renderTemplate("add_liquidity", map[string]interface{}{
 		"SessionID":       session.ID,
-		"TransactionData": transactionData,
+		"TransactionData": transactionDataJSON,
 	})
 	c.Set("Content-Type", "text/html")
 	return c.SendString(html)
@@ -228,8 +235,10 @@ func (s *APIServer) handleGenericConfirm(c *fiber.Ctx, recordType string) error 
 	sessionID := c.Params("session_id")
 
 	var body struct {
-		TransactionHash string `json:"transaction_hash"`
-		Status          string `json:"status"`
+		TransactionHash string                   `json:"transaction_hash"`
+		Status          models.TransactionStatus `json:"status"`
+		PairAddress     string                   `json:"pair_address,omitempty"`     // For pool creation
+		ContractAddress string                   `json:"contract_address,omitempty"` // For other deployments
 	}
 
 	if err := c.BodyParser(&body); err != nil {
@@ -247,7 +256,12 @@ func (s *APIServer) handleGenericConfirm(c *fiber.Ctx, recordType string) error 
 		if err == nil {
 			var transactionData map[string]interface{}
 			if err := json.Unmarshal([]byte(session.TransactionData), &transactionData); err == nil {
-				s.updateRelatedRecord(recordType, transactionData, body.TransactionHash)
+				// Pass additional data for specific record types
+				extraData := map[string]string{
+					"pair_address":     body.PairAddress,
+					"contract_address": body.ContractAddress,
+				}
+				s.updateRelatedRecord(recordType, transactionData, body.TransactionHash, extraData)
 			}
 		}
 	}
@@ -255,11 +269,12 @@ func (s *APIServer) handleGenericConfirm(c *fiber.Ctx, recordType string) error 
 	return c.JSON(map[string]string{"status": "success"})
 }
 
-func (s *APIServer) updateRelatedRecord(recordType string, transactionData map[string]interface{}, txHash string) {
+func (s *APIServer) updateRelatedRecord(recordType string, transactionData map[string]interface{}, txHash string, extraData map[string]string) {
 	switch recordType {
 	case "pool":
 		if poolID, ok := transactionData["pool_id"].(float64); ok {
-			s.db.UpdateLiquidityPoolStatus(uint(poolID), "confirmed", "", txHash)
+			pairAddress := extraData["pair_address"]
+			s.db.UpdateLiquidityPoolStatus(uint(poolID), "confirmed", pairAddress, txHash)
 		}
 	case "liquidity_position":
 		if positionID, ok := transactionData["position_id"].(float64); ok {

@@ -196,10 +196,10 @@ func TestAPIServer_TemplateWorkflow(t *testing.T) {
 
 		// Test successful confirmation with real transaction hash
 		confirmURL := fmt.Sprintf("/api/deploy/%s/confirm", sessionID)
-		confirmData := map[string]string{
+		confirmData := map[string]any{
 			"transaction_hash": result.TransactionHash.Hex(),
 			"contract_address": result.ContractAddress.Hex(),
-			"status":           "confirmed",
+			"status":           models.TransactionStatusConfirmed,
 		}
 
 		confirmJSON, err := json.Marshal(confirmData)
@@ -219,15 +219,15 @@ func TestAPIServer_TemplateWorkflow(t *testing.T) {
 		var response map[string]string
 		err = json.NewDecoder(resp.Body).Decode(&response)
 		require.NoError(t, err)
-		assert.Equal(t, "success", response["status"])
+		assert.Equal(t, string(models.TransactionStatusConfirmed), response["status"])
 
 		// Verify session was updated
 		session, err := setup.DB.GetTransactionSession(sessionID)
 		require.NoError(t, err)
-		assert.Equal(t, "confirmed", session.Status)
+		assert.Equal(t, models.TransactionStatusConfirmed, session.Status)
 		assert.Equal(t, confirmData["transaction_hash"], session.TransactionHash)
 
-		t.Logf("✓ Successfully confirmed transaction %s", result.TransactionHash.Hex())
+		t.Logf("✓ Successfully models.TransactionStatusConfirmed transaction %s", result.TransactionHash.Hex())
 	})
 }
 
@@ -330,26 +330,26 @@ func TestAPIServer_SessionManagement(t *testing.T) {
 		// Test initial session state
 		session, err := setup.DB.GetTransactionSession(sessionID)
 		require.NoError(t, err)
-		assert.Equal(t, "pending", session.Status)
+		assert.Equal(t, models.TransactionStatusPending, session.Status)
 		assert.Equal(t, "deploy", session.SessionType)
 		assert.True(t, time.Now().Before(session.ExpiresAt))
 
 		// Test status updates
-		err = setup.DB.UpdateTransactionSessionStatus(sessionID, "signed", "")
+		err = setup.DB.UpdateTransactionSessionStatus(sessionID, models.TransactionStatusConfirmed, "")
 		require.NoError(t, err)
 
 		session, err = setup.DB.GetTransactionSession(sessionID)
 		require.NoError(t, err)
-		assert.Equal(t, "signed", session.Status)
+		assert.Equal(t, models.TransactionStatusConfirmed, session.Status)
 
 		// Test final confirmation
 		txHash := "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-		err = setup.DB.UpdateTransactionSessionStatus(sessionID, "confirmed", txHash)
+		err = setup.DB.UpdateTransactionSessionStatus(sessionID, models.TransactionStatusConfirmed, txHash)
 		require.NoError(t, err)
 
 		session, err = setup.DB.GetTransactionSession(sessionID)
 		require.NoError(t, err)
-		assert.Equal(t, "confirmed", session.Status)
+		assert.Equal(t, models.TransactionStatusConfirmed, session.Status)
 		assert.Equal(t, txHash, session.TransactionHash)
 	})
 
@@ -374,7 +374,7 @@ func TestAPIServer_SessionManagement(t *testing.T) {
 		for i, sessionID := range sessionIDs {
 			session, err := setup.DB.GetTransactionSession(sessionID)
 			require.NoError(t, err)
-			assert.Equal(t, "pending", session.Status)
+			assert.Equal(t, models.TransactionStatusPending, session.Status)
 
 			var sessionData map[string]interface{}
 			err = json.Unmarshal([]byte(session.TransactionData), &sessionData)
@@ -385,19 +385,19 @@ func TestAPIServer_SessionManagement(t *testing.T) {
 		}
 
 		// Update one session and verify others are unaffected
-		err := setup.DB.UpdateTransactionSessionStatus(sessionIDs[0], "confirmed", "0x123")
+		err := setup.DB.UpdateTransactionSessionStatus(sessionIDs[0], models.TransactionStatusConfirmed, "0x123")
 		require.NoError(t, err)
 
 		// Check first session is updated
 		session, err := setup.DB.GetTransactionSession(sessionIDs[0])
 		require.NoError(t, err)
-		assert.Equal(t, "confirmed", session.Status)
+		assert.Equal(t, models.TransactionStatusConfirmed, session.Status)
 
 		// Check others are still pending
 		for _, sessionID := range sessionIDs[1:] {
 			session, err := setup.DB.GetTransactionSession(sessionID)
 			require.NoError(t, err)
-			assert.Equal(t, "pending", session.Status)
+			assert.Equal(t, models.TransactionStatusPending, session.Status)
 		}
 	})
 }

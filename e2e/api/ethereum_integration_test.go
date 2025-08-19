@@ -492,20 +492,20 @@ func testFullDeploymentWorkflow(t *testing.T, setup *TestSetup) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Step 6: Verify transaction was confirmed
+	// Step 6: Verify transaction was models.TransactionStatusConfirmed
 	session, err := setup.DB.GetTransactionSession(sessionID)
 	require.NoError(t, err)
-	assert.Equal(t, "confirmed", session.Status)
+	assert.Equal(t, models.TransactionStatusConfirmed, session.Status)
 	assert.Equal(t, realTxHash, session.TransactionHash)
 
 	// Update deployment record with real data
-	err = setup.DB.UpdateDeploymentStatus(deployment.ID, "confirmed", realContractAddress, realTxHash)
+	err = setup.DB.UpdateDeploymentStatus(deployment.ID, models.TransactionStatusConfirmed, realContractAddress, realTxHash)
 	require.NoError(t, err)
 
 	// Verify deployment record was updated with real data
 	updatedDeployment, err := setup.DB.GetDeploymentByID(deployment.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "confirmed", updatedDeployment.Status)
+	assert.Equal(t, string(models.TransactionStatusConfirmed), updatedDeployment.Status)
 	assert.Equal(t, realContractAddress, updatedDeployment.ContractAddress)
 	assert.Equal(t, realTxHash, updatedDeployment.TransactionHash)
 

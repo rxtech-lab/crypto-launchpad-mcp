@@ -177,17 +177,20 @@ The frontend uses a modular JavaScript architecture with separated concerns:
 #### Core Scripts:
 
 1. **`wallet-connection.js`** - Shared wallet management
+
    - EIP-6963 wallet discovery and connection
    - Network switching and transaction signing
    - Connection status management
    - Used by all transaction interfaces
 
 2. **`deploy-tokens.js`** - Token deployment specific
+
    - Token deployment session handling
    - Transaction preparation for contract deployment
    - Success state management for contract addresses
 
 3. **`deploy-uniswap.js`** - Uniswap deployment specific
+
    - Multi-contract deployment handling (WETH9, Factory, Router)
    - Uniswap-specific UI updates and progress tracking
    - Mock deployment with actual contract structure
@@ -240,7 +243,7 @@ All tools follow the exact structure from the example project:
 - **Modular JavaScript**: Multiple focused scripts served via HTTP endpoints:
   - `/js/wallet-connection.js` - Core wallet functionality
   - `/js/deploy-tokens.js` - Token deployment with embedded data support
-  - `/js/deploy-uniswap.js` - Uniswap deployment with embedded data support  
+  - `/js/deploy-uniswap.js` - Uniswap deployment with embedded data support
   - `/js/balance-query.js` - Balance queries
   - `/js/wallet.js` - Legacy monolithic script (deprecated)
 - **Build-time Inclusion**: All assets compiled into the binary for single-file distribution
@@ -250,6 +253,7 @@ All tools follow the exact structure from the example project:
 For optimal performance, transaction data is compiled and embedded during HTML template rendering:
 
 **Backend (Template Rendering)**:
+
 ```go
 // deployment_handlers.go & uniswap_handlers.go
 transactionData := s.generateTransactionData(deployment, template, activeChain)
@@ -260,15 +264,20 @@ html := s.renderTemplate("deploy", map[string]interface{}{
 ```
 
 **Frontend (HTML Template)**:
+
 ```html
-<div id="session-data" 
-     data-session-id="{{.SessionID}}" 
-     data-api-url="/api/deploy/{{.SessionID}}"
-     {{if .TransactionData}}data-transaction-data="{{.TransactionData | json}}"{{end}}>
-</div>
+<div
+  id="session-data"
+  data-session-id="{{.SessionID}}"
+  data-api-url="/api/deploy/{{.SessionID}}"
+  {{if
+  .TransactionData}}data-transaction-data="{{.TransactionData | json}}"
+  {{end}}
+></div>
 ```
 
 **JavaScript (Data Loading)**:
+
 ```javascript
 // Check embedded data first, fallback to API
 async loadSessionData(sessionId, apiUrl, embeddedData = null) {
@@ -283,8 +292,9 @@ async loadSessionData(sessionId, apiUrl, embeddedData = null) {
 ```
 
 **Benefits**:
+
 - ⚡ **Performance**: Eliminates extra API calls for transaction data
-- 🔧 **Reliability**: Prevents JavaScript errors with defensive null/undefined checking  
+- 🔧 **Reliability**: Prevents JavaScript errors with defensive null/undefined checking
 - 🔄 **Compatibility**: Maintains fallback to API calls for backward compatibility
 - 🚀 **User Experience**: Faster page loads with immediate data availability
 
@@ -371,9 +381,10 @@ go test -v ./e2e/api -run TestTokenDeploymentWithoutWallet -timeout 30s
 ```
 
 **Key Requirements:**
+
 - Use `NewTestSetup(t)` for consistent test environment
 - Verify Ethereum connection with `setup.VerifyEthereumConnection()`
-- Deploy real contracts using `setup.DeployContract()` 
+- Deploy real contracts using `setup.DeployContract()`
 - Test complete request/response cycles including HTML pages and JSON APIs
 - Verify database updates and blockchain transaction confirmation
 
@@ -391,6 +402,7 @@ go test -v ./tests -run TestUniswapDatabaseIntegration -timeout 30s
 ```
 
 **Key Requirements:**
+
 - Use temporary SQLite databases (`t.TempDir()` + `database.NewDatabase()`)
 - Test actual Solidity compilation with `utils.CompileSolidity()`
 - Validate real contract ABI generation and bytecode compilation
@@ -409,6 +421,7 @@ go test -v ./e2e -run TestContractDeployment -timeout 30s
 ### Required Test Infrastructure
 
 #### Database Testing
+
 ```go
 // E2E tests use in-memory databases for speed and isolation
 db, err := database.NewDatabase(":memory:")
@@ -428,6 +441,7 @@ require.NoError(t, err)
 ```
 
 #### Blockchain Testing
+
 ```go
 // Verify testnet connectivity
 err := setup.VerifyEthereumConnection()
@@ -444,6 +458,7 @@ assert.Equal(t, uint64(1), receipt.Status)
 ```
 
 #### API Testing
+
 ```go
 // Test complete HTTP workflows
 setup := NewTestSetup(t)
@@ -493,7 +508,7 @@ go test -v ./e2e/api -run TestTokenDeploymentPageLoad -timeout 30s    # Page loa
 go test -v ./e2e/api -run TestTokenDeploymentErrorHandling -timeout 30s # Error scenarios
 go test -v ./e2e/api -run TestTokenDeploymentWithoutWallet -timeout 30s # Wallet edge cases
 
-# Uniswap deployment specific tests  
+# Uniswap deployment specific tests
 go test -v ./e2e/api -run TestUniswapDeploymentChromedp -timeout 30s   # Full Uniswap workflow
 go test -v ./e2e/api -run TestUniswapDeploymentPageLoad -timeout 30s   # Uniswap page tests
 go test -v ./e2e/api -run TestUniswapDeploymentErrorHandling -timeout 30s # Uniswap errors
@@ -503,11 +518,12 @@ go test -v ./e2e/api -run TestUniswapDeploymentWithoutWallet -timeout 30s # Unis
 ### Test Patterns and Best Practices
 
 #### Session-Based Testing
+
 ```go
 // Create real transaction sessions
 sessionID, err := setup.DB.CreateTransactionSession(
     "deploy_uniswap",
-    "ethereum", 
+    "ethereum",
     TESTNET_CHAIN_ID,
     string(sessionDataJSON),
 )
@@ -517,11 +533,12 @@ session, err := setup.DB.GetTransactionSession(sessionID)
 assert.Equal(t, "pending", session.Status)
 
 // Test session updates
-err = setup.DB.UpdateTransactionSessionStatus(sessionID, "confirmed", txHash)
-assert.Equal(t, "confirmed", session.Status)
+err = setup.DB.UpdateTransactionSessionStatus(sessionID, models.TransactionStatusmodels.TransactionStatusConfirmed, txHash)
+assert.Equal(t, models.TransactionStatusConfirmed, session.Status)
 ```
 
 #### Contract Deployment Testing
+
 ```go
 // Use real contracts for testing APIs
 wethResult, err := setup.DeployContract(
@@ -538,6 +555,7 @@ assert.Equal(t, wethResult.TransactionHash.Hex(), updatedDeployment.WETHTxHash)
 ```
 
 #### Error Handling Testing
+
 ```go
 // Test API error responses
 resp, err := setup.MakeAPIRequest("GET", "/api/deploy-uniswap/invalid-session")
@@ -564,18 +582,18 @@ Each test file should include:
 ```go
 // TestUniswapDeploymentAPI tests the complete Uniswap deployment workflow
 // Requirements:
-// - Anvil testnet running on localhost:8545 (run 'make e2e-network')  
+// - Anvil testnet running on localhost:8545 (run 'make e2e-network')
 // - Real SQLite database with migrations
 // - Complete HTTP request/response testing
 // - Blockchain transaction verification
 func TestUniswapDeploymentAPI(t *testing.T) {
     setup := NewTestSetup(t)
     defer setup.Cleanup()
-    
+
     // Verify infrastructure
     err := setup.VerifyEthereumConnection()
     require.NoError(t, err, "Testnet required: run 'make e2e-network'")
-    
+
     // Test implementation...
 }
 ```
@@ -583,7 +601,7 @@ func TestUniswapDeploymentAPI(t *testing.T) {
 Write comprehensive tests for:
 
 - MCP tool implementations and parameter validation
-- Database operations and model relationships  
+- Database operations and model relationships
 - Transaction session management
 - API endpoints and error handling
 - Frontend wallet integration (manual testing)
@@ -597,19 +615,21 @@ The token deployment E2E tests are located at `/e2e/api/token_deployment_test.go
 #### Test Components
 
 1. **Test Suites**:
+
    - `TokenDeploymentTestSuite` - Main deployment workflows (OpenZeppelin & Custom)
    - `TokenDeploymentErrorTestSuite` - Error scenarios (invalid/expired sessions)
    - `TokenDeploymentWalletTestSuite` - Wallet interaction edge cases
    - `TokenDeploymentPageLoadTestSuite` - UI functionality tests
 
 2. **Page Object Model**: `/e2e/api/token_deployment_page.go`
+
    - `TokenDeploymentPage` - Encapsulates all page interactions
    - Methods for wallet selection, connection, transaction signing
    - Screenshot and debugging utilities
 
 3. **Test Helpers**: Enhanced `/e2e/api/test_helpers.go`
    - `CreateOpenZeppelinTemplate()` - Creates ERC20 template using OpenZeppelin
-   - `CreateCustomTemplate()` - Creates custom ERC20 implementation 
+   - `CreateCustomTemplate()` - Creates custom ERC20 implementation
    - `CreateTokenDeploymentSession()` - Proper session creation with deployment records
 
 #### Test Coverage
@@ -716,3 +736,40 @@ The architecture supports easy extension for:
 
 1. Never use fmt.Println to log something
 2. **Test Timeout Policy**: Never run tests longer than 30 seconds. Use `-timeout 30s` for all test commands to enforce this limit and prevent hanging tests.
+
+## E2E Testing Best Practices
+
+### HTML Testing Guidelines
+
+When testing HTML responses in E2E tests:
+
+1. **Focus on Functionality, Not Implementation Details**
+
+   - Test for essential data elements using IDs: `id="session-data"`
+   - Verify embedded transaction data: `data-transaction-data=`
+   - Check for session IDs and critical data attributes
+   - DO NOT test for specific JavaScript files or CSS classes
+   - Test files are located in /e2e/page
+
+2. **Use Element IDs for Reliable Testing**
+
+   ```go
+   // Good - tests functionality
+   s.Assert().Contains(htmlContent, `id="session-data"`)
+   s.Assert().Contains(htmlContent, "data-transaction-data=")
+
+   // Bad - tests implementation details
+   s.Assert().Contains(htmlContent, "wallet-connection.js")
+   s.Assert().Contains(htmlContent, "class=\"bg-gray-100\"")
+   ```
+
+3. **API Response Testing**
+
+   - Test the actual structure returned by handlers
+   - Don't assume all transaction data is included in generic API responses
+   - Verify critical fields based on what the handler actually returns
+
+4. **Database State Verification**
+   - Always verify database state changes after operations
+   - Check transaction hashes are properly stored
+   - Verify status updates are applied correctly

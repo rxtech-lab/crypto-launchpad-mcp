@@ -9,7 +9,7 @@ class UniswapDeploymentManager {
 
   async loadSessionData(sessionId, apiUrl, embeddedData = null) {
     this.apiUrl = apiUrl;
-    
+
     // Check for embedded transaction data first
     if (embeddedData) {
       console.log("Using embedded transaction data for Uniswap deployment");
@@ -18,7 +18,7 @@ class UniswapDeploymentManager {
       this.displayTransactionDetails();
       return;
     }
-    
+
     // Fallback to API call
     try {
       const response = await fetch(apiUrl);
@@ -255,11 +255,11 @@ class UniswapDeploymentManager {
       const artifact = await response.json();
 
       // Ensure bytecode has 0x prefix
-      let bytecode = artifact.bytecode || '';
-      if (typeof bytecode === 'string' && !bytecode.startsWith("0x")) {
+      let bytecode = artifact.bytecode || "";
+      if (typeof bytecode === "string" && !bytecode.startsWith("0x")) {
         bytecode = "0x" + bytecode;
-      } else if (typeof bytecode !== 'string') {
-        bytecode = '';
+      } else if (typeof bytecode !== "string") {
+        bytecode = "";
       }
 
       return {
@@ -498,13 +498,23 @@ document.addEventListener("DOMContentLoaded", function () {
         if (embeddedTransactionData) {
           try {
             parsedEmbeddedData = JSON.parse(embeddedTransactionData);
-            console.log("Found embedded Uniswap transaction data:", parsedEmbeddedData);
+            console.log(
+              "Found embedded Uniswap transaction data:",
+              parsedEmbeddedData
+            );
           } catch (error) {
-            console.error("Error parsing embedded Uniswap transaction data:", error);
+            console.error(
+              "Error parsing embedded Uniswap transaction data:",
+              error
+            );
           }
         }
-        
-        uniswapDeploymentManager.loadSessionData(sessionId, apiUrl, parsedEmbeddedData);
+
+        uniswapDeploymentManager.loadSessionData(
+          sessionId,
+          apiUrl,
+          parsedEmbeddedData
+        );
       }
     }
   }

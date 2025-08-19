@@ -219,6 +219,11 @@ class WalletManager {
   isConnected() {
     return this.account !== null;
   }
+
+  // Getter for provider to maintain compatibility
+  get provider() {
+    return this.selectedWallet;
+  }
 }
 
 // Global wallet manager instance
