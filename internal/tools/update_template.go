@@ -10,12 +10,13 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("update_template",
-		mcp.WithDescription("Update existing smart contract template with new description, chain type, or template code. Performs syntax validation on updated code."),
+		mcp.WithDescription("Update existing smart contract template with new description, chain type, template code, or metadata. Performs syntax validation on updated code."),
 		mcp.WithString("template_id",
 			mcp.Required(),
 			mcp.Description("ID of the template to update"),
@@ -27,7 +28,10 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			mcp.Description("New chain type (ethereum or solana)"),
 		),
 		mcp.WithString("template_code",
-			mcp.Description("New template code"),
+			mcp.Description("New template code with Go template syntax ({{.VariableName}})"),
+		),
+		mcp.WithString("template_metadata",
+			mcp.Description("JSON object defining template parameters as key-value pairs where values are empty strings (e.g., {\"TokenName\": \"\", \"TokenSymbol\": \"\"})"),
 		),
 	)
 
@@ -50,25 +54,37 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		description := request.GetString("description", "")
 		chainType := request.GetString("chain_type", "")
 		templateCode := request.GetString("template_code", "")
+		templateMetadata := request.GetString("template_metadata", "")
 
-		// OpenZeppelin configuration
-		useOpenZeppelinStr := request.GetString("use_openzeppelin", "")
-		openzeppelinVersion := request.GetString("openzeppelin_version", "")
-		openzeppelinContractsStr := request.GetString("openzeppelin_contracts", "")
+		// Parse template metadata if provided
+		var metadata models.JSON
+		if templateMetadata != "" {
+			if err := json.Unmarshal([]byte(templateMetadata), &metadata); err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						mcp.NewTextContent("Error: "),
+						mcp.NewTextContent(fmt.Sprintf("Invalid template_metadata JSON: %v", err)),
+					},
+				}, nil
+			}
 
-		// Parse OpenZeppelin usage
-		var useOpenZeppelin bool
-		if useOpenZeppelinStr != "" {
-			useOpenZeppelin = strings.ToLower(useOpenZeppelinStr) == "true"
-		}
-
-		// Convert comma-separated OpenZeppelin contracts to slice
-		var ozContracts []string
-		if openzeppelinContractsStr != "" {
-			for _, contract := range strings.Split(openzeppelinContractsStr, ",") {
-				contract = strings.TrimSpace(contract)
-				if contract != "" {
-					ozContracts = append(ozContracts, contract)
+			// Validate metadata format - all values should be empty strings for parameter definitions
+			for key, value := range metadata {
+				if key == "" {
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{
+							mcp.NewTextContent("Error: "),
+							mcp.NewTextContent("Metadata keys cannot be empty"),
+						},
+					}, nil
+				}
+				if str, ok := value.(string); !ok || str != "" {
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{
+							mcp.NewTextContent("Error: "),
+							mcp.NewTextContent(fmt.Sprintf("Metadata values must be empty strings for parameter definitions, got %v for key %s", value, key)),
+						},
+					}, nil
 				}
 			}
 		}
@@ -107,22 +123,18 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			updates = append(updates, "chain_type")
 		}
 
+		// Update metadata if provided
+		if templateMetadata != "" {
+			template.Metadata = metadata
+			updates = append(updates, "metadata")
+		}
+
 		// Update template code if provided
-		if templateCode != "" || useOpenZeppelinStr != "" {
+		if templateCode != "" {
 			// Use the current or new chain type for validation
 			validationChainType := template.ChainType
 			if chainType != "" {
 				validationChainType = chainType
-			}
-
-			// OpenZeppelin validation for non-Ethereum chains
-			if useOpenZeppelin && validationChainType != "ethereum" {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						mcp.NewTextContent("Error: "),
-						mcp.NewTextContent("OpenZeppelin is only supported for Ethereum contracts"),
-					},
-				}, nil
 			}
 
 			// Use existing template code if not provided
@@ -133,8 +145,10 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 
 			// Validate template code using Solidity compiler for Ethereum
 			if validationChainType == "ethereum" {
+				// Replace Go template variables with dummy values for compilation validation
+				validationCode := utils.ReplaceTemplateVariables(codeToValidate)
 				// Use Solidity version 0.8.20 for validation
-				_, err := utils.CompileSolidity("0.8.20", codeToValidate)
+				_, err := utils.CompileSolidity("0.8.20", validationCode)
 				if err != nil {
 					return &mcp.CallToolResult{
 						Content: []mcp.Content{
@@ -144,15 +158,7 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 					}, nil
 				}
 			} else if validationChainType == "solana" {
-				// For Solana, perform basic validation checks
-				if !strings.Contains(codeToValidate, "use anchor_lang::prelude::*;") && !strings.Contains(codeToValidate, "#[program]") {
-					return &mcp.CallToolResult{
-						Content: []mcp.Content{
-							mcp.NewTextContent("Error: "),
-							mcp.NewTextContent("Solana template must contain anchor_lang imports or #[program] attribute"),
-						},
-					}, nil
-				}
+				// Solana validation skipped - accept any template code
 			}
 
 			// Update the template code if provided
@@ -163,11 +169,11 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		}
 
 		// Check if any updates were provided
-		if len(updates) == 0 && useOpenZeppelinStr == "" {
+		if len(updates) == 0 {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("No update parameters provided. Specify description, chain_type, template_code, or OpenZeppelin options"),
+					mcp.NewTextContent("No update parameters provided. Specify description, chain_type, template_code, or template_metadata"),
 				},
 			}, nil
 		}
@@ -193,15 +199,10 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			"message":        fmt.Sprintf("Template updated successfully. Fields updated: %v", updates),
 		}
 
-		// Add OpenZeppelin information if configured
-		if useOpenZeppelinStr != "" {
-			result["use_openzeppelin"] = useOpenZeppelin
-			if openzeppelinVersion != "" {
-				result["openzeppelin_version"] = openzeppelinVersion
-			}
-			if len(ozContracts) > 0 {
-				result["openzeppelin_contracts"] = ozContracts
-			}
+		// Add metadata information if updated
+		if templateMetadata != "" && len(metadata) > 0 {
+			result["metadata"] = metadata
+			result["template_parameters"] = len(metadata)
 		}
 
 		// Format success message

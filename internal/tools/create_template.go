@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -15,7 +14,7 @@ import (
 
 func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("create_template",
-		mcp.WithDescription("Create new smart contract template with syntax validation. Template code should be valid Solidity (for Ethereum) or Rust (for Solana) and there is no template language in use when rendering the template. OpenZeppelin contracts are available to use."),
+		mcp.WithDescription("Create new smart contract template with syntax validation. Template code should use Go template syntax ({{.VariableName}}) for dynamic parameters. OpenZeppelin contracts are available to use."),
 		mcp.WithString("name",
 			mcp.Required(),
 			mcp.Description("Name of the template (e.g., 'ERC20 Basic Token', 'SPL Token')"),
@@ -30,7 +29,10 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		),
 		mcp.WithString("template_code",
 			mcp.Required(),
-			mcp.Description("The smart contract source code template"),
+			mcp.Description("The smart contract source code template with Go template syntax ({{.VariableName}})"),
+		),
+		mcp.WithString("template_metadata",
+			mcp.Description("JSON object defining template parameters as key-value pairs where values are empty strings (e.g., {\"TokenName\": \"\", \"TokenSymbol\": \"\"})"),
 		),
 	)
 
@@ -55,6 +57,40 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			return nil, fmt.Errorf("template_code parameter is required: %w", err)
 		}
 
+		// Parse template metadata if provided
+		var metadata models.JSON
+		templateMetadata := request.GetString("template_metadata", "")
+		if templateMetadata != "" {
+			if err := json.Unmarshal([]byte(templateMetadata), &metadata); err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						mcp.NewTextContent("Error: "),
+						mcp.NewTextContent(fmt.Sprintf("Invalid template_metadata JSON: %v", err)),
+					},
+				}, nil
+			}
+
+			// Validate metadata format - all values should be empty strings for parameter definitions
+			for key, value := range metadata {
+				if key == "" {
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{
+							mcp.NewTextContent("Error: "),
+							mcp.NewTextContent("Metadata keys cannot be empty"),
+						},
+					}, nil
+				}
+				if str, ok := value.(string); !ok || str != "" {
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{
+							mcp.NewTextContent("Error: "),
+							mcp.NewTextContent(fmt.Sprintf("Metadata values must be empty strings for parameter definitions, got %v for key %s", value, key)),
+						},
+					}, nil
+				}
+			}
+		}
+
 		// Validate chain type
 		if chainType != "ethereum" && chainType != "solana" {
 			return &mcp.CallToolResult{
@@ -67,9 +103,13 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 
 		// Validate template code using Solidity compiler for Ethereum
 		var compilationResult *utils.CompilationResult
-		if chainType == "ethereum" {
+		switch chainType {
+		case "ethereum":
+			// Replace Go template variables with dummy values for compilation validation
+			validationCode := utils.ReplaceTemplateVariables(templateCode)
+
 			// Use Solidity version 0.8.20 for validation
-			result, err := utils.CompileSolidity("0.8.20", templateCode)
+			result, err := utils.CompileSolidity("0.8.20", validationCode)
 			if err != nil {
 				return &mcp.CallToolResult{
 					Content: []mcp.Content{
@@ -79,16 +119,8 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 				}, nil
 			}
 			compilationResult = &result
-		} else if chainType == "solana" {
-			// For Solana, perform basic validation checks
-			if !strings.Contains(templateCode, "use anchor_lang::prelude::*;") && !strings.Contains(templateCode, "#[program]") {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						mcp.NewTextContent("Error: "),
-						mcp.NewTextContent("Solana template must contain anchor_lang imports or #[program] attribute"),
-					},
-				}, nil
-			}
+		case "solana":
+			// Solana validation skipped - accept any template code
 		}
 
 		// Create template
@@ -97,6 +129,7 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			Description:  description,
 			ChainType:    chainType,
 			TemplateCode: templateCode,
+			Metadata:     metadata,
 		}
 
 		if err := db.CreateTemplate(template); err != nil {
@@ -116,6 +149,12 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			"chain_type":  template.ChainType,
 			"created_at":  template.CreatedAt,
 			"message":     "Template created successfully",
+		}
+
+		// Include metadata if provided
+		if len(metadata) > 0 {
+			result["metadata"] = metadata
+			result["template_parameters"] = len(metadata)
 		}
 
 		// Add compilation information for Ethereum
