@@ -1,12 +1,14 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -17,18 +19,14 @@ import (
 
 func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("launch",
-		mcp.WithDescription("Generate deployment URL with contract compilation and signing interface. Creates a transaction session and returns a URL where users can sign and deploy the contract."),
+		mcp.WithDescription("Generate deployment URL with contract compilation and signing interface. Creates a transaction session and returns a URL where users can sign and deploy the contract using template parameter values."),
 		mcp.WithString("template_id",
 			mcp.Required(),
 			mcp.Description("ID of the template to deploy"),
 		),
-		mcp.WithString("token_name",
+		mcp.WithString("template_values",
 			mcp.Required(),
-			mcp.Description("Name of the token to deploy"),
-		),
-		mcp.WithString("token_symbol",
-			mcp.Required(),
-			mcp.Description("Symbol of the token to deploy"),
+			mcp.Description("JSON object with runtime values for template parameters (e.g., {\"TokenName\": \"MyToken\", \"TokenSymbol\": \"MTK\"})"),
 		),
 	)
 
@@ -38,14 +36,15 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 			return nil, fmt.Errorf("template_id parameter is required: %w", err)
 		}
 
-		tokenName, err := request.RequireString("token_name")
+		templateValuesStr, err := request.RequireString("template_values")
 		if err != nil {
-			return nil, fmt.Errorf("token_name parameter is required: %w", err)
+			return nil, fmt.Errorf("template_values parameter is required: %w", err)
 		}
 
-		tokenSymbol, err := request.RequireString("token_symbol")
-		if err != nil {
-			return nil, fmt.Errorf("token_symbol parameter is required: %w", err)
+		// Parse template values
+		var templateValues models.JSON
+		if err := json.Unmarshal([]byte(templateValuesStr), &templateValues); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid template_values JSON: %v", err)), nil
 		}
 
 		templateID, err := strconv.ParseUint(templateIDStr, 10, 32)
@@ -57,6 +56,24 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 		template, err := db.GetTemplateByID(uint(templateID))
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Template not found: %v", err)), nil
+		}
+
+		// Validate template values against metadata
+		if template.Metadata != nil && len(template.Metadata) > 0 {
+			for key := range template.Metadata {
+				if _, exists := templateValues[key]; !exists {
+					return mcp.NewToolResultError(fmt.Sprintf("Missing required template parameter: %s", key)), nil
+				}
+			}
+		}
+
+		// Validate that no extra parameters are provided
+		if template.Metadata != nil {
+			for key := range templateValues {
+				if _, exists := template.Metadata[key]; !exists {
+					return mcp.NewToolResultError(fmt.Sprintf("Unknown template parameter: %s", key)), nil
+				}
+			}
 		}
 
 		// Get active chain configuration
@@ -90,7 +107,10 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 		var compilationResult *utils.CompilationResult
 		if activeChain.ChainType == "ethereum" {
 			// Replace template placeholders with actual values
-			processedCode := replaceTemplatePlaceholders(template.TemplateCode, tokenName, tokenSymbol)
+			processedCode, err := renderContractTemplate(template.TemplateCode, templateValues)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Template rendering failed: %v", err)), nil
+			}
 
 			// Compile the contract using utils/solidity.go
 			result, err := utils.CompileSolidity("0.8.20", processedCode)
@@ -104,10 +124,17 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 		deployment := &models.Deployment{
 			TemplateID:      uint(templateID),
 			ChainID:         activeChain.ID,
-			TokenName:       tokenName,
-			TokenSymbol:     tokenSymbol,
+			TemplateValues:  templateValues,
 			DeployerAddress: "", // Will be set by frontend when wallet connects
 			Status:          "pending",
+		}
+
+		// For backward compatibility, set TokenName and TokenSymbol if they exist in templateValues
+		if tokenName, ok := templateValues["TokenName"].(string); ok {
+			deployment.TokenName = tokenName
+		}
+		if tokenSymbol, ok := templateValues["TokenSymbol"].(string); ok {
+			deployment.TokenSymbol = tokenSymbol
 		}
 
 		if err := db.CreateDeployment(deployment); err != nil {
@@ -140,16 +167,23 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 
 		// Prepare comprehensive result
 		result := map[string]interface{}{
-			"deployment_id": deployment.ID,
-			"session_id":    sessionID,
-			"signing_url":   signingURL,
-			"template_name": template.Name,
-			"contract_name": contractName,
-			"token_name":    tokenName,
-			"token_symbol":  tokenSymbol,
-			"chain_type":    activeChain.ChainType,
-			"chain_id":      activeChain.ChainID,
-			"message":       "Deployment session created. Use the signing URL to connect wallet and deploy contract.",
+			"deployment_id":   deployment.ID,
+			"session_id":      sessionID,
+			"signing_url":     signingURL,
+			"template_name":   template.Name,
+			"contract_name":   contractName,
+			"template_values": templateValues,
+			"chain_type":      activeChain.ChainType,
+			"chain_id":        activeChain.ChainID,
+			"message":         "Deployment session created. Use the signing URL to connect wallet and deploy contract.",
+		}
+
+		// Include backward compatible token fields if they exist
+		if tokenName, ok := templateValues["TokenName"].(string); ok {
+			result["token_name"] = tokenName
+		}
+		if tokenSymbol, ok := templateValues["TokenSymbol"].(string); ok {
+			result["token_symbol"] = tokenSymbol
 		}
 
 		// Add Uniswap warning if applicable
@@ -200,6 +234,21 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 	}
 
 	return tool, handler
+}
+
+// renderContractTemplate renders the template code with provided values using Go template engine
+func renderContractTemplate(templateCode string, values models.JSON) (string, error) {
+	tmpl, err := template.New("contract").Parse(templateCode)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, values); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return buf.String(), nil
 }
 
 // extractContractName extracts the contract name from Solidity source code

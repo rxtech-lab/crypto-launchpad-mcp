@@ -1,10 +1,37 @@
 package models
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
 )
+
+// JSON is a custom type for JSON fields
+type JSON map[string]interface{}
+
+// Implement the driver.Valuer interface for JSON type
+func (j JSON) Value() (driver.Value, error) {
+	if j == nil {
+		return nil, nil
+	}
+	return json.Marshal(j)
+}
+
+// Implement the sql.Scanner interface for JSON type
+func (j *JSON) Scan(value interface{}) error {
+	if value == nil {
+		*j = nil
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+	return json.Unmarshal(bytes, j)
+}
 
 // Chain represents blockchain configurations
 type Chain struct {
@@ -26,6 +53,7 @@ type Template struct {
 	Description  string         `json:"description"`
 	ChainType    string         `gorm:"not null" json:"chain_type"` // ethereum, solana
 	TemplateCode string         `gorm:"type:text;not null" json:"template_code"`
+	Metadata     JSON           `gorm:"type:text" json:"metadata"` // Template parameter definitions (key: empty value pairs)
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
@@ -36,11 +64,12 @@ type Deployment struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
 	TemplateID      uint      `gorm:"not null" json:"template_id"`
 	ChainID         uint      `gorm:"not null" json:"chain_id"`
-	ContractAddress string    `gorm:"not null" json:"contract_address"`
-	TokenName       string    `gorm:"not null" json:"token_name"`
-	TokenSymbol     string    `gorm:"not null" json:"token_symbol"`
-	DeployerAddress string    `gorm:"not null" json:"deployer_address"`
-	TransactionHash string    `gorm:"not null" json:"transaction_hash"`
+	ContractAddress string    `json:"contract_address"`
+	TokenName       string    `json:"token_name"`                       // Deprecated: use TemplateValues instead
+	TokenSymbol     string    `json:"token_symbol"`                     // Deprecated: use TemplateValues instead
+	TemplateValues  JSON      `gorm:"type:text" json:"template_values"` // Runtime template parameter values
+	DeployerAddress string    `json:"deployer_address"`
+	TransactionHash string    `json:"transaction_hash"`
 	Status          string    `gorm:"default:pending" json:"status"` // pending, confirmed, failed
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`

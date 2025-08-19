@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -25,6 +26,23 @@ func CompileSolidity(version string, code string) (CompilationResult, error) {
 
 	opts := solc.CompileOptions{
 		ImportCallback: func(u string) solc.ImportResult {
+			// Handle @openzeppelin-contracts/ imports
+			if contractPath, ok := strings.CutPrefix(u, "@openzeppelin-contracts/"); ok {
+				embeddedPath := filepath.Join("openzeppelin-contracts", contractPath)
+				// Read the contract content from the embedded filesystem
+				content, err := contracts.OpenZeppelinFS.ReadFile(embeddedPath)
+				if err != nil {
+					return solc.ImportResult{
+						Error: fmt.Sprintf("OpenZeppelin contract %s not found: %v", u, err),
+					}
+				}
+
+				return solc.ImportResult{
+					Contents: string(content),
+				}
+			}
+
+			// Handle @openzeppelin/ imports (legacy format)
 			if contractPath, ok := strings.CutPrefix(u, "@openzeppelin/"); ok {
 				embeddedPath := filepath.Join("openzeppelin-contracts", contractPath)
 				// Read the contract content from the embedded filesystem
@@ -112,4 +130,50 @@ func EncodeConstructorArgs(bytecode, tokenName, tokenSymbol string) (string, err
 
 	// Return with 0x prefix
 	return "0x" + cleanBytecode + encodedArgsHex, nil
+}
+
+// ReplaceTemplateVariables replaces Go template variables with dummy values for compilation validation
+func ReplaceTemplateVariables(code string) string {
+	// First handle quoted template variables (e.g., "{{.TokenName}}")
+	quotedRe := regexp.MustCompile(`"\{\{\.(\w+)\}\}"`)
+	code = quotedRe.ReplaceAllStringFunc(code, func(match string) string {
+		// Extract the variable name
+		varName := quotedRe.FindStringSubmatch(match)[1]
+
+		// Return string values without extra quotes since they're already quoted
+		switch {
+		case strings.Contains(strings.ToLower(varName), "name"):
+			return "\"TestToken\""
+		case strings.Contains(strings.ToLower(varName), "symbol"):
+			return "\"TEST\""
+		default:
+			return "\"DefaultValue\""
+		}
+	})
+
+	// Then handle unquoted template variables (e.g., {{.InitialSupply}})
+	unquotedRe := regexp.MustCompile(`\{\{\.(\w+)\}\}`)
+	code = unquotedRe.ReplaceAllStringFunc(code, func(match string) string {
+		// Extract the variable name
+		varName := unquotedRe.FindStringSubmatch(match)[1]
+
+		// Return appropriate dummy values
+		switch {
+		case strings.Contains(strings.ToLower(varName), "supply"):
+			return "1000000"
+		case strings.Contains(strings.ToLower(varName), "decimal"):
+			return "18"
+		case strings.Contains(strings.ToLower(varName), "amount"):
+			return "100"
+		case strings.Contains(strings.ToLower(varName), "address"):
+			return "0x1234567890123456789012345678901234567890"
+		case strings.Contains(strings.ToLower(varName), "owner"):
+			return "0x1234567890123456789012345678901234567890"
+		default:
+			// For any other numeric-like variable, use a number
+			return "1000"
+		}
+	})
+
+	return code
 }
