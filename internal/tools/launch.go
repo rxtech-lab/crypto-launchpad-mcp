@@ -105,12 +105,14 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 
 		// Compile contract for validation and bytecode generation (Ethereum only)
 		var compilationResult *utils.CompilationResult
+		var renderedContract string
 		if activeChain.ChainType == "ethereum" {
 			// Replace template placeholders with actual values
 			processedCode, err := renderContractTemplate(template.TemplateCode, templateValues)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Template rendering failed: %v", err)), nil
 			}
+			renderedContract = processedCode
 
 			// Compile the contract using utils/solidity.go
 			result, err := utils.CompileSolidity("0.8.20", processedCode)
@@ -118,6 +120,9 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 				return mcp.NewToolResultError(fmt.Sprintf("Contract compilation failed: %v", err)), nil
 			}
 			compilationResult = &result
+		} else {
+			// For non-Ethereum chains, use the template code as-is
+			renderedContract = template.TemplateCode
 		}
 
 		// Create deployment record
@@ -167,15 +172,16 @@ func NewLaunchTool(db *database.Database, serverPort int) (mcp.Tool, server.Tool
 
 		// Prepare comprehensive result
 		result := map[string]interface{}{
-			"deployment_id":   deployment.ID,
-			"session_id":      sessionID,
-			"signing_url":     signingURL,
-			"template_name":   template.Name,
-			"contract_name":   contractName,
-			"template_values": templateValues,
-			"chain_type":      activeChain.ChainType,
-			"chain_id":        activeChain.ChainID,
-			"message":         "Deployment session created. Use the signing URL to connect wallet and deploy contract.",
+			"deployment_id":     deployment.ID,
+			"session_id":        sessionID,
+			"signing_url":       signingURL,
+			"template_name":     template.Name,
+			"contract_name":     contractName,
+			"template_values":   templateValues,
+			"chain_type":        activeChain.ChainType,
+			"chain_id":          activeChain.ChainID,
+			"rendered_contract": renderedContract,
+			"message":           "Deployment session created. Use the signing URL to connect wallet and deploy contract.",
 		}
 
 		// Include backward compatible token fields if they exist

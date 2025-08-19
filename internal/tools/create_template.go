@@ -29,7 +29,7 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		),
 		mcp.WithString("template_code",
 			mcp.Required(),
-			mcp.Description("The smart contract source code template with Go template syntax ({{.VariableName}})"),
+			mcp.Description("The smart contract source code template with Go template syntax ({{.VariableName}}). Don't need to include the contract owner info since it will be set during the deployment. Use msg.sender as the contract owner if not specified."),
 		),
 		mcp.WithString("template_metadata",
 			mcp.Description("JSON object defining template parameters as key-value pairs where values are empty strings (e.g., {\"TokenName\": \"\", \"TokenSymbol\": \"\"})"),
