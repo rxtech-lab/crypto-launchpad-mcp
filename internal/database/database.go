@@ -306,6 +306,15 @@ func (d *Database) GetLiquidityPoolByTokenAddress(tokenAddress string) (*models.
 	return &pool, nil
 }
 
+func (d *Database) GetLiquidityPoolByID(id uint) (*models.LiquidityPool, error) {
+	var pool models.LiquidityPool
+	err := d.DB.First(&pool, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &pool, nil
+}
+
 func (d *Database) UpdateLiquidityPoolStatus(id uint, status, pairAddress, txHash string) error {
 	updates := map[string]interface{}{
 		"status": status,
@@ -331,6 +340,15 @@ func (d *Database) CreateLiquidityPosition(position *models.LiquidityPosition) e
 	return d.DB.Create(position).Error
 }
 
+func (d *Database) GetLiquidityPositionByID(id uint) (*models.LiquidityPosition, error) {
+	var position models.LiquidityPosition
+	err := d.DB.First(&position, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &position, nil
+}
+
 func (d *Database) UpdateLiquidityPositionStatus(id uint, status, txHash string) error {
 	updates := map[string]interface{}{
 		"status": status,
@@ -351,6 +369,15 @@ func (d *Database) GetLiquidityPositionsByUser(userAddress string) ([]models.Liq
 // Swap Transaction operations
 func (d *Database) CreateSwapTransaction(swap *models.SwapTransaction) error {
 	return d.DB.Create(swap).Error
+}
+
+func (d *Database) GetSwapTransactionByID(id uint) (*models.SwapTransaction, error) {
+	var swap models.SwapTransaction
+	err := d.DB.First(&swap, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &swap, nil
 }
 
 func (d *Database) UpdateSwapTransactionStatus(id uint, status, txHash string) error {

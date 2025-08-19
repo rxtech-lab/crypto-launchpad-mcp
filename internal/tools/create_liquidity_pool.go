@@ -26,10 +26,6 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 			mcp.Required(),
 			mcp.Description("Initial amount of ETH to add to the pool"),
 		),
-		mcp.WithString("creator_address",
-			mcp.Required(),
-			mcp.Description("Address that will create the pool"),
-		),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -46,11 +42,6 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 		initialETHAmount, err := request.RequireString("initial_eth_amount")
 		if err != nil {
 			return nil, fmt.Errorf("initial_eth_amount parameter is required: %w", err)
-		}
-
-		creatorAddress, err := request.RequireString("creator_address")
-		if err != nil {
-			return nil, fmt.Errorf("creator_address parameter is required: %w", err)
 		}
 
 		// Get active chain configuration
@@ -97,6 +88,7 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 		}
 
 		// Create liquidity pool record
+		// Creator address will be set when wallet connects on the web interface
 		pool := &models.LiquidityPool{
 			TokenAddress:   tokenAddress,
 			UniswapVersion: uniswapSettings.Version,
@@ -104,7 +96,7 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 			Token1:         "0x0000000000000000000000000000000000000000", // ETH placeholder
 			InitialToken0:  initialTokenAmount,
 			InitialToken1:  initialETHAmount,
-			CreatorAddress: creatorAddress,
+			CreatorAddress: "", // Will be populated when wallet connects
 			Status:         "pending",
 		}
 
@@ -160,7 +152,6 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 			"initial_eth_amount":   initialETHAmount,
 			"uniswap_version":      uniswapSettings.Version,
 			"chain_type":           activeChain.ChainType,
-			"creator_address":      creatorAddress,
 			"message":              "Liquidity pool creation session created. Use the signing URL to connect wallet and create pool.",
 			"instructions":         "1. Open the signing URL in your browser\n2. Connect your wallet using EIP-6963\n3. Review the pool creation details\n4. Sign and send the transaction to create the pool",
 		}

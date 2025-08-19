@@ -19,8 +19,21 @@ func (s *APIServer) handleCreatePoolPage(c *fiber.Ctx) error {
 		return c.Status(400).SendString("Invalid session type")
 	}
 
+	// Parse session data and generate transaction data
+	var transactionData map[string]interface{}
+	if sessionData, err := s.parseLiquiditySessionData(session.TransactionData); err == nil {
+		if poolID, ok := sessionData["pool_id"].(float64); ok {
+			if pool, err := s.db.GetLiquidityPoolByID(uint(poolID)); err == nil {
+				if activeChain, err := s.db.GetActiveChain(); err == nil {
+					transactionData = s.generateCreatePoolTransactionData(pool, sessionData, activeChain)
+				}
+			}
+		}
+	}
+
 	html := s.renderTemplate("create_pool", map[string]interface{}{
-		"SessionID": session.ID,
+		"SessionID":       session.ID,
+		"TransactionData": transactionData,
 	})
 	c.Set("Content-Type", "text/html")
 	return c.SendString(html)
@@ -36,7 +49,37 @@ func (s *APIServer) handleCreatePoolConfirm(c *fiber.Ctx) error {
 
 // Add liquidity handlers
 func (s *APIServer) handleAddLiquidityPage(c *fiber.Ctx) error {
-	return s.handleGenericPage(c, "add_liquidity")
+	sessionID := c.Params("session_id")
+
+	session, err := s.db.GetTransactionSession(sessionID)
+	if err != nil {
+		return c.Status(404).SendString("Session not found or expired")
+	}
+
+	if session.SessionType != "add_liquidity" {
+		return c.Status(400).SendString("Invalid session type")
+	}
+
+	// Parse session data and generate transaction data
+	var transactionData map[string]interface{}
+	if sessionData, err := s.parseLiquiditySessionData(session.TransactionData); err == nil {
+		if positionID, ok := sessionData["position_id"].(float64); ok {
+			if position, err := s.db.GetLiquidityPositionByID(uint(positionID)); err == nil {
+				if pool, err := s.db.GetLiquidityPoolByID(position.PoolID); err == nil {
+					if activeChain, err := s.db.GetActiveChain(); err == nil {
+						transactionData = s.generateAddLiquidityTransactionData(position, pool, sessionData, activeChain)
+					}
+				}
+			}
+		}
+	}
+
+	html := s.renderTemplate("add_liquidity", map[string]interface{}{
+		"SessionID":       session.ID,
+		"TransactionData": transactionData,
+	})
+	c.Set("Content-Type", "text/html")
+	return c.SendString(html)
 }
 
 func (s *APIServer) handleAddLiquidityAPI(c *fiber.Ctx) error {
@@ -49,7 +92,37 @@ func (s *APIServer) handleAddLiquidityConfirm(c *fiber.Ctx) error {
 
 // Remove liquidity handlers
 func (s *APIServer) handleRemoveLiquidityPage(c *fiber.Ctx) error {
-	return s.handleGenericPage(c, "remove_liquidity")
+	sessionID := c.Params("session_id")
+
+	session, err := s.db.GetTransactionSession(sessionID)
+	if err != nil {
+		return c.Status(404).SendString("Session not found or expired")
+	}
+
+	if session.SessionType != "remove_liquidity" {
+		return c.Status(400).SendString("Invalid session type")
+	}
+
+	// Parse session data and generate transaction data
+	var transactionData map[string]interface{}
+	if sessionData, err := s.parseLiquiditySessionData(session.TransactionData); err == nil {
+		if positionID, ok := sessionData["position_id"].(float64); ok {
+			if position, err := s.db.GetLiquidityPositionByID(uint(positionID)); err == nil {
+				if pool, err := s.db.GetLiquidityPoolByID(position.PoolID); err == nil {
+					if activeChain, err := s.db.GetActiveChain(); err == nil {
+						transactionData = s.generateRemoveLiquidityTransactionData(position, pool, sessionData, activeChain)
+					}
+				}
+			}
+		}
+	}
+
+	html := s.renderTemplate("remove_liquidity", map[string]interface{}{
+		"SessionID":       session.ID,
+		"TransactionData": transactionData,
+	})
+	c.Set("Content-Type", "text/html")
+	return c.SendString(html)
 }
 
 func (s *APIServer) handleRemoveLiquidityAPI(c *fiber.Ctx) error {
@@ -62,7 +135,35 @@ func (s *APIServer) handleRemoveLiquidityConfirm(c *fiber.Ctx) error {
 
 // Swap handlers
 func (s *APIServer) handleSwapPage(c *fiber.Ctx) error {
-	return s.handleGenericPage(c, "swap")
+	sessionID := c.Params("session_id")
+
+	session, err := s.db.GetTransactionSession(sessionID)
+	if err != nil {
+		return c.Status(404).SendString("Session not found or expired")
+	}
+
+	if session.SessionType != "swap" {
+		return c.Status(400).SendString("Invalid session type")
+	}
+
+	// Parse session data and generate transaction data
+	var transactionData map[string]interface{}
+	if sessionData, err := s.parseLiquiditySessionData(session.TransactionData); err == nil {
+		if swapID, ok := sessionData["swap_id"].(float64); ok {
+			if swap, err := s.db.GetSwapTransactionByID(uint(swapID)); err == nil {
+				if activeChain, err := s.db.GetActiveChain(); err == nil {
+					transactionData = s.generateSwapTransactionData(swap, sessionData, activeChain)
+				}
+			}
+		}
+	}
+
+	html := s.renderTemplate("swap", map[string]interface{}{
+		"SessionID":       session.ID,
+		"TransactionData": transactionData,
+	})
+	c.Set("Content-Type", "text/html")
+	return c.SendString(html)
 }
 
 func (s *APIServer) handleSwapAPI(c *fiber.Ctx) error {
