@@ -2,6 +2,10 @@
 
 AI-powered crypto launchpad supporting Ethereum and Solana blockchains. Unlike traditional web-based launchpads, this uses AI as the interface for easy token creation and management.
 
+## Download
+
+Visit [cryptolaunch.app](https://cryptolaunch.app) to download the latest version of the Crypto Launchpad MCP server for your platform.
+
 ## Features
 
 - **AI-First Interface**: Natural language commands for blockchain operations
