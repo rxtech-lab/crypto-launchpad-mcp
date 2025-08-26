@@ -161,16 +161,3 @@ type UniswapDeployment struct {
 	Chain Chain `gorm:"foreignKey:ChainID;references:ID" json:"chain,omitempty"`
 }
 
-// TransactionSession represents signing session management
-type TransactionSession struct {
-	ID              string            `gorm:"primaryKey" json:"id"`
-	SessionType     string            `gorm:"not null" json:"session_type"` // deploy, create_pool, add_liquidity, remove_liquidity, swap, deploy_uniswap, balance_query
-	ChainType       string            `gorm:"not null" json:"chain_type"`
-	ChainID         string            `gorm:"not null" json:"chain_id"`
-	TransactionData string            `gorm:"type:text;not null" json:"transaction_data"` // JSON data for the transaction
-	Status          TransactionStatus `gorm:"default:pending" json:"status"`              // pending, signed, models.TransactionStatusConfirmed, failed
-	TransactionHash string            `json:"transaction_hash"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
-	ExpiresAt       time.Time         `json:"expires_at"`
-}
