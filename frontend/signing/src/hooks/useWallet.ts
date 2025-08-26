@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { BrowserProvider, Signer, parseEther } from 'ethers';
+import { BrowserProvider, parseEther } from 'ethers';
+import type { Signer } from 'ethers';
 import type { EIP6963Provider, WalletState } from '../types/wallet';
 
 export function useWallet() {

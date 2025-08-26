@@ -1,4 +1,3 @@
-import React from 'react';
 import { CheckCircle2, XCircle, Loader2, Clock, Layers } from 'lucide-react';
 import type { TransactionDeployment, TransactionStatus } from '../types/wallet';
 import { formatEther } from '../utils/ethereum';

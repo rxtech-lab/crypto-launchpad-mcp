@@ -1,4 +1,3 @@
-import React from 'react';
 import { Send, Loader2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface TransactionSignerProps {

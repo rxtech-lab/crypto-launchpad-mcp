@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { XCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ErrorDisplayProps {

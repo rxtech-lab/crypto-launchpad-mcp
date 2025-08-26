@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { TransactionSession, TransactionState, TransactionStatus } from '../types/wallet';
+import type { TransactionState, TransactionStatus } from '../types/wallet';
 
 interface UseTransactionProps {
   sessionId?: string;

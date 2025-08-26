@@ -1,4 +1,3 @@
-import React from 'react';
 import { Info, FileText } from 'lucide-react';
 import type { TransactionMetadata } from '../types/wallet';
 

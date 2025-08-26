@@ -1,4 +1,3 @@
-import React from 'react';
 import { CheckCircle2, AlertTriangle, Link } from 'lucide-react';
 import { formatAddress, getChainName } from '../utils/ethereum';
 
