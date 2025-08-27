@@ -2,8 +2,8 @@ package api
 
 import (
 	"bytes"
+	"html/template"
 	"log"
-	"text/template"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rxtech-lab/launchpad-mcp/internal/assets"

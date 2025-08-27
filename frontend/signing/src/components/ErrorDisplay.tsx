@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { XCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from "react";
+import { XCircle, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 
 interface ErrorDisplayProps {
   error: Error | null;
@@ -18,7 +18,7 @@ export function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
         <div className="flex-grow">
           <p className="text-sm font-medium text-red-800">Error Occurred</p>
           <p className="text-sm text-red-600 mt-1">{error.message}</p>
-          
+
           {error.stack && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
@@ -37,13 +37,13 @@ export function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
               )}
             </button>
           )}
-          
+
           {isExpanded && error.stack && (
             <pre className="mt-2 p-2 bg-red-100 rounded text-xs text-red-700 overflow-x-auto whitespace-pre-wrap break-all">
               {error.stack}
             </pre>
           )}
-          
+
           {onRetry && (
             <button
               onClick={onRetry}

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { TransactionState, TransactionStatus, TransactionDeployment } from '../types/wallet';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useCallback, useEffect, useState } from "react";
+import type { TransactionState, TransactionStatus } from "../types/wallet";
 
 interface UseTransactionProps {
   sessionId?: string;
@@ -11,33 +12,40 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
     transactionStatuses: new Map(),
     currentIndex: 0,
     error: null,
-    isExecuting: false
+    isExecuting: false,
   });
-  
+
   // Store deployed contract addresses
-  const [deployedContracts, setDeployedContracts] = useState<Map<number, { address: string; txHash: string }>>(new Map());
+  const [deployedContracts, setDeployedContracts] = useState<
+    Map<number, { address: string; txHash: string }>
+  >(new Map());
 
   // Load session data from meta tag or API
   const loadSession = useCallback(async () => {
     if (!sessionId) {
       // Try to get from meta tag
-      const metaTag = document.querySelector('meta[name="transaction-session"]');
+      const metaTag = document.querySelector(
+        'meta[name="transaction-session"]'
+      );
       if (metaTag) {
         try {
-          const sessionData = JSON.parse(metaTag.getAttribute('content') || '{}');
+          const metaTagContent = metaTag.getAttribute("content");
+          const sessionData = JSON.parse(metaTagContent || "{}");
           const statusMap = new Map<number, TransactionStatus>();
-          sessionData.transaction_deployments?.forEach((_: any, index: number) => {
-            statusMap.set(index, 'waiting');
-          });
-          
-          setState(prev => ({
+          sessionData.transaction_deployments?.forEach(
+            (_: any, index: number) => {
+              statusMap.set(index, "waiting");
+            }
+          );
+
+          setState((prev) => ({
             ...prev,
             session: sessionData,
-            transactionStatuses: statusMap
+            transactionStatuses: statusMap,
           }));
           return;
         } catch (error) {
-          console.error('Failed to parse session from meta tag:', error);
+          console.error("Failed to parse session from meta tag:", error);
         }
       }
     }
@@ -46,137 +54,146 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
     if (sessionId) {
       try {
         const response = await fetch(`/api/session/${sessionId}`);
-        if (!response.ok) throw new Error('Failed to load session');
-        
+        if (!response.ok) throw new Error("Failed to load session");
+
         const sessionData = await response.json();
         const statusMap = new Map<number, TransactionStatus>();
-        sessionData.transaction_deployments?.forEach((_: any, index: number) => {
-          statusMap.set(index, 'waiting');
-        });
-        
-        setState(prev => ({
+        sessionData.transaction_deployments?.forEach(
+          (_: any, index: number) => {
+            statusMap.set(index, "waiting");
+          }
+        );
+
+        setState((prev) => ({
           ...prev,
           session: sessionData,
-          transactionStatuses: statusMap
+          transactionStatuses: statusMap,
         }));
       } catch (error) {
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
-          error: error as Error
+          error: error as Error,
         }));
       }
     }
   }, [sessionId]);
 
   // Update transaction status
-  const updateTransactionStatus = useCallback((index: number, status: TransactionStatus) => {
-    setState(prev => {
-      const newStatuses = new Map(prev.transactionStatuses);
-      newStatuses.set(index, status);
-      return {
-        ...prev,
-        transactionStatuses: newStatuses
-      };
-    });
-  }, []);
+  const updateTransactionStatus = useCallback(
+    (index: number, status: TransactionStatus) => {
+      setState((prev) => {
+        const newStatuses = new Map(prev.transactionStatuses);
+        newStatuses.set(index, status);
+        return {
+          ...prev,
+          transactionStatuses: newStatuses,
+        };
+      });
+    },
+    []
+  );
 
   // Execute transaction
-  const executeTransaction = useCallback(async (
-    index: number,
-    signTransaction: (tx: any) => Promise<any>
-  ) => {
-    if (!state.session) {
-      throw new Error('No session loaded');
-    }
+  const executeTransaction = useCallback(
+    async (index: number, signTransaction: (tx: any) => Promise<any>) => {
+      if (!state.session) {
+        throw new Error("No session loaded");
+      }
 
-    const deployment = state.session.transaction_deployments[index];
-    if (!deployment) {
-      throw new Error(`No transaction at index ${index}`);
-    }
+      const deployment = state.session.transaction_deployments[index];
+      if (!deployment) {
+        throw new Error(`No transaction at index ${index}`);
+      }
 
-    updateTransactionStatus(index, 'pending');
+      updateTransactionStatus(index, "pending");
 
-    try {
-      const tx = {
-        data: deployment.data,
-        value: deployment.value
-      };
+      try {
+        const tx = {
+          data: deployment.data,
+          value: deployment.value.length > 0 ? deployment.value : "0",
+        };
 
-      const txResponse = await signTransaction(tx);
-      const receipt = await txResponse.wait();
+        const txResponse = await signTransaction(tx);
+        const receipt = await txResponse.wait();
 
-      updateTransactionStatus(index, receipt.status === 1 ? 'confirmed' : 'failed');
-      
-      // Store contract address if deployment created one
-      if (receipt.contractAddress) {
-        setDeployedContracts(prev => {
-          const newMap = new Map(prev);
-          newMap.set(index, { 
-            address: receipt.contractAddress, 
-            txHash: receipt.hash 
+        updateTransactionStatus(
+          index,
+          receipt.status === 1 ? "confirmed" : "failed"
+        );
+
+        // Store contract address if deployment created one
+        if (receipt.contractAddress) {
+          setDeployedContracts((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(index, {
+              address: receipt.contractAddress,
+              txHash: receipt.hash,
+            });
+            return newMap;
           });
-          return newMap;
-        });
-      }
-      
-      // Update session status on backend
-      if (state.session.id) {
-        await fetch(`/api/session/${state.session.id}/transaction/${index}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            status: receipt.status === 1 ? 'confirmed' : 'failed',
-            transactionHash: receipt.hash,
-            contractAddress: receipt.contractAddress
-          })
-        });
-      }
+        }
 
-      return receipt;
-    } catch (error) {
-      updateTransactionStatus(index, 'failed');
-      throw error;
-    }
-  }, [state.session, updateTransactionStatus]);
+        // Update session status on backend
+        if (state.session.id) {
+          await fetch(`/api/session/${state.session.id}/transaction/${index}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: receipt.status === 1 ? "confirmed" : "failed",
+              transactionHash: receipt.hash,
+              contractAddress: receipt.contractAddress,
+            }),
+          });
+        }
+
+        return receipt;
+      } catch (error) {
+        updateTransactionStatus(index, "failed");
+        throw error;
+      }
+    },
+    [state.session, updateTransactionStatus]
+  );
 
   // Execute all transactions sequentially
-  const executeAllTransactions = useCallback(async (
-    signTransaction: (tx: any) => Promise<any>
-  ) => {
-    if (!state.session) {
-      throw new Error('No session loaded');
-    }
-
-    setState(prev => ({ ...prev, isExecuting: true, error: null }));
-
-    try {
-      const results = [];
-      for (let i = 0; i < state.session.transaction_deployments.length; i++) {
-        setState(prev => ({ ...prev, currentIndex: i }));
-        const receipt = await executeTransaction(i, signTransaction);
-        results.push(receipt);
+  const executeAllTransactions = useCallback(
+    async (signTransaction: (tx: any) => Promise<any>) => {
+      if (!state.session) {
+        throw new Error("No session loaded");
       }
 
-      // Update overall session status
-      if (state.session.id) {
-        await fetch(`/api/session/${state.session.id}/complete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'confirmed' })
-        });
-      }
+      setState((prev) => ({ ...prev, isExecuting: true, error: null }));
 
-      setState(prev => ({ ...prev, isExecuting: false }));
-      return results;
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        isExecuting: false,
-        error: error as Error
-      }));
-      throw error;
-    }
-  }, [state.session, executeTransaction]);
+      try {
+        const results = [];
+        for (let i = 0; i < state.session.transaction_deployments.length; i++) {
+          setState((prev) => ({ ...prev, currentIndex: i }));
+          const receipt = await executeTransaction(i, signTransaction);
+          results.push(receipt);
+        }
+
+        // Update overall session status
+        if (state.session.id) {
+          await fetch(`/api/session/${state.session.id}/complete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "confirmed" }),
+          });
+        }
+
+        setState((prev) => ({ ...prev, isExecuting: false }));
+        return results;
+      } catch (error) {
+        setState((prev) => ({
+          ...prev,
+          isExecuting: false,
+          error: error as Error,
+        }));
+        throw error;
+      }
+    },
+    [state.session, executeTransaction]
+  );
 
   // Reset state
   const reset = useCallback(() => {
@@ -185,7 +202,7 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
       transactionStatuses: new Map(),
       currentIndex: 0,
       error: null,
-      isExecuting: false
+      isExecuting: false,
     });
     setDeployedContracts(new Map());
   }, []);
@@ -202,6 +219,6 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
     updateTransactionStatus,
     executeTransaction,
     executeAllTransactions,
-    reset
+    reset,
   };
 }

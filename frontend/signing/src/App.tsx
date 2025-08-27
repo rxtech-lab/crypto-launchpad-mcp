@@ -21,12 +21,10 @@ function App() {
     }
 
     // Check if we need to switch networks
-    if (
-      transaction.session?.chain_id &&
-      wallet.chainId !== transaction.session.chain_id
-    ) {
+    const rpcNetwork = wallet.getRPCNetworkMetadata();
+    if (rpcNetwork && wallet.chainId !== rpcNetwork.chain_id) {
       try {
-        await wallet.switchNetwork(transaction.session.chain_id);
+        await wallet.switchNetwork(rpcNetwork.chain_id);
       } catch (error) {
         console.error("Failed to switch network:", error);
         return;
@@ -45,6 +43,17 @@ function App() {
     transaction.loadSession();
   }, [transaction]);
 
+  const handleSwitchNetwork = useCallback(async () => {
+    const rpcNetwork = wallet.getRPCNetworkMetadata();
+    if (!rpcNetwork) return;
+
+    try {
+      await wallet.switchNetwork(rpcNetwork.chain_id);
+    } catch (error) {
+      console.error("Failed to switch network:", error);
+    }
+  }, [wallet]);
+
   const allCompleted = useMemo(() => {
     if (!transaction.session) return false;
     const totalTx = transaction.session.transaction_deployments.length;
@@ -53,6 +62,20 @@ function App() {
     ).filter((status) => status === "confirmed").length;
     return totalTx > 0 && completedCount === totalTx;
   }, [transaction.session, transaction.transactionStatuses]);
+
+  // Check for network mismatch - compare wallet chain with RPC network metadata
+  const networkMismatch = useMemo(() => {
+    if (!wallet.isConnected) return false;
+    const rpcNetwork = wallet.getRPCNetworkMetadata();
+    if (!rpcNetwork) return false;
+    console.log(
+      "wallet.chainId",
+      wallet.chainId,
+      "rpcNetwork.chain_id",
+      rpcNetwork.chain_id
+    );
+    return wallet.chainId !== rpcNetwork.chain_id;
+  }, [wallet]);
 
   // Determine current step for stepper
   const currentStep = useMemo(() => {
@@ -121,12 +144,41 @@ function App() {
           </h2>
 
           {/* Network Status */}
-          {wallet.chainId !== transaction.session?.chain_id && (
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-sm text-amber-800">
-                Wrong network detected. Please switch to the correct network
-                when prompted.
-              </p>
+          {networkMismatch && wallet.getRPCNetworkMetadata() && (
+            <div className="mb-6 flex items-center justify-between p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white rounded-lg shadow-sm">
+                  <Activity className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      Network Mismatch
+                    </span>
+                    <div className="h-2 w-2 bg-amber-500 rounded-full animate-pulse"></div>
+                  </div>
+                  <div className="text-base font-semibold text-gray-900 mb-1">
+                    Please switch networks to continue
+                  </div>
+                  <div className="text-sm text-amber-700">
+                    Current: Chain ID {wallet.chainId} → Required: Chain ID{" "}
+                    {wallet.getRPCNetworkMetadata()?.chain_id || "Unknown"}
+                  </div>
+                  {wallet.networkSwitchError && (
+                    <p className="text-sm text-red-600 mt-1">
+                      Error: {wallet.networkSwitchError.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleSwitchNetwork}
+                className="px-4 py-2 text-sm font-medium text-amber-700 bg-white border border-amber-200 rounded-lg hover:bg-amber-50 hover:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 transition-all duration-200 flex items-center gap-2"
+                disabled={false} // Could add loading state here if needed
+              >
+                <Activity className="h-4 w-4" />
+                <span>Switch Network</span>
+              </button>
             </div>
           )}
 
@@ -167,6 +219,7 @@ function App() {
             }
             error={transaction.error}
             allCompleted={allCompleted}
+            networkMismatch={networkMismatch}
             onSign={handleSignTransactions}
             onRetry={handleRetry}
           />
@@ -234,22 +287,26 @@ function App() {
           {wallet.isConnected && wallet.account && (
             <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3">
                   <Wallet className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-700">
-                    {formatAddress(wallet.account)}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    • Chain ID: {wallet.chainId}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-700">
+                      {formatAddress(wallet.account)}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      Chain ID: {wallet.chainId}
+                    </span>
+                  </div>
                 </div>
-                <button
-                  onClick={wallet.disconnectWallet}
-                  className="flex items-center space-x-1 px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Disconnect</span>
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={wallet.disconnectWallet}
+                    className="flex items-center space-x-1 px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Disconnect</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}

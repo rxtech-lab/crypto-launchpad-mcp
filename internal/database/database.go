@@ -445,9 +445,9 @@ func (d *Database) GetTransactionSession(sessionID string) (*models.TransactionS
 	}
 
 	// Check if session is expired
-	if time.Now().After(session.ExpiresAt) {
-		return nil, fmt.Errorf("session expired")
-	}
+	// if time.Now().After(session.ExpiresAt) {
+	// 	return nil, fmt.Errorf("session expired")
+	// }
 
 	return &session, nil
 }

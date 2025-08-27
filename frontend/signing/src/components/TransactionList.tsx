@@ -1,11 +1,10 @@
 import {
   CheckCircle2,
-  XCircle,
-  Loader2,
   Clock,
-  Layers,
   Copy,
-  ExternalLink,
+  Layers,
+  Loader2,
+  XCircle,
 } from "lucide-react";
 import { useState } from "react";
 import type { TransactionDeployment, TransactionStatus } from "../types/wallet";
@@ -132,7 +131,7 @@ export function TransactionList({
 
               <div className="text-right">
                 <span className="font-mono text-sm text-gray-700">
-                  {formatEther(tx.value)} ETH
+                  {tx.value.length > 0 ? formatEther(tx.value) : "0"} ETH
                 </span>
                 {status === "confirmed" && (
                   <p className="text-xs text-green-600 mt-1">Confirmed</p>
@@ -166,15 +165,6 @@ export function TransactionList({
                         <Copy className="h-3 w-3 text-gray-500" />
                       )}
                     </button>
-                    <a
-                      href={`https://etherscan.io/address/${deployedContract.address}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                      title="View on Etherscan"
-                    >
-                      <ExternalLink className="h-3 w-3 text-gray-500" />
-                    </a>
                   </div>
                 </div>
               </div>

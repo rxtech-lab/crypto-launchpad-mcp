@@ -25,6 +25,13 @@ export interface TransactionDeployment {
   transactionHash?: string; // Added to track transaction hash
 }
 
+export interface BlockchainNetwork {
+  rpc: string;
+  chain_id: number;
+  name: string;
+  type: "ethereum" | "solana";
+}
+
 export interface TransactionSession {
   id: string;
   metadata: TransactionMetadata[];
