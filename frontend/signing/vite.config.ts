@@ -16,13 +16,13 @@ export default defineConfig({
         chunkFileNames: "vendor.js",
         assetFileNames: (assetInfo) => {
           // Keep CSS files with a fixed name
-          if (assetInfo.name?.endsWith('.css')) {
-            return 'app.css';
+          if (assetInfo.name?.endsWith(".css")) {
+            return "app.css";
           }
           // Keep other assets with their original names
-          return '[name][extname]';
-        }
-      }
-    }
-  }
+          return "[name][extname]";
+        },
+      },
+    },
+  },
 });

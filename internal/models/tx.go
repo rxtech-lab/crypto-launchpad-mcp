@@ -45,8 +45,8 @@ type TransactionSession struct {
 	// TransactionDeployments are list of the transactions that needs to be signed
 	TransactionDeployments []TransactionDeployment `gorm:"serializer:json" json:"transaction_deployments"`
 
-	Chain   Chain `gorm:"foreignKey:ChainID;references:ID" json:"chain,omitempty"`
 	ChainID uint  `gorm:"not null" json:"chain_id"`
+	Chain   Chain `gorm:"foreignKey:ChainID;references:ID" json:"chain,omitempty"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

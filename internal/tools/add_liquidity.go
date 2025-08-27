@@ -146,7 +146,7 @@ func NewAddLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, serve
 			"min_eth_amount":   minETHAmount,
 			"uniswap_version":  uniswapSettings.Version,
 			"chain_type":       activeChain.ChainType,
-			"chain_id":         activeChain.ChainID,
+			"chain_id":         activeChain.NetworkID,
 			"rpc":              activeChain.RPC,
 		}
 
@@ -164,7 +164,7 @@ func NewAddLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, serve
 		sessionID, err := db.CreateTransactionSession(
 			"add_liquidity",
 			activeChain.ChainType,
-			activeChain.ChainID,
+			activeChain.NetworkID,
 			string(transactionDataJSON),
 		)
 		if err != nil {

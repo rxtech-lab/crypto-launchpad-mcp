@@ -437,21 +437,6 @@ func (d *Database) CreateTransactionSession(sessionType string, chainType models
 	return session.ID, nil
 }
 
-func (d *Database) GetTransactionSession(sessionID string) (*models.TransactionSession, error) {
-	var session models.TransactionSession
-	err := d.DB.Where("id = ?", sessionID).First(&session).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if session is expired
-	// if time.Now().After(session.ExpiresAt) {
-	// 	return nil, fmt.Errorf("session expired")
-	// }
-
-	return &session, nil
-}
-
 func (d *Database) UpdateTransactionSessionStatus(sessionID string, status models.TransactionStatus, txHash string) error {
 	updates := map[string]interface{}{
 		"status": status,

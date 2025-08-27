@@ -70,8 +70,12 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize services
+	evmService := services.NewEvmService()
+	txService := services.NewTransactionService(db.DB)
+
 	// Initialize and start API server (HTTP server for transaction signing)
-	apiServer := api.NewAPIServer(db)
+	apiServer := api.NewAPIServer(db, txService)
 
 	// Start API server and get the assigned port
 	port, err := apiServer.Start()
@@ -80,10 +84,6 @@ func main() {
 	}
 
 	log.Printf("API server started on port %d\n", port)
-
-	// Initialize services
-	evmService := services.NewEvmService()
-	txService := services.NewTransactionService(db.DB)
 
 	// Initialize MCP server with the API server port
 	mcpServer := mcp.NewMCPServer(db, port, evmService, txService)

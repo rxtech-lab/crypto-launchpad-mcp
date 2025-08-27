@@ -39,10 +39,10 @@ func NewDeployUniswapTool(db *database.Database, serverPort int) (mcp.Tool, serv
 		}
 
 		// Check if Uniswap is already deployed for this chain
-		existingDeployment, err := db.GetUniswapDeploymentByChain(string(activeChain.ChainType), activeChain.ChainID)
+		existingDeployment, err := db.GetUniswapDeploymentByChain(string(activeChain.ChainType), activeChain.NetworkID)
 		if err == nil && existingDeployment != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Uniswap %s is already deployed on %s (Chain ID: %s)",
-				existingDeployment.Version, string(activeChain.ChainType), activeChain.ChainID)), nil
+				existingDeployment.Version, string(activeChain.ChainType), activeChain.NetworkID)), nil
 		}
 
 		// Prepare deployment data based on version
@@ -51,7 +51,7 @@ func NewDeployUniswapTool(db *database.Database, serverPort int) (mcp.Tool, serv
 
 		switch version {
 		case "v2":
-			v2Data, err := utils.DeployV2Uniswap(string(activeChain.ChainType), activeChain.ChainID)
+			v2Data, err := utils.DeployV2Uniswap(string(activeChain.ChainType), activeChain.NetworkID)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to prepare V2 deployment: %v", err)), nil
 			}
@@ -89,7 +89,7 @@ func NewDeployUniswapTool(db *database.Database, serverPort int) (mcp.Tool, serv
 		sessionID, err := db.CreateTransactionSession(
 			"deploy_uniswap",
 			activeChain.ChainType,
-			activeChain.ChainID,
+			activeChain.NetworkID,
 			string(sessionDataJSON),
 		)
 		if err != nil {
@@ -106,7 +106,7 @@ func NewDeployUniswapTool(db *database.Database, serverPort int) (mcp.Tool, serv
 			"signing_url":           signingURL,
 			"version":               version,
 			"chain_type":            activeChain.ChainType,
-			"chain_id":              activeChain.ChainID,
+			"chain_id":              activeChain.NetworkID,
 			"metadata":              metadata,
 			"message":               fmt.Sprintf("Uniswap %s deployment session created. Use the signing URL to connect wallet and deploy contracts.", version),
 		}

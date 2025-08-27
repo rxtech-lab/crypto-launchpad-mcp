@@ -9,12 +9,18 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/assets"
 )
 
+type RPCNetwork struct {
+	ChainID string `json:"chain_id"`
+	Name    string `json:"name"`
+	Rpc     string `json:"rpc"`
+}
+
 // handleTransactionPage serves the universal transaction signing page
 func (s *APIServer) handleTransactionPage(c *fiber.Ctx) error {
 	sessionID := c.Params("session_id")
 
 	// Get the session from database
-	session, err := s.db.GetTransactionSession(sessionID)
+	session, err := s.txService.GetTransactionSession(sessionID)
 	if err != nil {
 		log.Printf("Error getting session %s: %v", sessionID, err)
 		// Still serve the page but let the React app handle the error
@@ -23,6 +29,11 @@ func (s *APIServer) handleTransactionPage(c *fiber.Ctx) error {
 	// Prepare template data
 	data := map[string]interface{}{
 		"SessionID": sessionID,
+		"RPCNetwork": RPCNetwork{
+			ChainID: session.Chain.NetworkID,
+			Name:    session.Chain.Name,
+			Rpc:     session.Chain.RPC,
+		},
 	}
 
 	// Only add SessionData if session exists
@@ -53,7 +64,7 @@ func (s *APIServer) handleTransactionAPI(c *fiber.Ctx) error {
 	sessionID := c.Params("session_id")
 
 	// Get the session from database
-	session, err := s.db.GetTransactionSession(sessionID)
+	session, err := s.txService.GetTransactionSession(sessionID)
 	if err != nil {
 		log.Printf("Error getting session %s: %v", sessionID, err)
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{

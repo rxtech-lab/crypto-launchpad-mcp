@@ -183,7 +183,7 @@ func NewSetChainTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 			newChain := &models.Chain{
 				ChainType: models.TransactionChainType(chainType),
 				RPC:       rpc,
-				ChainID:   chainID,
+				NetworkID: chainID,
 				Name:      name,
 				IsActive:  false,
 			}

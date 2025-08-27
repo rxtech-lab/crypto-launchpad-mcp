@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 
 type TransactionService interface {
 	CreateTransactionSession(req CreateTransactionSessionRequest) (string, error)
+	GetTransactionSession(sessionID string) (*models.TransactionSession, error)
 }
 
 type transactionService struct {
@@ -47,5 +49,27 @@ func (s *transactionService) CreateTransactionSession(req CreateTransactionSessi
 		return "", err
 	}
 
+	// Load the Chain association after creation
+	err = s.db.Preload("Chain").First(session, "id = ?", sessionID).Error
+	if err != nil {
+		return "", err
+	}
+
 	return sessionID, nil
+}
+
+// GetTransactionSession returns the transaction session by sessionID
+func (t *transactionService) GetTransactionSession(sessionID string) (*models.TransactionSession, error) {
+	var session models.TransactionSession
+	err := t.db.Where("id = ?", sessionID).Preload("Chain").First(&session).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if session is expired
+	if time.Now().After(session.ExpiresAt) {
+		return nil, fmt.Errorf("session expired")
+	}
+
+	return &session, nil
 }

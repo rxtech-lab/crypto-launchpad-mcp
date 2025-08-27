@@ -135,7 +135,7 @@ func TestSetChainHandler(t *testing.T) {
 			expectedChain: &models.Chain{
 				ChainType: "ethereum",
 				RPC:       "https://eth-mainnet.alchemyapi.io/v2/test",
-				ChainID:   "1",
+				NetworkID: "1",
 				Name:      "Ethereum Mainnet",
 				IsActive:  false,
 			},
@@ -152,7 +152,7 @@ func TestSetChainHandler(t *testing.T) {
 			expectedChain: &models.Chain{
 				ChainType: "ethereum",
 				RPC:       "http://localhost:8545",
-				ChainID:   "1337",
+				NetworkID: "1337",
 				Name:      "Ethereum Chain 1337",
 				IsActive:  false,
 			},
@@ -168,7 +168,7 @@ func TestSetChainHandler(t *testing.T) {
 			expectedChain: &models.Chain{
 				ChainType: "solana",
 				RPC:       "https://api.devnet.solana.com",
-				ChainID:   "devnet",
+				NetworkID: "devnet",
 				Name:      "Solana Devnet",
 				IsActive:  false,
 			},
@@ -262,7 +262,7 @@ func TestSetChainHandler(t *testing.T) {
 				chain := chains[0]
 				assert.Equal(t, tt.expectedChain.ChainType, chain.ChainType)
 				assert.Equal(t, tt.expectedChain.RPC, chain.RPC)
-				assert.Equal(t, tt.expectedChain.ChainID, chain.ChainID)
+				assert.Equal(t, tt.expectedChain.NetworkID, chain.NetworkID)
 				assert.Equal(t, tt.expectedChain.Name, chain.Name)
 				assert.Equal(t, tt.expectedChain.IsActive, chain.IsActive)
 
@@ -277,7 +277,7 @@ func TestSetChainHandler(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedChain.ChainType, resultData["chain_type"])
 				assert.Equal(t, tt.expectedChain.RPC, resultData["rpc"])
-				assert.Equal(t, tt.expectedChain.ChainID, resultData["chain_id"])
+				assert.Equal(t, tt.expectedChain.NetworkID, resultData["chain_id"])
 				assert.Equal(t, tt.expectedChain.Name, resultData["name"])
 			}
 		})
@@ -293,7 +293,7 @@ func TestSetChainUpdateExisting(t *testing.T) {
 	initialChain := &models.Chain{
 		ChainType: "ethereum",
 		RPC:       "https://old-rpc.com",
-		ChainID:   "1",
+		NetworkID: "1",
 		Name:      "Old Ethereum",
 		IsActive:  true,
 	}
@@ -324,7 +324,7 @@ func TestSetChainUpdateExisting(t *testing.T) {
 	chain := chains[0]
 	assert.Equal(t, "ethereum", chain.ChainType)
 	assert.Equal(t, "https://new-rpc.com", chain.RPC)
-	assert.Equal(t, "11155111", chain.ChainID)
+	assert.Equal(t, "11155111", chain.NetworkID)
 	// Note: Name is not updated by UpdateChainConfig, only RPC and ChainID
 }
 

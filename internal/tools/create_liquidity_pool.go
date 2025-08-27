@@ -151,7 +151,7 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 		sessionID, err := db.CreateTransactionSession(
 			"create_pool",
 			activeChain.ChainType,
-			activeChain.ChainID,
+			activeChain.NetworkID,
 			string(sessionDataJSON),
 		)
 		if err != nil {

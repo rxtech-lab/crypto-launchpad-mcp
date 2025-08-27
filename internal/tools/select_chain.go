@@ -46,7 +46,7 @@ func NewSelectChainTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 			"chain_type": activeChain.ChainType,
 			"name":       activeChain.Name,
 			"rpc":        activeChain.RPC,
-			"chain_id":   activeChain.ChainID,
+			"chain_id":   activeChain.NetworkID,
 			"is_active":  activeChain.IsActive,
 			"message":    fmt.Sprintf("Successfully selected %s blockchain (ID: %d)", activeChain.Name, activeChain.ID),
 		}

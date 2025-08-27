@@ -38,7 +38,7 @@ type Chain struct {
 	ID        uint                 `gorm:"primaryKey" json:"id"`
 	ChainType TransactionChainType `gorm:"not null" json:"chain_type"` // ethereum, solana
 	RPC       string               `gorm:"not null" json:"rpc"`
-	ChainID   string               `json:"chain_id"`
+	NetworkID string               `gorm:"column:chain_id" json:"chain_id"` // The blockchain's chain ID (e.g., "1" for Ethereum mainnet)
 	Name      string               `gorm:"not null" json:"name"`
 	IsActive  bool                 `gorm:"default:false" json:"is_active"`
 	CreatedAt time.Time            `json:"created_at"`

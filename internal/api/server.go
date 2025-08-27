@@ -12,17 +12,19 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/assets"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 type APIServer struct {
 	app       *fiber.App
 	db        *database.Database
+	txService services.TransactionService
 	mcpServer *mcp.MCPServer
 	port      int
 }
 
-func NewAPIServer(db *database.Database) *APIServer {
+func NewAPIServer(db *database.Database, txService services.TransactionService) *APIServer {
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -36,8 +38,9 @@ func NewAPIServer(db *database.Database) *APIServer {
 	}))
 
 	server := &APIServer{
-		app: app,
-		db:  db,
+		app:       app,
+		db:        db,
+		txService: txService,
 	}
 	server.setupRoutes()
 	return server
@@ -184,8 +187,8 @@ func (s *APIServer) verifyTransactionOnChain(txHash, chainID string) error { // 
 	}
 
 	// Verify chain ID matches
-	if activeChain.ChainID != chainID {
-		return fmt.Errorf("chain ID mismatch: session has %s but active chain is %s", chainID, activeChain.ChainID)
+	if activeChain.NetworkID != chainID {
+		return fmt.Errorf("chain ID mismatch: session has %s but active chain is %s", chainID, activeChain.NetworkID)
 	}
 
 	// Create RPC client

@@ -25,7 +25,7 @@ func (s *APIServer) generateTransactionData(deployment *models.Deployment, templ
 		"template_values":  deployment.TemplateValues,
 		"deployer_address": deployment.DeployerAddress,
 		"chain_type":       activeChain.ChainType,
-		"chain_id":         activeChain.ChainID,
+		"chain_id":         activeChain.NetworkID,
 		"rpc":              activeChain.RPC,
 		"compiled":         false,
 	}

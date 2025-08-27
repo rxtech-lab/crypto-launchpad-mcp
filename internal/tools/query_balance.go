@@ -67,7 +67,7 @@ func handleBrowserMode(db *database.Database, serverPort int, activeChain *model
 		"wallet_address": walletAddress, // Can be empty - will be set by frontend
 		"token_address":  tokenAddress,  // Optional
 		"chain_type":     activeChain.ChainType,
-		"chain_id":       activeChain.ChainID,
+		"chain_id":       activeChain.NetworkID,
 		"rpc_url":        activeChain.RPC,
 	}
 
@@ -80,7 +80,7 @@ func handleBrowserMode(db *database.Database, serverPort int, activeChain *model
 	sessionID, err := db.CreateTransactionSession(
 		"balance_query",
 		activeChain.ChainType,
-		activeChain.ChainID,
+		activeChain.NetworkID,
 		string(sessionDataJSON),
 	)
 	if err != nil {
@@ -94,7 +94,7 @@ func handleBrowserMode(db *database.Database, serverPort int, activeChain *model
 		"session_id":  sessionID,
 		"balance_url": balanceURL,
 		"chain_type":  activeChain.ChainType,
-		"chain_id":    activeChain.ChainID,
+		"chain_id":    activeChain.NetworkID,
 		"mode":        "browser",
 		"message":     "Balance query session created. Use the URL to view wallet balance in browser.",
 	}
@@ -121,7 +121,7 @@ func handleDirectMode(activeChain *models.Chain, walletAddress, tokenAddress str
 	result := map[string]interface{}{
 		"wallet_address": walletAddress,
 		"chain_type":     activeChain.ChainType,
-		"chain_id":       activeChain.ChainID,
+		"chain_id":       activeChain.NetworkID,
 		"mode":           "direct",
 	}
 
@@ -147,7 +147,7 @@ func handleDirectMode(activeChain *models.Chain, walletAddress, tokenAddress str
 	resultJSON, _ := json.Marshal(result)
 
 	// Format human-readable summary
-	summary := fmt.Sprintf("Balance for %s on %s (Chain ID: %s):\n", walletAddress, activeChain.ChainType, activeChain.ChainID)
+	summary := fmt.Sprintf("Balance for %s on %s (Chain ID: %s):\n", walletAddress, activeChain.ChainType, activeChain.NetworkID)
 	summary += fmt.Sprintf("• Native Balance: %s\n", nativeBalance.FormattedBalance)
 
 	if tokenAddress != "" && result["token_balance"] != nil {

@@ -35,7 +35,7 @@ func NewListChainsTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc)
 					"name":       chain.Name,
 					"chain_type": chain.ChainType,
 					"rpc":        chain.RPC,
-					"chain_id":   chain.ChainID,
+					"chain_id":   chain.NetworkID,
 					"is_active":  chain.IsActive,
 					"created_at": chain.CreatedAt,
 					"updated_at": chain.UpdatedAt,
@@ -57,7 +57,7 @@ func NewListChainsTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc)
 					"name":       chain.Name,
 					"chain_type": chain.ChainType,
 					"rpc":        chain.RPC,
-					"chain_id":   chain.ChainID,
+					"chain_id":   chain.NetworkID,
 					"is_active":  chain.IsActive,
 				}
 				break
