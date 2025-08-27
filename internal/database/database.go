@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -399,27 +398,6 @@ func (d *Database) GetSwapTransactionsByUser(userAddress string) ([]models.SwapT
 	var swaps []models.SwapTransaction
 	err := d.DB.Where("user_address = ?", userAddress).Find(&swaps).Error
 	return swaps, err
-}
-
-// Transaction Session operations
-func (d *Database) CreateTransactionSession(sessionType, chainType, chainID, transactionData string) (string, error) {
-	sessionID := uuid.New().String()
-	session := &models.TransactionSession{
-		ID:              sessionID,
-		SessionType:     sessionType,
-		ChainType:       chainType,
-		ChainID:         chainID,
-		TransactionData: transactionData,
-		Status:          "pending",
-		ExpiresAt:       time.Now().Add(30 * time.Minute), // 30 minute expiry
-	}
-
-	err := d.DB.Create(session).Error
-	if err != nil {
-		return "", err
-	}
-
-	return sessionID, nil
 }
 
 func (d *Database) GetTransactionSession(sessionID string) (*models.TransactionSession, error) {

@@ -160,4 +160,3 @@ type UniswapDeployment struct {
 
 	Chain Chain `gorm:"foreignKey:ChainID;references:ID" json:"chain,omitempty"`
 }
-
