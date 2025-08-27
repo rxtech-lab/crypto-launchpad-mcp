@@ -1,8 +1,8 @@
-import { Activity } from "lucide-react";
+import { Activity, CheckCircle, Wallet, LogOut } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import "./App.css";
-import { ConnectionStatus } from "./components/ConnectionStatus";
 import { ErrorDisplay } from "./components/ErrorDisplay";
+import { HorizontalStepper } from "./components/HorizontalStepper";
 import { MetadataDisplay } from "./components/MetadataDisplay";
 import { TransactionList } from "./components/TransactionList";
 import { TransactionSigner } from "./components/TransactionSigner";
@@ -54,104 +54,228 @@ function App() {
     return totalTx > 0 && completedCount === totalTx;
   }, [transaction.session, transaction.transactionStatuses]);
 
+  // Determine current step for stepper
+  const currentStep = useMemo(() => {
+    if (allCompleted) return 2;
+    if (wallet.isConnected) return 1;
+    return 0;
+  }, [wallet.isConnected, allCompleted]);
+
+  const steps = [
+    {
+      id: "connect",
+      title: "Connect Wallet",
+    },
+    {
+      id: "review-sign",
+      title: "Review & Sign",
+    },
+    {
+      id: "complete",
+      title: "Complete",
+    },
+  ];
+
+  // Format wallet address for display
+  const formatAddress = (address: string) => {
+    if (!address) return "";
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  // Render current step content
+  const renderStepContent = () => {
+    // Step 1: Connect Wallet
+    if (currentStep === 0) {
+      return (
+        <>
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">
+            Connect Your Wallet
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Please connect your wallet to proceed with the transaction signing
+            process.
+          </p>
+          <WalletSelector
+            providers={wallet.providers}
+            selectedProvider={wallet.selectedProvider}
+            isConnecting={wallet.isConnecting}
+            isConnected={wallet.isConnected}
+            onConnect={wallet.connectWallet}
+            onDisconnect={wallet.disconnectWallet}
+          />
+          {wallet.error && (
+            <div className="mt-4">
+              <ErrorDisplay error={wallet.error} />
+            </div>
+          )}
+        </>
+      );
+    }
+
+    // Step 2: Review & Sign
+    if (currentStep === 1) {
+      return (
+        <>
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">
+            Review & Sign Transactions
+          </h2>
+
+          {/* Network Status */}
+          {wallet.chainId !== transaction.session?.chain_id && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                Wrong network detected. Please switch to the correct network
+                when prompted.
+              </p>
+            </div>
+          )}
+
+          {/* Metadata if available */}
+          {transaction.session?.metadata &&
+            transaction.session.metadata.length > 0 && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <MetadataDisplay
+                  metadata={transaction.session.metadata}
+                  sessionId={transaction.session.id}
+                />
+              </div>
+            )}
+
+          {/* Transaction List */}
+          {transaction.session && (
+            <div className="mb-6">
+              <TransactionList
+                transactions={transaction.session.transaction_deployments}
+                statuses={transaction.transactionStatuses}
+                currentIndex={transaction.currentIndex}
+                isExecuting={transaction.isExecuting}
+                deployedContracts={transaction.deployedContracts}
+              />
+            </div>
+          )}
+
+          {/* Sign button and status */}
+          <TransactionSigner
+            isExecuting={transaction.isExecuting}
+            isConnected={wallet.isConnected}
+            hasTransactions={
+              (transaction.session?.transaction_deployments.length || 0) > 0
+            }
+            currentIndex={transaction.currentIndex}
+            totalTransactions={
+              transaction.session?.transaction_deployments.length || 0
+            }
+            error={transaction.error}
+            allCompleted={allCompleted}
+            onSign={handleSignTransactions}
+            onRetry={handleRetry}
+          />
+        </>
+      );
+    }
+
+    // Step 3: Complete
+    if (currentStep === 2) {
+      return (
+        <>
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">
+            All Transactions Complete
+          </h2>
+
+          <div className="text-center py-8">
+            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <p className="text-lg text-gray-700 mb-2">
+              All transactions have been successfully executed!
+            </p>
+            <p className="text-sm text-gray-500">
+              You can now close this window or view the transaction details
+              below.
+            </p>
+          </div>
+
+          {/* Final transaction list */}
+          {transaction.session && (
+            <div className="mt-6">
+              <TransactionList
+                transactions={transaction.session.transaction_deployments}
+                statuses={transaction.transactionStatuses}
+                currentIndex={transaction.currentIndex}
+                isExecuting={false}
+                deployedContracts={transaction.deployedContracts}
+              />
+            </div>
+          )}
+        </>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto p-6">
-        <header className="mb-8">
-          <div className="flex items-center space-x-3 mb-2">
+      <div className="max-w-3xl mx-auto p-6">
+        {/* Header */}
+        <header className="mb-8 text-center">
+          <div className="flex items-center justify-center space-x-3 mb-2">
             <Activity className="h-8 w-8 text-blue-600" />
             <h1 className="text-3xl font-bold text-gray-900">
               Transaction Signing
             </h1>
           </div>
           <p className="text-gray-600">
-            Connect your wallet and sign the required transactions
+            Follow the steps to sign and execute your transactions
           </p>
         </header>
 
-        <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              Wallet Connection
-            </h2>
-            <WalletSelector
-              providers={wallet.providers}
-              selectedProvider={wallet.selectedProvider}
-              isConnecting={wallet.isConnecting}
-              isConnected={wallet.isConnected}
-              onConnect={wallet.connectWallet}
-              onDisconnect={wallet.disconnectWallet}
-            />
-            {(wallet.isConnected || wallet.error) && (
-              <div className="mt-4">
-                <ConnectionStatus
-                  isConnected={wallet.isConnected}
-                  account={wallet.account}
-                  chainId={wallet.chainId}
-                  requiredChainId={transaction.session?.chain_id}
-                />
+        {/* Main Card */}
+        <div className="bg-white rounded-lg border border-gray-200">
+          {/* Wallet Status Bar - Only show when connected */}
+          {wallet.isConnected && wallet.account && (
+            <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Wallet className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700">
+                    {formatAddress(wallet.account)}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    • Chain ID: {wallet.chainId}
+                  </span>
+                </div>
+                <button
+                  onClick={wallet.disconnectWallet}
+                  className="flex items-center space-x-1 px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Disconnect</span>
+                </button>
               </div>
-            )}
-            {wallet.error && (
-              <div className="mt-4">
-                <ErrorDisplay error={wallet.error} />
-              </div>
-            )}
+            </div>
+          )}
+
+          {/* Stepper */}
+          <div className="px-6 py-4 border-b border-gray-200">
+            <HorizontalStepper steps={steps} currentStep={currentStep} />
           </div>
 
-          {transaction.session && (
-            <>
-              {transaction.session.metadata &&
-                transaction.session.metadata.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-sm p-6">
-                    <MetadataDisplay
-                      metadata={transaction.session.metadata}
-                      sessionId={transaction.session.id}
-                    />
-                  </div>
-                )}
-
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <TransactionList
-                  transactions={transaction.session.transaction_deployments}
-                  statuses={transaction.transactionStatuses}
-                  currentIndex={transaction.currentIndex}
-                  isExecuting={transaction.isExecuting}
-                />
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <TransactionSigner
-                  isExecuting={transaction.isExecuting}
-                  isConnected={wallet.isConnected}
-                  hasTransactions={
-                    transaction.session.transaction_deployments.length > 0
-                  }
-                  currentIndex={transaction.currentIndex}
-                  totalTransactions={
-                    transaction.session.transaction_deployments.length
-                  }
-                  error={transaction.error}
-                  allCompleted={allCompleted}
-                  onSign={handleSignTransactions}
-                  onRetry={handleRetry}
-                />
-              </div>
-            </>
-          )}
-
-          {transaction.error && !transaction.session && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
+          {/* Content */}
+          <div className="p-6">
+            {transaction.error && !transaction.session ? (
               <ErrorDisplay error={transaction.error} onRetry={handleRetry} />
-            </div>
-          )}
-
-          {!transaction.session && !transaction.error && (
-            <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-500">
-              <Activity className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p>Loading transaction session...</p>
-            </div>
-          )}
+            ) : !wallet.isConnected ? (
+              // Always show wallet connection step when not connected
+              renderStepContent()
+            ) : !transaction.session && !transaction.error ? (
+              // Show loading when wallet is connected but no session yet
+              <div className="text-center py-8">
+                <Activity className="h-12 w-12 text-gray-300 mx-auto mb-3 animate-pulse" />
+                <p className="text-gray-500">Loading transaction session...</p>
+              </div>
+            ) : (
+              renderStepContent()
+            )}
+          </div>
         </div>
       </div>
     </div>

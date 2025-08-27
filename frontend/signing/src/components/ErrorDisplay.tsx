@@ -39,7 +39,7 @@ export function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
           )}
           
           {isExpanded && error.stack && (
-            <pre className="mt-2 p-2 bg-red-100 rounded text-xs text-red-700 overflow-x-auto">
+            <pre className="mt-2 p-2 bg-red-100 rounded text-xs text-red-700 overflow-x-auto whitespace-pre-wrap break-all">
               {error.stack}
             </pre>
           )}

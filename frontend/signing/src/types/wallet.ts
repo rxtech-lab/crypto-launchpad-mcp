@@ -5,12 +5,15 @@ export interface EIP6963Provider {
     icon: string;
     rdns: string;
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   provider: any; // EIP-1193 provider
 }
 
 export interface TransactionMetadata {
   key: string;
   value: string;
+  title: string;
+  description: string;
 }
 
 export interface TransactionDeployment {
@@ -18,6 +21,8 @@ export interface TransactionDeployment {
   description: string;
   data: string;
   value: string;
+  contractAddress?: string; // Added to track deployed contract address
+  transactionHash?: string; // Added to track transaction hash
 }
 
 export interface TransactionSession {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { TransactionState, TransactionStatus } from '../types/wallet';
+import type { TransactionState, TransactionStatus, TransactionDeployment } from '../types/wallet';
 
 interface UseTransactionProps {
   sessionId?: string;
@@ -13,6 +13,9 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
     error: null,
     isExecuting: false
   });
+  
+  // Store deployed contract addresses
+  const [deployedContracts, setDeployedContracts] = useState<Map<number, { address: string; txHash: string }>>(new Map());
 
   // Load session data from meta tag or API
   const loadSession = useCallback(async () => {
@@ -104,6 +107,18 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
 
       updateTransactionStatus(index, receipt.status === 1 ? 'confirmed' : 'failed');
       
+      // Store contract address if deployment created one
+      if (receipt.contractAddress) {
+        setDeployedContracts(prev => {
+          const newMap = new Map(prev);
+          newMap.set(index, { 
+            address: receipt.contractAddress, 
+            txHash: receipt.hash 
+          });
+          return newMap;
+        });
+      }
+      
       // Update session status on backend
       if (state.session.id) {
         await fetch(`/api/session/${state.session.id}/transaction/${index}`, {
@@ -172,6 +187,7 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
       error: null,
       isExecuting: false
     });
+    setDeployedContracts(new Map());
   }, []);
 
   // Load session on mount
@@ -181,6 +197,7 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
 
   return {
     ...state,
+    deployedContracts,
     loadSession,
     updateTransactionStatus,
     executeTransaction,

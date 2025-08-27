@@ -1,5 +1,5 @@
-import { Info, FileText } from 'lucide-react';
-import type { TransactionMetadata } from '../types/wallet';
+import { Info, FileText } from "lucide-react";
+import type { TransactionMetadata } from "../types/wallet";
 
 interface MetadataDisplayProps {
   metadata: TransactionMetadata[];
@@ -15,9 +15,11 @@ export function MetadataDisplay({ metadata, sessionId }: MetadataDisplayProps) {
     <div className="bg-white border border-gray-200 rounded-lg p-4 animate-fade-in">
       <div className="flex items-center space-x-2 mb-3">
         <Info className="h-5 w-5 text-blue-500" />
-        <h3 className="text-lg font-semibold text-gray-800">Session Information</h3>
+        <h3 className="text-lg font-semibold text-gray-800">
+          Session Information
+        </h3>
       </div>
-      
+
       {sessionId && (
         <div className="mb-3 pb-3 border-b border-gray-100">
           <p className="text-xs text-gray-500 font-mono">
@@ -32,10 +34,13 @@ export function MetadataDisplay({ metadata, sessionId }: MetadataDisplayProps) {
             <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
             <div className="min-w-0 flex-grow">
               <p className="text-xs text-gray-500 uppercase tracking-wider">
-                {item.key.replace(/_/g, ' ')}
+                {item.title}
               </p>
-              <p className="text-sm text-gray-700 font-medium truncate" title={item.value}>
-                {item.value}
+              <p
+                className="text-sm text-gray-700 font-medium truncate"
+                title={item.value}
+              >
+                {item.description}
               </p>
             </div>
           </div>

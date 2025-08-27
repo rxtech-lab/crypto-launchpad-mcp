@@ -8,4 +8,21 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Use fixed names for the output files
+        entryFileNames: "app.js",
+        chunkFileNames: "vendor.js",
+        assetFileNames: (assetInfo) => {
+          // Keep CSS files with a fixed name
+          if (assetInfo.name?.endsWith('.css')) {
+            return 'app.css';
+          }
+          // Keep other assets with their original names
+          return '[name][extname]';
+        }
+      }
+    }
+  }
 });
