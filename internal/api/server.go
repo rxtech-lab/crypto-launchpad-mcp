@@ -1,9 +1,7 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
-	"html/template"
 	"log"
 	"net"
 	"time"
@@ -22,7 +20,6 @@ type APIServer struct {
 	db        *database.Database
 	mcpServer *mcp.MCPServer
 	port      int
-	templates map[string]*template.Template
 }
 
 func NewAPIServer(db *database.Database) *APIServer {
@@ -42,101 +39,20 @@ func NewAPIServer(db *database.Database) *APIServer {
 		app: app,
 		db:  db,
 	}
-
-	server.initTemplates()
 	server.setupRoutes()
 	return server
 }
 
-func (s *APIServer) initTemplates() {
-	s.templates = make(map[string]*template.Template)
-
-	// Define custom functions
-	funcMap := template.FuncMap{
-		"json": func(v interface{}) (string, error) {
-			b, err := json.Marshal(v)
-			return string(b), err
-		},
-	}
-
-	// Parse deployment template with custom functions
-	deployTmpl, err := template.New("deploy").Funcs(funcMap).Parse(string(assets.DeployHTML))
-	if err != nil {
-		log.Printf("Error parsing deploy template: %v", err)
-	} else {
-		s.templates["deploy"] = deployTmpl
-	}
-
-	// Parse create pool template with custom functions
-	poolTmpl, err := template.New("create_pool").Funcs(funcMap).Parse(string(assets.CreatePoolHTML))
-	if err != nil {
-		log.Printf("Error parsing create pool template: %v", err)
-	} else {
-		s.templates["create_pool"] = poolTmpl
-	}
-
-	// Parse generic template
-	genericTmpl, err := template.New("generic").Parse(string(assets.GenericHTML))
-	if err != nil {
-		log.Printf("Error parsing generic template: %v", err)
-	} else {
-		s.templates["generic"] = genericTmpl
-	}
-
-	// Parse Uniswap deployment template with custom functions
-	uniswapTmpl, err := template.New("deploy_uniswap").Funcs(funcMap).Parse(string(assets.DeployUniswapHTML))
-	if err != nil {
-		log.Printf("Error parsing deploy uniswap template: %v", err)
-	} else {
-		s.templates["deploy_uniswap"] = uniswapTmpl
-	}
-
-	// Parse balance query template
-	balanceTmpl, err := template.New("balance").Parse(string(assets.BalanceHTML))
-	if err != nil {
-		log.Printf("Error parsing balance template: %v", err)
-	} else {
-		s.templates["balance"] = balanceTmpl
-	}
-
-	// Parse add liquidity template with custom functions
-	addLiquidityTmpl, err := template.New("add_liquidity").Funcs(funcMap).Parse(string(assets.AddLiquidityHTML))
-	if err != nil {
-		log.Printf("Error parsing add liquidity template: %v", err)
-	} else {
-		s.templates["add_liquidity"] = addLiquidityTmpl
-	}
-
-	// Parse remove liquidity template with custom functions
-	removeLiquidityTmpl, err := template.New("remove_liquidity").Funcs(funcMap).Parse(string(assets.RemoveLiquidityHTML))
-	if err != nil {
-		log.Printf("Error parsing remove liquidity template: %v", err)
-	} else {
-		s.templates["remove_liquidity"] = removeLiquidityTmpl
-	}
-
-	// Parse swap template with custom functions
-	swapTmpl, err := template.New("swap").Funcs(funcMap).Parse(string(assets.SwapHTML))
-	if err != nil {
-		log.Printf("Error parsing swap template: %v", err)
-	} else {
-		s.templates["swap"] = swapTmpl
-	}
-}
-
 func (s *APIServer) setupRoutes() {
-	// Static files
-	s.app.Get("/js/wallet.js", s.handleWalletJS)
-	s.app.Get("/js/wallet-connection.js", s.handleWalletConnectionJS)
-	s.app.Get("/js/deploy-tokens.js", s.handleDeployTokensJS)
-	s.app.Get("/js/deploy-uniswap.js", s.handleDeployUniswapJS)
-	s.app.Get("/js/balance-query.js", s.handleBalanceQueryJS)
-	s.app.Get("/js/create-pool.js", s.handleCreatePoolJS)
-	s.app.Get("/js/liquidity.js", s.handleLiquidityJS)
 
 	// Universal transaction signing routes
 	s.app.Get("/tx/:session_id", s.handleTransactionPage)
 	s.app.Get("/api/tx/:session_id", s.handleTransactionAPI)
+	s.app.Get("/api/session/:session_id", s.handleTransactionAPI) // Alias for React app compatibility
+
+	// Static assets for signing app
+	s.app.Get("/static/tx/app.js", s.handleSigningAppJS)
+	s.app.Get("/static/tx/app.css", s.handleSigningAppCSS)
 
 	// Legacy deployment signing routes (redirect to new tx routes)
 	s.app.Get("/deploy/:session_id", func(c *fiber.Ctx) error {
@@ -248,46 +164,16 @@ func (s *APIServer) GetMCPServer() *mcp.MCPServer {
 	return s.mcpServer
 }
 
-// handleWalletJS serves the embedded wallet.js file
-func (s *APIServer) handleWalletJS(c *fiber.Ctx) error {
+// handleSigningAppJS serves the embedded signing app.js file
+func (s *APIServer) handleSigningAppJS(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/javascript")
-	return c.Send(assets.WalletJS)
+	return c.Send(assets.SigningAppJS)
 }
 
-// handleWalletConnectionJS serves the embedded wallet-connection.js file
-func (s *APIServer) handleWalletConnectionJS(c *fiber.Ctx) error {
-	c.Set("Content-Type", "application/javascript")
-	return c.Send(assets.WalletConnectionJS)
-}
-
-// handleDeployTokensJS serves the embedded deploy-tokens.js file
-func (s *APIServer) handleDeployTokensJS(c *fiber.Ctx) error {
-	c.Set("Content-Type", "application/javascript")
-	return c.Send(assets.DeployTokensJS)
-}
-
-// handleDeployUniswapJS serves the embedded deploy-uniswap.js file
-func (s *APIServer) handleDeployUniswapJS(c *fiber.Ctx) error {
-	c.Set("Content-Type", "application/javascript")
-	return c.Send(assets.DeployUniswapJS)
-}
-
-// handleBalanceQueryJS serves the embedded balance-query.js file
-func (s *APIServer) handleBalanceQueryJS(c *fiber.Ctx) error {
-	c.Set("Content-Type", "application/javascript")
-	return c.Send(assets.BalanceQueryJS)
-}
-
-// handleCreatePoolJS serves the embedded create-pool.js file
-func (s *APIServer) handleCreatePoolJS(c *fiber.Ctx) error {
-	c.Set("Content-Type", "application/javascript")
-	return c.Send(assets.CreatePoolJS)
-}
-
-// handleLiquidityJS serves the embedded liquidity.js file
-func (s *APIServer) handleLiquidityJS(c *fiber.Ctx) error {
-	c.Set("Content-Type", "application/javascript")
-	return c.Send(assets.LiquidityJS)
+// handleSigningAppCSS serves the embedded signing app.css file
+func (s *APIServer) handleSigningAppCSS(c *fiber.Ctx) error {
+	c.Set("Content-Type", "text/css")
+	return c.Send(assets.SigningAppCSS)
 }
 
 // verifyTransactionOnChain verifies that a transaction exists and was successful on-chain
