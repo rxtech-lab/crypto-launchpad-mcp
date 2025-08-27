@@ -400,6 +400,54 @@ func (d *Database) GetSwapTransactionsByUser(userAddress string) ([]models.SwapT
 	return swaps, err
 }
 
+func (d *Database) CreateTransactionSession(sessionType, chainType, chainID, data string) (string, error) {
+	// Generate a UUID for the session ID
+	sessionID := fmt.Sprintf("%s-%d", sessionType, time.Now().UnixNano())
+
+	// Parse chainID to uint
+	var chainIDUint uint
+	if _, err := fmt.Sscanf(chainID, "%d", &chainIDUint); err != nil {
+		// If chainID is not a number, try to find the chain by type and chainID string
+		var chain models.Chain
+		if err := d.DB.Where("chain_type = ? AND chain_id = ?", chainType, chainID).First(&chain).Error; err != nil {
+			return "", fmt.Errorf("failed to find chain: %w", err)
+		}
+		chainIDUint = chain.ID
+	}
+
+	// Convert chainType string to TransactionChainType
+	var txChainType models.TransactionChainType
+	switch chainType {
+	case "ethereum":
+		txChainType = models.TransactionChainTypeEthereum
+	case "solana":
+		txChainType = models.TransactionChainTypeSolana
+	default:
+		txChainType = models.TransactionChainTypeEthereum
+	}
+
+	// Create metadata for session type
+	metadata := []models.TransactionMetadata{
+		{Key: "session_type", Value: sessionType},
+		{Key: "data", Value: data},
+	}
+
+	session := &models.TransactionSession{
+		ID:                   sessionID,
+		Metadata:             metadata,
+		TransactionStatus:    models.TransactionStatusPending,
+		TransactionChainType: txChainType,
+		ChainID:              chainIDUint,
+		ExpiresAt:            time.Now().Add(30 * time.Minute),
+	}
+
+	if err := d.DB.Create(session).Error; err != nil {
+		return "", err
+	}
+
+	return session.ID, nil
+}
+
 func (d *Database) GetTransactionSession(sessionID string) (*models.TransactionSession, error) {
 	var session models.TransactionSession
 	err := d.DB.Where("id = ?", sessionID).First(&session).Error

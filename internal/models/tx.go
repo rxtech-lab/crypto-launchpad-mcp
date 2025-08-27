@@ -23,10 +23,16 @@ type TransactionMetadata struct {
 }
 
 type TransactionDeployment struct {
-	Title       string `gorm:"not null" json:"title"`
+	// Title is the title of the transaction used to display in the UI
+	Title string `gorm:"not null" json:"title"`
+	// Description is the description of the transaction used to display in the UI
 	Description string `gorm:"not null" json:"description"`
-	Data        string `gorm:"type:text" json:"data"` // transaction data included in the transaction body
-	Value       string `gorm:"not null" json:"value"` // value of the transaction
+	// Data is the transaction data included in the transaction body for wallet to sign
+	Data string `gorm:"type:text" json:"data"`
+	// Value is the value of the transaction for wallet to sign (e.g. 100 WEI)
+	Value string `gorm:"not null" json:"value"`
+	// Receiver is the receiver of the transaction for wallet to sign (e.g. 0x1234567890123456789012345678901234567890)
+	Receiver string `gorm:"not null" json:"receiver"`
 }
 
 // TransactionSession represents signing session management

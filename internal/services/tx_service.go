@@ -13,10 +13,10 @@ type TransactionService struct {
 }
 
 type CreateTransactionSessionRequest struct {
-	Metadata               []models.TransactionMetadata    `json:"metadata"`
+	Metadata               []models.TransactionMetadata   `json:"metadata"`
 	TransactionDeployments []models.TransactionDeployment `json:"transaction_deployments"`
-	ChainType              string                          `json:"chain_type"`
-	ChainID                uint                            `json:"chain_id"`
+	ChainType              string                         `json:"chain_type"`
+	ChainID                uint                           `json:"chain_id"`
 }
 
 func NewTransactionService(db *gorm.DB) *TransactionService {
@@ -25,7 +25,7 @@ func NewTransactionService(db *gorm.DB) *TransactionService {
 
 func (s *TransactionService) CreateTransactionSession(req CreateTransactionSessionRequest) (string, error) {
 	sessionID := uuid.New().String()
-	
+
 	session := &models.TransactionSession{
 		ID:                     sessionID,
 		Metadata:               req.Metadata,

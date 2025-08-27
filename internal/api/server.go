@@ -134,38 +134,64 @@ func (s *APIServer) setupRoutes() {
 	s.app.Get("/js/create-pool.js", s.handleCreatePoolJS)
 	s.app.Get("/js/liquidity.js", s.handleLiquidityJS)
 
-	// Deployment signing routes
-	s.app.Get("/deploy/:session_id", s.handleDeploymentPage)
-	s.app.Get("/api/deploy/:session_id", s.handleDeploymentAPI)
-	s.app.Post("/api/deploy/:session_id/confirm", s.handleDeploymentConfirm)
+	// Universal transaction signing routes
+	s.app.Get("/tx/:session_id", s.handleTransactionPage)
+	s.app.Get("/api/tx/:session_id", s.handleTransactionAPI)
 
-	// Uniswap deployment routes
-	s.app.Get("/deploy-uniswap/:session_id", s.handleUniswapDeploymentPage)
-	s.app.Get("/api/deploy-uniswap/:session_id", s.handleUniswapDeploymentAPI)
-	s.app.Post("/api/deploy-uniswap/:session_id/confirm", s.handleUniswapDeploymentConfirm)
+	// Legacy deployment signing routes (redirect to new tx routes)
+	s.app.Get("/deploy/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/tx/" + c.Params("session_id"))
+	})
+	s.app.Get("/api/deploy/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/api/tx/" + c.Params("session_id"))
+	})
 
-	// Balance query routes
-	s.app.Get("/balance/:session_id", s.handleBalancePage)
-	s.app.Get("/api/balance/:session_id", s.handleBalanceAPI)
+	// Legacy Uniswap deployment routes (redirect to new tx routes)
+	s.app.Get("/deploy-uniswap/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/tx/" + c.Params("session_id"))
+	})
+	s.app.Get("/api/deploy-uniswap/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/api/tx/" + c.Params("session_id"))
+	})
 
-	// Liquidity pool creation routes
-	s.app.Get("/pool/create/:session_id", s.handleCreatePoolPage)
-	s.app.Get("/api/pool/create/:session_id", s.handleCreatePoolAPI)
-	s.app.Post("/api/pool/create/:session_id/confirm", s.handleCreatePoolConfirm)
+	// Legacy balance query routes (redirect to new tx routes)
+	s.app.Get("/balance/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/tx/" + c.Params("session_id"))
+	})
+	s.app.Get("/api/balance/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/api/tx/" + c.Params("session_id"))
+	})
 
-	// Liquidity management routes
-	s.app.Get("/liquidity/add/:session_id", s.handleAddLiquidityPage)
-	s.app.Get("/api/liquidity/add/:session_id", s.handleAddLiquidityAPI)
-	s.app.Post("/api/liquidity/add/:session_id/confirm", s.handleAddLiquidityConfirm)
+	// Legacy liquidity pool creation routes (redirect to new tx routes)
+	s.app.Get("/pool/create/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/tx/" + c.Params("session_id"))
+	})
+	s.app.Get("/api/pool/create/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/api/tx/" + c.Params("session_id"))
+	})
 
-	s.app.Get("/liquidity/remove/:session_id", s.handleRemoveLiquidityPage)
-	s.app.Get("/api/liquidity/remove/:session_id", s.handleRemoveLiquidityAPI)
-	s.app.Post("/api/liquidity/remove/:session_id/confirm", s.handleRemoveLiquidityConfirm)
+	// Legacy liquidity management routes (redirect to new tx routes)
+	s.app.Get("/liquidity/add/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/tx/" + c.Params("session_id"))
+	})
+	s.app.Get("/api/liquidity/add/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/api/tx/" + c.Params("session_id"))
+	})
 
-	// Swap routes
-	s.app.Get("/swap/:session_id", s.handleSwapPage)
-	s.app.Get("/api/swap/:session_id", s.handleSwapAPI)
-	s.app.Post("/api/swap/:session_id/confirm", s.handleSwapConfirm)
+	s.app.Get("/liquidity/remove/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/tx/" + c.Params("session_id"))
+	})
+	s.app.Get("/api/liquidity/remove/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/api/tx/" + c.Params("session_id"))
+	})
+
+	// Legacy swap routes (redirect to new tx routes)
+	s.app.Get("/swap/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/tx/" + c.Params("session_id"))
+	})
+	s.app.Get("/api/swap/:session_id", func(c *fiber.Ctx) error {
+		return c.Redirect("/api/tx/" + c.Params("session_id"))
+	})
 
 	// Test API for E2E testing
 	s.app.Post("/api/test/sign-transaction", s.handleTestSignTransaction)
