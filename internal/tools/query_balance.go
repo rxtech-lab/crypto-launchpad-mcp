@@ -126,7 +126,7 @@ func handleDirectMode(activeChain *models.Chain, walletAddress, tokenAddress str
 	}
 
 	// Query native balance
-	nativeBalance, err := utils.QueryNativeBalance(activeChain.RPC, walletAddress, activeChain.ChainType)
+	nativeBalance, err := utils.QueryNativeBalance(activeChain.RPC, walletAddress, string(activeChain.ChainType))
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to query native balance: %v", err)), nil
 	}

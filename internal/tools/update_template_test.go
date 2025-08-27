@@ -251,7 +251,7 @@ func TestUpdateTemplateHandler_UpdateChainType(t *testing.T) {
 			template := &models.Template{
 				Name:         "Test Template",
 				Description:  "Test description",
-				ChainType:    tt.originalChain,
+				ChainType:    models.TransactionChainType(tt.originalChain),
 				TemplateCode: originalTemplate,
 			}
 			err := db.CreateTemplate(template)
@@ -363,7 +363,7 @@ pub struct Initialize {}`,
 			template := &models.Template{
 				Name:         "Test Template",
 				Description:  "Test description",
-				ChainType:    tt.chainType,
+				ChainType:    models.TransactionChainType(tt.chainType),
 				TemplateCode: originalTemplate,
 			}
 			err := db.CreateTemplate(template)

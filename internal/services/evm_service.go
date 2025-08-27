@@ -9,17 +9,23 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-type EvmService struct {
+type EvmService interface {
+	GetContractDeploymentTransactionWithContractCode(args ContractDeploymentWithContractCodeTransactionArgs) (models.TransactionDeployment, error)
+	GetContractDeploymentTransactionWithBytecodeAndAbi(args ContractDeploymentWithBytecodeAndAbiTransactionArgs) (models.TransactionDeployment, error)
+	GetTransactionData(args GetTransactionDataArgs) (string, error)
+}
+
+type evmService struct {
 	validator *validator.Validate
 }
 
-func NewEvmService() *EvmService {
+func NewEvmService() EvmService {
 	validator := validator.New()
-	return &EvmService{validator: validator}
+	return &evmService{validator: validator}
 }
 
 // GetContractDeploymentTransactionWithContractCode returns a transaction deployment for a contract deployment with contract code
-func (s *EvmService) GetContractDeploymentTransactionWithContractCode(args ContractDeploymentWithContractCodeTransactionArgs) (models.TransactionDeployment, error) {
+func (s *evmService) GetContractDeploymentTransactionWithContractCode(args ContractDeploymentWithContractCodeTransactionArgs) (models.TransactionDeployment, error) {
 	err := s.validator.Struct(args)
 	if err != nil {
 		return models.TransactionDeployment{}, err
@@ -40,7 +46,7 @@ func (s *EvmService) GetContractDeploymentTransactionWithContractCode(args Contr
 }
 
 // GetContractDeploymentWithBytecodeAndAbi returns a transaction deployment for a contract deployment with bytecode and abi
-func (s *EvmService) GetContractDeploymentTransactionWithBytecodeAndAbi(args ContractDeploymentWithBytecodeAndAbiTransactionArgs) (models.TransactionDeployment, error) {
+func (s *evmService) GetContractDeploymentTransactionWithBytecodeAndAbi(args ContractDeploymentWithBytecodeAndAbiTransactionArgs) (models.TransactionDeployment, error) {
 	err := s.validator.Struct(args)
 	if err != nil {
 		return models.TransactionDeployment{}, err
@@ -61,7 +67,7 @@ func (s *EvmService) GetContractDeploymentTransactionWithBytecodeAndAbi(args Con
 }
 
 // GetTransactionData returns the transaction data interacting with a contract
-func (s *EvmService) GetTransactionData(args GetTransactionDataArgs) (string, error) {
+func (s *evmService) GetTransactionData(args GetTransactionDataArgs) (string, error) {
 	err := s.validator.Struct(args)
 	if err != nil {
 		return "", err
@@ -75,7 +81,7 @@ func (s *EvmService) GetTransactionData(args GetTransactionDataArgs) (string, er
 	return encodedData, nil
 }
 
-func (s *EvmService) getContractDeploymentTransactionDataWithBytecodeAndAbi(abi string, bytecode string, constructorArgs []any) (string, error) {
+func (s *evmService) getContractDeploymentTransactionDataWithBytecodeAndAbi(abi string, bytecode string, constructorArgs []any) (string, error) {
 	// Encode constructor arguments if provided
 	encodedArgs, err := utils.EncodeContractConstructorArgs(abi, constructorArgs)
 	if err != nil {
@@ -87,7 +93,7 @@ func (s *EvmService) getContractDeploymentTransactionDataWithBytecodeAndAbi(abi 
 	return txData, nil
 }
 
-func (s *EvmService) getContractDeploymentTransactionData(contractName string, constructorArgs []any, contractCode string) (string, error) {
+func (s *evmService) getContractDeploymentTransactionData(contractName string, constructorArgs []any, contractCode string) (string, error) {
 	compilationResult, err := utils.CompileSolidity("0.8.27", contractCode)
 	if err != nil {
 		return "", err

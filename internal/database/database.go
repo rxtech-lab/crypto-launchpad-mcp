@@ -400,7 +400,7 @@ func (d *Database) GetSwapTransactionsByUser(userAddress string) ([]models.SwapT
 	return swaps, err
 }
 
-func (d *Database) CreateTransactionSession(sessionType, chainType, chainID, data string) (string, error) {
+func (d *Database) CreateTransactionSession(sessionType string, chainType models.TransactionChainType, chainID, data string) (string, error) {
 	// Generate a UUID for the session ID
 	sessionID := fmt.Sprintf("%s-%d", sessionType, time.Now().UnixNano())
 
@@ -415,17 +415,6 @@ func (d *Database) CreateTransactionSession(sessionType, chainType, chainID, dat
 		chainIDUint = chain.ID
 	}
 
-	// Convert chainType string to TransactionChainType
-	var txChainType models.TransactionChainType
-	switch chainType {
-	case "ethereum":
-		txChainType = models.TransactionChainTypeEthereum
-	case "solana":
-		txChainType = models.TransactionChainTypeSolana
-	default:
-		txChainType = models.TransactionChainTypeEthereum
-	}
-
 	// Create metadata for session type
 	metadata := []models.TransactionMetadata{
 		{Key: "session_type", Value: sessionType},
@@ -436,7 +425,7 @@ func (d *Database) CreateTransactionSession(sessionType, chainType, chainID, dat
 		ID:                   sessionID,
 		Metadata:             metadata,
 		TransactionStatus:    models.TransactionStatusPending,
-		TransactionChainType: txChainType,
+		TransactionChainType: chainType,
 		ChainID:              chainIDUint,
 		ExpiresAt:            time.Now().Add(30 * time.Minute),
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/api"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
 // Build information (set via ldflags)
@@ -80,8 +81,12 @@ func main() {
 
 	log.Printf("API server started on port %d\n", port)
 
+	// Initialize services
+	evmService := services.NewEvmService()
+	txService := services.NewTransactionService(db.DB)
+
 	// Initialize MCP server with the API server port
-	mcpServer := mcp.NewMCPServer(db, port)
+	mcpServer := mcp.NewMCPServer(db, port, evmService, txService)
 
 	// Set MCP server reference in API server for cross-communication
 	apiServer.SetMCPServer(mcpServer)

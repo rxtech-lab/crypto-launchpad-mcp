@@ -8,22 +8,26 @@ import (
 	"gorm.io/gorm"
 )
 
-type TransactionService struct {
+type TransactionService interface {
+	CreateTransactionSession(req CreateTransactionSessionRequest) (string, error)
+}
+
+type transactionService struct {
 	db *gorm.DB
 }
 
 type CreateTransactionSessionRequest struct {
 	Metadata               []models.TransactionMetadata   `json:"metadata"`
 	TransactionDeployments []models.TransactionDeployment `json:"transaction_deployments"`
-	ChainType              string                         `json:"chain_type"`
+	ChainType              models.TransactionChainType    `json:"chain_type"`
 	ChainID                uint                           `json:"chain_id"`
 }
 
-func NewTransactionService(db *gorm.DB) *TransactionService {
-	return &TransactionService{db: db}
+func NewTransactionService(db *gorm.DB) TransactionService {
+	return &transactionService{db: db}
 }
 
-func (s *TransactionService) CreateTransactionSession(req CreateTransactionSessionRequest) (string, error) {
+func (s *transactionService) CreateTransactionSession(req CreateTransactionSessionRequest) (string, error) {
 	sessionID := uuid.New().String()
 
 	session := &models.TransactionSession{

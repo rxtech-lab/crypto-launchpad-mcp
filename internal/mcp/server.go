@@ -8,6 +8,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/tools"
 )
 
@@ -16,15 +17,15 @@ type MCPServer struct {
 	db     *database.Database
 }
 
-func NewMCPServer(db *database.Database, serverPort int) *MCPServer {
+func NewMCPServer(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService) *MCPServer {
 	mcpServer := &MCPServer{
 		db: db,
 	}
-	mcpServer.InitializeTools(db, serverPort)
+	mcpServer.InitializeTools(db, serverPort, evmService, txService)
 	return mcpServer
 }
 
-func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
+func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService) {
 	srv := server.NewMCPServer(
 		"Crypto Launchpad MCP Server",
 		"1.0.0",
@@ -81,8 +82,8 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	srv.AddTool(deleteTemplateTool, deleteTemplateHandler)
 
 	// Deployment Tools
-	launchTool, launchHandler := tools.NewLaunchTool(db, serverPort)
-	srv.AddTool(launchTool, launchHandler)
+	launchTool := tools.NewLaunchTool(db, serverPort, evmService, txService)
+	srv.AddTool(launchTool.GetTool(), launchTool.GetHandler())
 
 	listDeploymentsTool, listDeploymentsHandler := tools.NewListDeploymentsTool(db)
 	srv.AddTool(listDeploymentsTool, listDeploymentsHandler)

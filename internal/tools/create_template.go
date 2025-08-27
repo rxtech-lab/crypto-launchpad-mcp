@@ -23,6 +23,10 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			mcp.Required(),
 			mcp.Description("Description of what this template does"),
 		),
+		mcp.WithString("contract_name",
+			mcp.Required(),
+			mcp.Description("Name of the contract to be deployed"),
+		),
 		mcp.WithString("chain_type",
 			mcp.Required(),
 			mcp.Description("Target blockchain type (ethereum or solana)"),
@@ -47,6 +51,11 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			return nil, fmt.Errorf("description parameter is required: %w", err)
 		}
 
+		contractName, err := request.RequireString("contract_name")
+		if err != nil {
+			return nil, fmt.Errorf("contract_name parameter is required: %w", err)
+		}
+
 		chainType, err := request.RequireString("chain_type")
 		if err != nil {
 			return nil, fmt.Errorf("chain_type parameter is required: %w", err)
@@ -62,23 +71,13 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		templateMetadata := request.GetString("template_metadata", "")
 		if templateMetadata != "" {
 			if err := json.Unmarshal([]byte(templateMetadata), &metadata); err != nil {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						mcp.NewTextContent("Error: "),
-						mcp.NewTextContent(fmt.Sprintf("Invalid template_metadata JSON: %v", err)),
-					},
-				}, nil
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid template_metadata JSON: %v", err)), nil
 			}
 
 			// Validate metadata format - all values should be empty strings for parameter definitions
 			for key, value := range metadata {
 				if key == "" {
-					return &mcp.CallToolResult{
-						Content: []mcp.Content{
-							mcp.NewTextContent("Error: "),
-							mcp.NewTextContent("Metadata keys cannot be empty"),
-						},
-					}, nil
+					return mcp.NewToolResultError("Metadata keys cannot be empty"), nil
 				}
 				if str, ok := value.(string); !ok || str != "" {
 					return &mcp.CallToolResult{
@@ -109,14 +108,14 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			validationCode := utils.ReplaceTemplateVariables(templateCode)
 
 			// Use Solidity version 0.8.20 for validation
-			result, err := utils.CompileSolidity("0.8.20", validationCode)
+			result, err := utils.CompileSolidity("0.8.27", validationCode)
+			// check if the contract name is in the result
+			contract := result.Abi[contractName]
+			if contract == nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Contract %s not found in the compilation result", contractName)), nil
+			}
 			if err != nil {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						mcp.NewTextContent("Error: "),
-						mcp.NewTextContent(fmt.Sprintf("Solidity compilation failed: %v", err)),
-					},
-				}, nil
+				return mcp.NewToolResultError(fmt.Sprintf("Solidity compilation failed: %v", err)), nil
 			}
 			compilationResult = &result
 		case "solana":
@@ -127,18 +126,14 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		template := &models.Template{
 			Name:         name,
 			Description:  description,
-			ChainType:    chainType,
+			ChainType:    models.TransactionChainType(chainType),
+			ContractName: contractName,
 			TemplateCode: templateCode,
 			Metadata:     metadata,
 		}
 
 		if err := db.CreateTemplate(template); err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error creating template: %v", err)),
-				},
-			}, nil
+			return mcp.NewToolResultError(fmt.Sprintf("Error creating template: %v", err)), nil
 		}
 
 		// Prepare result

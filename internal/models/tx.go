@@ -38,12 +38,12 @@ type TransactionDeployment struct {
 // TransactionSession represents signing session management
 type TransactionSession struct {
 	ID                   string                `gorm:"primaryKey" json:"id"`
-	Metadata             []TransactionMetadata `gorm:"type:text" json:"metadata"`
+	Metadata             []TransactionMetadata `gorm:"serializer:json" json:"metadata"`
 	TransactionStatus    TransactionStatus     `gorm:"default:pending" json:"status"`
 	TransactionChainType TransactionChainType  `gorm:"not null" json:"chain_type"`
 
 	// TransactionDeployments are list of the transactions that needs to be signed
-	TransactionDeployments []TransactionDeployment `gorm:"type:text" json:"transaction_deployments"`
+	TransactionDeployments []TransactionDeployment `gorm:"serializer:json" json:"transaction_deployments"`
 
 	Chain   Chain `gorm:"foreignKey:ChainID;references:ID" json:"chain,omitempty"`
 	ChainID uint  `gorm:"not null" json:"chain_id"`

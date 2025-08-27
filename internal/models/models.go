@@ -35,23 +35,26 @@ func (j *JSON) Scan(value interface{}) error {
 
 // Chain represents blockchain configurations
 type Chain struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	ChainType string         `gorm:"not null" json:"chain_type"` // ethereum, solana
-	RPC       string         `gorm:"not null" json:"rpc"`
-	ChainID   string         `json:"chain_id"`
-	Name      string         `gorm:"not null" json:"name"`
-	IsActive  bool           `gorm:"default:false" json:"is_active"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID        uint                 `gorm:"primaryKey" json:"id"`
+	ChainType TransactionChainType `gorm:"not null" json:"chain_type"` // ethereum, solana
+	RPC       string               `gorm:"not null" json:"rpc"`
+	ChainID   string               `json:"chain_id"`
+	Name      string               `gorm:"not null" json:"name"`
+	IsActive  bool                 `gorm:"default:false" json:"is_active"`
+	CreatedAt time.Time            `json:"created_at"`
+	UpdatedAt time.Time            `json:"updated_at"`
+	DeletedAt gorm.DeletedAt       `gorm:"index" json:"-"`
 }
 
 // Template represents smart contract templates by chain type
 type Template struct {
-	ID           uint           `gorm:"primaryKey" json:"id"`
-	Name         string         `gorm:"not null" json:"name"`
-	Description  string         `json:"description"`
-	ChainType    string         `gorm:"not null" json:"chain_type"` // ethereum, solana
+	ID          uint                 `gorm:"primaryKey" json:"id"`
+	Name        string               `gorm:"not null" json:"name"`
+	Description string               `json:"description"`
+	ChainType   TransactionChainType `gorm:"not null" json:"chain_type"` // ethereum, solana
+	// ContractName is the name of the contract to be deployed.
+	// Sometimes the template code contains multiple contracts, so we need to specify the name of the contract to be deployed.
+	ContractName string         `gorm:"not null" json:"contract_name"`
 	TemplateCode string         `gorm:"type:text;not null" json:"template_code"`
 	Metadata     JSON           `gorm:"type:text" json:"metadata"` // Template parameter definitions (key: empty value pairs)
 	CreatedAt    time.Time      `json:"created_at"`

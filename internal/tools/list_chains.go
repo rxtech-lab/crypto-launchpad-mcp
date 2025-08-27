@@ -29,7 +29,7 @@ func NewListChainsTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc)
 		// Filter by chain type if specified
 		var filteredChains []interface{}
 		for _, chain := range chains {
-			if chainType == "" || chain.ChainType == chainType {
+			if chainType == "" || string(chain.ChainType) == chainType {
 				filteredChains = append(filteredChains, map[string]interface{}{
 					"id":         chain.ID,
 					"name":       chain.Name,

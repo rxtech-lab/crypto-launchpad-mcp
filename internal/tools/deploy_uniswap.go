@@ -39,10 +39,10 @@ func NewDeployUniswapTool(db *database.Database, serverPort int) (mcp.Tool, serv
 		}
 
 		// Check if Uniswap is already deployed for this chain
-		existingDeployment, err := db.GetUniswapDeploymentByChain(activeChain.ChainType, activeChain.ChainID)
+		existingDeployment, err := db.GetUniswapDeploymentByChain(string(activeChain.ChainType), activeChain.ChainID)
 		if err == nil && existingDeployment != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Uniswap %s is already deployed on %s (Chain ID: %s)",
-				existingDeployment.Version, activeChain.ChainType, activeChain.ChainID)), nil
+				existingDeployment.Version, string(activeChain.ChainType), activeChain.ChainID)), nil
 		}
 
 		// Prepare deployment data based on version
@@ -51,7 +51,7 @@ func NewDeployUniswapTool(db *database.Database, serverPort int) (mcp.Tool, serv
 
 		switch version {
 		case "v2":
-			v2Data, err := utils.DeployV2Uniswap(activeChain.ChainType, activeChain.ChainID)
+			v2Data, err := utils.DeployV2Uniswap(string(activeChain.ChainType), activeChain.ChainID)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to prepare V2 deployment: %v", err)), nil
 			}
