@@ -17,15 +17,15 @@ type MCPServer struct {
 	db     *database.Database
 }
 
-func NewMCPServer(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService) *MCPServer {
+func NewMCPServer(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService) *MCPServer {
 	mcpServer := &MCPServer{
 		db: db,
 	}
-	mcpServer.InitializeTools(db, serverPort, evmService, txService, uniswapService)
+	mcpServer.InitializeTools(db, serverPort, evmService, txService, uniswapService, liquidityService)
 	return mcpServer
 }
 
-func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService) {
+func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService) {
 	srv := server.NewMCPServer(
 		"Crypto Launchpad MCP Server",
 		"1.0.0",
@@ -96,11 +96,11 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmSe
 	srv.AddTool(getUniswapAddressesTool, getUniswapAddressesHandler)
 
 	// Liquidity Management Tools
-	createLiquidityPoolTool, createLiquidityPoolHandler := tools.NewCreateLiquidityPoolTool(db, serverPort)
-	srv.AddTool(createLiquidityPoolTool, createLiquidityPoolHandler)
+	liqudityPoolTool := tools.NewCreateLiquidityPoolTool(db, serverPort, evmService, txService, liquidityService, uniswapService)
+	srv.AddTool(liqudityPoolTool.GetTool(), liqudityPoolTool.GetHandler())
 
-	addLiquidityTool, addLiquidityHandler := tools.NewAddLiquidityTool(db, serverPort)
-	srv.AddTool(addLiquidityTool, addLiquidityHandler)
+	addLiquidityTool := tools.NewAddLiquidityTool(db, serverPort, evmService, txService, liquidityService)
+	srv.AddTool(addLiquidityTool.GetTool(), addLiquidityTool.GetHandler())
 
 	removeLiquidityTool, removeLiquidityHandler := tools.NewRemoveLiquidityTool(db, serverPort)
 	srv.AddTool(removeLiquidityTool, removeLiquidityHandler)

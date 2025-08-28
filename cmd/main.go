@@ -77,11 +77,12 @@ func main() {
 	txService := services.NewTransactionService(db.DB)
 	uniswapService := services.NewUniswapService(db.DB)
 	hookService := services.NewHookService()
+	liquidityService := services.NewLiquidityService(db.DB)
 
 	// Register hooks
 	tokenDeploymentHook := hooks.NewTokenDeploymentHook(db.DB)
 	uniswapDeploymentHook := hooks.NewUniswapDeploymentHook(db.DB)
-	
+
 	if err := hookService.AddHook(tokenDeploymentHook); err != nil {
 		log.Fatal("Failed to register token deployment hook:", err)
 	}
@@ -101,7 +102,7 @@ func main() {
 	log.Printf("API server started on port %d\n", port)
 
 	// Initialize MCP server with the API server port
-	mcpServer := mcp.NewMCPServer(db, port, evmService, txService, uniswapService)
+	mcpServer := mcp.NewMCPServer(db, port, evmService, txService, uniswapService, liquidityService)
 
 	// Set MCP server reference in API server for cross-communication
 	apiServer.SetMCPServer(mcpServer)

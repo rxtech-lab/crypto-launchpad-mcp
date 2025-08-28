@@ -23,10 +23,12 @@ const (
 	TransactionTypeUniswapV2RouterDeployment  TransactionType = "uniswap_v2_router_deployment"
 	TransactionTypeUniswapV2FactoryDeployment TransactionType = "uniswap_v2_factory_deployment"
 	TransactionTypeUniswapV2TokenDeployment   TransactionType = "uniswap_v2_token_deployment"
+	TransactionTypeLiquidityPoolCreation      TransactionType = "liquidity_pool_creation"
 	TransactionTypeLiquidityPoolDeployment    TransactionType = "liquidity_pool_deployment"
 	TransactionTypeTokenDeployment            TransactionType = "token_deployment"
 	TransactionTypeTokenSwap                  TransactionType = "token_swap"
 	TransactionTypeAddLiquidity               TransactionType = "add_liquidity"
+	TransactionTypeRemoveLiquidity            TransactionType = "remove_liquidity"
 	TransactionTypeRegular                    TransactionType = "regular"
 )
 
