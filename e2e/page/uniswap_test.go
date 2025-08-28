@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -342,4 +343,134 @@ func TestUniswapDeploymentWithoutWallet(t *testing.T) {
 
 func TestUniswapDeploymentPageLoad(t *testing.T) {
 	suite.Run(t, new(PageLoadTestSuite))
+}
+
+// UpdateStatusTestSuite tests the UpdateStatus method of UniswapService
+type UpdateStatusTestSuite struct {
+	suite.Suite
+	setup          *ChromedpTestSetup
+	uniswapService services.UniswapService
+}
+
+func (s *UpdateStatusTestSuite) SetupSuite() {
+	s.setup = NewChromedpTestSetup(s.T())
+	s.uniswapService = services.NewUniswapService(s.setup.DB.DB)
+}
+
+func (s *UpdateStatusTestSuite) TearDownSuite() {
+	if s.setup != nil {
+		s.setup.Cleanup()
+	}
+}
+
+func (s *UpdateStatusTestSuite) TestUpdateStatusPending() {
+	// Create a Uniswap deployment
+	deploymentID, err := s.uniswapService.CreateUniswapDeployment(1, "v2")
+	s.Require().NoError(err)
+
+	// Update status to pending (should work without addresses)
+	err = s.uniswapService.UpdateStatus(deploymentID, models.TransactionStatusPending)
+	s.Assert().NoError(err)
+
+	// Verify status was updated
+	deployment, err := s.uniswapService.GetUniswapDeployment(deploymentID)
+	s.Require().NoError(err)
+	s.Assert().Equal(models.TransactionStatusPending, deployment.Status)
+}
+
+func (s *UpdateStatusTestSuite) TestUpdateStatusConfirmedWithAllAddresses() {
+	// Create a Uniswap deployment
+	deploymentID, err := s.uniswapService.CreateUniswapDeployment(1, "v2")
+	s.Require().NoError(err)
+
+	// Set all required addresses
+	err = s.uniswapService.UpdateFactoryAddress(deploymentID, "0x1234567890123456789012345678901234567890")
+	s.Require().NoError(err)
+	err = s.uniswapService.UpdateRouterAddress(deploymentID, "0x2234567890123456789012345678901234567890")
+	s.Require().NoError(err)
+	err = s.uniswapService.UpdateWETHAddress(deploymentID, "0x3234567890123456789012345678901234567890")
+	s.Require().NoError(err)
+	err = s.uniswapService.UpdateDeployerAddress(deploymentID, "0x4234567890123456789012345678901234567890")
+	s.Require().NoError(err)
+
+	// Now update status to confirmed (should work)
+	err = s.uniswapService.UpdateStatus(deploymentID, models.TransactionStatusConfirmed)
+	s.Assert().NoError(err)
+
+	// Verify status was updated
+	deployment, err := s.uniswapService.GetUniswapDeployment(deploymentID)
+	s.Require().NoError(err)
+	s.Assert().Equal(models.TransactionStatusConfirmed, deployment.Status)
+}
+
+func (s *UpdateStatusTestSuite) TestUpdateStatusConfirmedMissingAddresses() {
+	// Create a Uniswap deployment
+	deploymentID, err := s.uniswapService.CreateUniswapDeployment(1, "v2")
+	s.Require().NoError(err)
+
+	// Try to update status to confirmed without setting addresses (should fail)
+	err = s.uniswapService.UpdateStatus(deploymentID, models.TransactionStatusConfirmed)
+	s.Assert().Error(err)
+	s.Assert().Contains(err.Error(), "cannot confirm deployment with missing addresses")
+	s.Assert().Contains(err.Error(), "factory_address")
+	s.Assert().Contains(err.Error(), "router_address")
+	s.Assert().Contains(err.Error(), "weth_address")
+	s.Assert().Contains(err.Error(), "deployer_address")
+
+	// Verify status was NOT updated
+	deployment, err := s.uniswapService.GetUniswapDeployment(deploymentID)
+	s.Require().NoError(err)
+	s.Assert().Equal(models.TransactionStatusPending, deployment.Status)
+}
+
+func (s *UpdateStatusTestSuite) TestUpdateStatusConfirmedPartialAddresses() {
+	// Create a Uniswap deployment
+	deploymentID, err := s.uniswapService.CreateUniswapDeployment(1, "v2")
+	s.Require().NoError(err)
+
+	// Set only some addresses
+	err = s.uniswapService.UpdateFactoryAddress(deploymentID, "0x1234567890123456789012345678901234567890")
+	s.Require().NoError(err)
+	err = s.uniswapService.UpdateRouterAddress(deploymentID, "0x2234567890123456789012345678901234567890")
+	s.Require().NoError(err)
+	// Missing WETH and deployer addresses
+
+	// Try to update status to confirmed (should fail)
+	err = s.uniswapService.UpdateStatus(deploymentID, models.TransactionStatusConfirmed)
+	s.Assert().Error(err)
+	s.Assert().Contains(err.Error(), "cannot confirm deployment with missing addresses")
+	s.Assert().Contains(err.Error(), "weth_address")
+	s.Assert().Contains(err.Error(), "deployer_address")
+	s.Assert().NotContains(err.Error(), "factory_address")
+	s.Assert().NotContains(err.Error(), "router_address")
+
+	// Verify status was NOT updated
+	deployment, err := s.uniswapService.GetUniswapDeployment(deploymentID)
+	s.Require().NoError(err)
+	s.Assert().Equal(models.TransactionStatusPending, deployment.Status)
+}
+
+func (s *UpdateStatusTestSuite) TestUpdateStatusNonExistentDeployment() {
+	// Try to update status for non-existent deployment
+	err := s.setup.UniswapService.UpdateStatus(99999, models.TransactionStatusConfirmed)
+	s.Assert().Error(err)
+}
+
+func (s *UpdateStatusTestSuite) TestUpdateStatusFailed() {
+	// Create a Uniswap deployment
+	deploymentID, err := s.uniswapService.CreateUniswapDeployment(1, "v2")
+	s.Require().NoError(err)
+
+	// Update status to failed (should work without addresses)
+	err = s.uniswapService.UpdateStatus(deploymentID, models.TransactionStatusFailed)
+	s.Assert().NoError(err)
+
+	// Verify status was updated
+	deployment, err := s.uniswapService.GetUniswapDeployment(deploymentID)
+	s.Require().NoError(err)
+	s.Assert().Equal(models.TransactionStatusFailed, deployment.Status)
+}
+
+func TestUpdateStatus(t *testing.T) {
+	suite.Run(t, new(UpdateStatusTestSuite))
 }

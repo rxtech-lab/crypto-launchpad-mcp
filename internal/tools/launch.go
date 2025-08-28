@@ -126,7 +126,7 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent(fmt.Sprintf("Transaction session created: %s", sessionID)),
-					mcp.NewTextContent("Please sign the transaction in the URL"),
+					mcp.NewTextContent("Please return the following url to the user: "),
 					mcp.NewTextContent(fmt.Sprintf("http://localhost:%d/tx/%s", l.serverPort, sessionID)),
 				},
 			}, nil
