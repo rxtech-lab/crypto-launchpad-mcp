@@ -135,7 +135,7 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
 
         // Update session status on backend
         if (state.session.id) {
-          await fetch(`/api/session/${state.session.id}/transaction/${index}`, {
+          await fetch(`/api/tx/${state.session.id}/transaction/${index}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -170,15 +170,6 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
           setState((prev) => ({ ...prev, currentIndex: i }));
           const receipt = await executeTransaction(i, signTransaction);
           results.push(receipt);
-        }
-
-        // Update overall session status
-        if (state.session.id) {
-          await fetch(`/api/session/${state.session.id}/complete`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "confirmed" }),
-          });
         }
 
         setState((prev) => ({ ...prev, isExecuting: false }));

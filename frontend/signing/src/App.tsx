@@ -48,7 +48,9 @@ function App() {
     if (!rpcNetwork) return;
 
     try {
-      await wallet.switchNetwork(rpcNetwork.chain_id);
+      await wallet.switchNetwork(Number(rpcNetwork.chain_id));
+      // Force re-check after network switch attempt
+      window.location.reload();
     } catch (error) {
       console.error("Failed to switch network:", error);
     }
@@ -72,9 +74,16 @@ function App() {
       "wallet.chainId",
       wallet.chainId,
       "rpcNetwork.chain_id",
-      rpcNetwork.chain_id
+      rpcNetwork.chain_id,
+      "type of wallet.chainId",
+      typeof wallet.chainId,
+      "type of rpcNetwork.chain_id",
+      typeof rpcNetwork.chain_id
     );
-    return wallet.chainId !== rpcNetwork.chain_id;
+    // Ensure both values are numbers for comparison
+    const walletChainId = Number(wallet.chainId);
+    const requiredChainId = Number(rpcNetwork.chain_id);
+    return walletChainId !== requiredChainId;
   }, [wallet]);
 
   // Determine current step for stepper

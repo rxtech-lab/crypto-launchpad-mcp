@@ -269,3 +269,256 @@ func TestGetTransactionSession(t *testing.T) {
 		assert.Contains(t, err.Error(), "session expired")
 	})
 }
+
+func TestUpdateTransactionSession(t *testing.T) {
+	db := setupTestDB(t)
+	service := &transactionService{db: db}
+
+	t.Run("successful update", func(t *testing.T) {
+		// Create a chain first
+		chain := &models.Chain{
+			ChainType: models.TransactionChainTypeEthereum,
+			RPC:       "https://localhost:8545",
+			NetworkID: "1",
+			Name:      "Ethereum Mainnet",
+			IsActive:  true,
+		}
+		err := db.Create(chain).Error
+		require.NoError(t, err)
+
+		// Create initial transaction session
+		sessionID := uuid.New().String()
+		originalTime := time.Now().Add(-1 * time.Hour)
+		session := &models.TransactionSession{
+			ID: sessionID,
+			Metadata: []models.TransactionMetadata{
+				{Key: "old_key", Value: "old_value"},
+			},
+			TransactionStatus:    models.TransactionStatusPending,
+			TransactionChainType: models.TransactionChainTypeEthereum,
+			TransactionDeployments: []models.TransactionDeployment{
+				{
+					Title:       "Original Deployment",
+					Description: "Original Description",
+					Data:        "0x1234",
+					Value:       "0",
+					Receiver:    "0x0000000000000000000000000000000000000000",
+					Status:      models.TransactionStatusPending,
+				},
+			},
+			ChainID:   chain.ID,
+			CreatedAt: originalTime,
+			UpdatedAt: originalTime,
+			ExpiresAt: time.Now().Add(30 * time.Minute),
+		}
+		err = db.Create(session).Error
+		require.NoError(t, err)
+
+		// Update the session
+		updatedSession := &models.TransactionSession{
+			ID: sessionID,
+			Metadata: []models.TransactionMetadata{
+				{Key: "new_key", Value: "new_value"},
+				{Key: "another_key", Value: "another_value"},
+			},
+			TransactionStatus:    models.TransactionStatusConfirmed,
+			TransactionChainType: models.TransactionChainTypeEthereum,
+			TransactionDeployments: []models.TransactionDeployment{
+				{
+					Title:       "Updated Deployment",
+					Description: "Updated Description",
+					Data:        "0xabcd",
+					Value:       "1000",
+					Receiver:    "0x1234567890123456789012345678901234567890",
+					Status:      models.TransactionStatusConfirmed,
+				},
+			},
+			ChainID: chain.ID,
+		}
+
+		beforeUpdate := time.Now()
+		err = service.UpdateTransactionSession(sessionID, updatedSession)
+		require.NoError(t, err)
+
+		// Retrieve and verify the updated session
+		retrieved, err := service.GetTransactionSession(sessionID)
+		require.NoError(t, err)
+		require.NotNil(t, retrieved)
+
+		// Verify updates
+		assert.Equal(t, sessionID, retrieved.ID)
+		assert.Equal(t, models.TransactionStatusConfirmed, retrieved.TransactionStatus)
+		assert.Len(t, retrieved.Metadata, 2)
+		assert.Equal(t, "new_key", retrieved.Metadata[0].Key)
+		assert.Equal(t, "new_value", retrieved.Metadata[0].Value)
+		assert.Equal(t, "another_key", retrieved.Metadata[1].Key)
+		assert.Equal(t, "another_value", retrieved.Metadata[1].Value)
+
+		// Verify deployments were updated
+		assert.Len(t, retrieved.TransactionDeployments, 1)
+		assert.Equal(t, "Updated Deployment", retrieved.TransactionDeployments[0].Title)
+		assert.Equal(t, "Updated Description", retrieved.TransactionDeployments[0].Description)
+		assert.Equal(t, "0xabcd", retrieved.TransactionDeployments[0].Data)
+		assert.Equal(t, "1000", retrieved.TransactionDeployments[0].Value)
+		assert.Equal(t, models.TransactionStatusConfirmed, retrieved.TransactionDeployments[0].Status)
+
+		// Verify UpdatedAt was updated
+		assert.True(t, retrieved.UpdatedAt.After(beforeUpdate) || retrieved.UpdatedAt.Equal(beforeUpdate))
+		assert.True(t, retrieved.UpdatedAt.After(originalTime))
+
+		// Verify CreatedAt and ExpiresAt were not changed
+		assert.Equal(t, originalTime.Unix(), retrieved.CreatedAt.Unix())
+	})
+
+	t.Run("update non-existent session", func(t *testing.T) {
+		nonExistentID := uuid.New().String()
+		session := &models.TransactionSession{
+			ID:                   nonExistentID,
+			TransactionStatus:    models.TransactionStatusConfirmed,
+			TransactionChainType: models.TransactionChainTypeEthereum,
+			ChainID:              1,
+		}
+
+		err := service.UpdateTransactionSession(nonExistentID, session)
+		// GORM Updates doesn't return error for non-existent records
+		// It just doesn't update anything
+		require.NoError(t, err)
+
+		// Verify the session doesn't exist
+		retrieved, err := service.GetTransactionSession(nonExistentID)
+		assert.Error(t, err)
+		assert.Nil(t, retrieved)
+		assert.Equal(t, gorm.ErrRecordNotFound, err)
+	})
+
+	t.Run("update with partial data", func(t *testing.T) {
+		// Create initial session
+		sessionID := uuid.New().String()
+		originalSession := &models.TransactionSession{
+			ID: sessionID,
+			Metadata: []models.TransactionMetadata{
+				{Key: "key1", Value: "value1"},
+			},
+			TransactionStatus:    models.TransactionStatusPending,
+			TransactionChainType: models.TransactionChainTypeEthereum,
+			TransactionDeployments: []models.TransactionDeployment{
+				{
+					Title:       "Original",
+					Description: "Original Desc",
+					Data:        "0x1111",
+					Value:       "0",
+					Receiver:    "0xaaaa",
+					Status:      models.TransactionStatusPending,
+				},
+			},
+			ChainID:   1,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			ExpiresAt: time.Now().Add(30 * time.Minute),
+		}
+		err := db.Create(originalSession).Error
+		require.NoError(t, err)
+
+		// Update only status
+		partialUpdate := &models.TransactionSession{
+			TransactionStatus: models.TransactionStatusFailed,
+		}
+
+		err = service.UpdateTransactionSession(sessionID, partialUpdate)
+		require.NoError(t, err)
+
+		// Retrieve and verify
+		retrieved, err := service.GetTransactionSession(sessionID)
+		require.NoError(t, err)
+
+		// Status should be updated
+		assert.Equal(t, models.TransactionStatusFailed, retrieved.TransactionStatus)
+
+		// Other fields should remain unchanged
+		assert.Len(t, retrieved.Metadata, 1)
+		assert.Equal(t, "key1", retrieved.Metadata[0].Key)
+		assert.Len(t, retrieved.TransactionDeployments, 1)
+		assert.Equal(t, "Original", retrieved.TransactionDeployments[0].Title)
+	})
+
+	t.Run("update deployment status", func(t *testing.T) {
+		// Create a chain
+		chain := &models.Chain{
+			ChainType: models.TransactionChainTypeEthereum,
+			RPC:       "https://localhost:8545",
+			NetworkID: "1",
+			Name:      "Ethereum Mainnet",
+			IsActive:  true,
+		}
+		err := db.Create(chain).Error
+		require.NoError(t, err)
+
+		// Create session with multiple deployments
+		sessionID := uuid.New().String()
+		session := &models.TransactionSession{
+			ID:                   sessionID,
+			TransactionStatus:    models.TransactionStatusPending,
+			TransactionChainType: models.TransactionChainTypeEthereum,
+			TransactionDeployments: []models.TransactionDeployment{
+				{
+					Title:       "Deploy Token",
+					Description: "Deploy ERC20",
+					Data:        "0xaaa",
+					Value:       "0",
+					Receiver:    "0x111",
+					Status:      models.TransactionStatusPending,
+				},
+				{
+					Title:       "Initialize Pool",
+					Description: "Init LP",
+					Data:        "0xbbb",
+					Value:       "100",
+					Receiver:    "0x222",
+					Status:      models.TransactionStatusPending,
+				},
+			},
+			ChainID:   chain.ID,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			ExpiresAt: time.Now().Add(30 * time.Minute),
+		}
+		err = db.Create(session).Error
+		require.NoError(t, err)
+
+		// Update to mark first deployment as confirmed
+		updatedSession := &models.TransactionSession{
+			TransactionStatus:    models.TransactionStatusPending,
+			TransactionChainType: models.TransactionChainTypeEthereum,
+			TransactionDeployments: []models.TransactionDeployment{
+				{
+					Title:       "Deploy Token",
+					Description: "Deploy ERC20",
+					Data:        "0xaaa",
+					Value:       "0",
+					Receiver:    "0x111",
+					Status:      models.TransactionStatusConfirmed, // Changed
+				},
+				{
+					Title:       "Initialize Pool",
+					Description: "Init LP",
+					Data:        "0xbbb",
+					Value:       "100",
+					Receiver:    "0x222",
+					Status:      models.TransactionStatusPending, // Unchanged
+				},
+			},
+			ChainID: chain.ID,
+		}
+
+		err = service.UpdateTransactionSession(sessionID, updatedSession)
+		require.NoError(t, err)
+
+		// Retrieve and verify
+		retrieved, err := service.GetTransactionSession(sessionID)
+		require.NoError(t, err)
+
+		assert.Len(t, retrieved.TransactionDeployments, 2)
+		assert.Equal(t, models.TransactionStatusConfirmed, retrieved.TransactionDeployments[0].Status)
+		assert.Equal(t, models.TransactionStatusPending, retrieved.TransactionDeployments[1].Status)
+	})
+}

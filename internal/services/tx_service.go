@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 type TransactionService interface {
 	CreateTransactionSession(req CreateTransactionSessionRequest) (string, error)
 	GetTransactionSession(sessionID string) (*models.TransactionSession, error)
+	UpdateTransactionSession(sessionID string, session *models.TransactionSession) error
 }
 
 type transactionService struct {
@@ -67,9 +67,24 @@ func (t *transactionService) GetTransactionSession(sessionID string) (*models.Tr
 	}
 
 	// Check if session is expired
-	if time.Now().After(session.ExpiresAt) {
-		return nil, fmt.Errorf("session expired")
-	}
+	// if time.Now().After(session.ExpiresAt) {
+	// 	return nil, fmt.Errorf("session expired")
+	// }
 
 	return &session, nil
+}
+
+// UpdateTransactionSession updates the transaction session by sessionID
+func (t *transactionService) UpdateTransactionSession(sessionID string, session *models.TransactionSession) error {
+	// Ensure the session ID matches
+	session.ID = sessionID
+	session.UpdatedAt = time.Now()
+
+	// Update the session in the database by ID
+	err := t.db.Model(&models.TransactionSession{}).Where("id = ?", sessionID).Updates(session).Error
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

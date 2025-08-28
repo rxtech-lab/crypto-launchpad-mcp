@@ -245,6 +245,15 @@ export function useWallet() {
         throw error;
       }
 
+      // Check if already on the target network
+      const currentChainId = Number(state.chainId);
+      const targetId = Number(targetChainId);
+      if (currentChainId === targetId) {
+        console.log(`Already on chain ${targetId}, no switch needed`);
+        setNetworkSwitchError(null);
+        return; // Already on the correct network
+      }
+
       try {
         setNetworkSwitchError(null); // Clear any previous errors
         const chainIdHex = `0x${targetChainId.toString(16)}`;
@@ -257,6 +266,12 @@ export function useWallet() {
             });
             break;
           } catch (switchError) {
+            // Check if the error is because we're already on the chain
+            const error = switchError as { code?: number; message?: string };
+            if (error.code === -32000 && error.message?.includes("already")) {
+              console.log("Wallet reports already on target chain");
+              break;
+            }
             retries--;
             if (retries === 0) throw switchError;
             // Wait before retry
@@ -272,7 +287,7 @@ export function useWallet() {
         throw networkError;
       }
     },
-    [state.selectedProvider]
+    [state.selectedProvider, state.chainId]
   );
 
   // Disconnect wallet

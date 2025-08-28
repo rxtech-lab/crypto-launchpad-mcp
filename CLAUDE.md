@@ -225,13 +225,57 @@ The frontend uses a modular JavaScript architecture with separated concerns:
 
 ### Tool Implementation Pattern
 
-All tools follow the exact structure from the example project:
+All tools follow the consistent structure exemplified in `internal/tools/launch.go`:
 
-- Package `tools`
-- Function signature: `func NewXxxTool(db *database.Database, ...params) (mcp.Tool, server.ToolHandlerFunc)`
-- Parameter validation with required/optional parameters
-- Database operations with error handling
-- JSON response formatting
+#### Tool Structure Components
+
+1. **Tool Type Definition**:
+```go
+type launchTool struct {
+    db         *database.Database
+    evmService services.EvmService
+    txService  services.TransactionService
+    serverPort int
+}
+```
+
+2. **Arguments Structure**:
+```go
+type LaunchArguments struct {
+    // Required fields
+    TemplateID     string         `json:"template_id"`
+    TemplateValues map[string]any `json:"template_values"`
+    
+    // Optional fields
+    ConstructorArgs []any                        `json:"constructor_args,omitempty"`
+    Value           string                       `json:"value,omitempty"`
+    Metadata        []models.TransactionMetadata `json:"metadata,omitempty"`
+}
+```
+
+3. **Constructor Function**:
+```go
+func NewLaunchTool(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService) *launchTool
+```
+
+4. **Tool Definition Method** (`GetTool()`):
+- Returns `mcp.Tool` with parameter definitions
+- Uses `mcp.NewTool()` with description and parameters
+- Defines required/optional parameters with proper descriptions
+
+5. **Handler Method** (`GetHandler()`):
+- Returns `server.ToolHandlerFunc`
+- Binds arguments using `request.BindArguments(&args)`
+- Validates inputs and performs database operations
+- Returns `mcp.CallToolResult` with proper content formatting
+- Uses `mcp.NewToolResultError()` for error responses
+
+#### Key Patterns:
+- Package location: `internal/tools/`
+- Error handling with descriptive messages
+- Database validation before operations
+- Transaction session management for signing interfaces
+- URL generation for browser-based signing: `fmt.Sprintf("http://localhost:%d/tx/%s", l.serverPort, sessionID)`
 
 ### Asset Management
 

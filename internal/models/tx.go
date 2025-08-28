@@ -32,7 +32,8 @@ type TransactionDeployment struct {
 	// Value is the value of the transaction for wallet to sign (e.g. 100 WEI)
 	Value string `gorm:"not null" json:"value"`
 	// Receiver is the receiver of the transaction for wallet to sign (e.g. 0x1234567890123456789012345678901234567890)
-	Receiver string `gorm:"not null" json:"receiver"`
+	Receiver string            `gorm:"not null" json:"receiver"`
+	Status   TransactionStatus `gorm:"default:pending" json:"status"`
 }
 
 // TransactionSession represents signing session management
