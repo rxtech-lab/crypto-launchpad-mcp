@@ -652,6 +652,175 @@ Write comprehensive tests for:
 - Cross-platform binary compatibility
 - CI/CD pipeline validation
 
+### MCP Tool Testing Guidelines
+
+All MCP tool tests should follow these patterns for consistency and reliability:
+
+#### Test Structure
+
+```go
+type ToolTestSuite struct {
+    suite.Suite
+    db       *database.Database
+    tool     *toolType
+    // Other dependencies (ethClient, services, etc.)
+}
+
+func (suite *ToolTestSuite) SetupSuite() {
+    // Initialize in-memory database for testing
+    db, err := database.NewDatabase(":memory:")
+    suite.Require().NoError(err)
+    suite.db = db
+    
+    // Initialize tool with test dependencies
+    suite.tool = NewTool(db, /* other dependencies */)
+    
+    // Setup test data (chains, templates, etc.)
+    suite.setupTestData()
+}
+
+func (suite *ToolTestSuite) TearDownSuite() {
+    if suite.db != nil {
+        suite.db.Close()
+    }
+}
+
+func (suite *ToolTestSuite) SetupTest() {
+    // Clean up any test-specific data between tests
+    suite.cleanupTestData()
+}
+```
+
+#### Request Construction
+
+Use `mcp.CallToolParams` for test requests (not `mcp.CallToolRequestParams`):
+
+```go
+request := mcp.CallToolRequest{
+    Params: mcp.CallToolParams{
+        Arguments: map[string]interface{}{
+            "parameter_name": "parameter_value",
+            // ... other arguments
+        },
+    },
+}
+```
+
+#### Content Access Pattern
+
+Always use type assertion to access content safely:
+
+```go
+// For successful responses
+if result.IsError {
+    if len(result.Content) > 0 {
+        if textContent, ok := result.Content[0].(mcp.TextContent); ok {
+            suite.T().Logf("Unexpected error: %s", textContent.Text)
+            suite.FailNow("Expected successful result but got error", textContent.Text)
+        }
+    }
+    suite.FailNow("Expected successful result but got error with no content")
+}
+
+suite.Require().Len(result.Content, expectedLength)
+
+// Access content safely
+var contentText string
+if len(result.Content) > index {
+    if textContent, ok := result.Content[index].(mcp.TextContent); ok {
+        contentText = textContent.Text
+        suite.Contains(contentText, "expected substring")
+    }
+}
+
+// For error responses
+suite.True(result.IsError)
+if len(result.Content) > 0 {
+    if textContent, ok := result.Content[0].(mcp.TextContent); ok {
+        suite.Contains(textContent.Text, "expected error message")
+    }
+}
+```
+
+#### Database Operations
+
+Use direct GORM operations for test setup and validation:
+
+```go
+// Update records directly in tests
+err := suite.db.DB.Model(&models.Chain{}).Where("id = ?", chainID).Update("is_active", false).Error
+suite.Require().NoError(err)
+
+// Clean up test data
+suite.db.DB.Where("1 = 1").Delete(&models.TransactionSession{})
+suite.db.DB.Where("1 = 1").Delete(&models.Deployment{})
+```
+
+#### Test Coverage Requirements
+
+Each MCP tool must test:
+
+1. **Tool Definition** (`TestGetTool`):
+   - Verify tool name, description, and parameters
+   - Use type assertion for parameter properties: `prop.(map[string]any)["type"]`
+
+2. **Success Cases** (`TestHandlerSuccess`):
+   - Valid arguments with expected successful operation
+   - Verify database state changes
+   - Validate response content structure
+
+3. **Error Cases**:
+   - Invalid arguments (`TestHandlerInvalidBindArguments`)
+   - Missing required fields (`TestHandlerMissingRequiredFields`)
+   - Invalid IDs (`TestHandlerInvalidTemplateID`)
+   - Not found scenarios (`TestHandlerTemplateNotFound`)
+
+4. **Business Logic**:
+   - Chain type validation
+   - State consistency checks
+   - Integration with services
+
+#### Validation and Arguments
+
+- Use struct validation tags properly: `validate:"required"` for required fields
+- Test both validation success and failure scenarios
+- Ensure argument binding errors are handled correctly
+
+#### Common Patterns
+
+```go
+// Tool registration test
+func (suite *ToolTestSuite) TestToolRegistration() {
+    mcpServer := server.NewMCPServer("test", "1.0.0")
+    tool := suite.tool.GetTool()
+    handler := suite.tool.GetHandler()
+    
+    suite.NotPanics(func() {
+        mcpServer.AddTool(tool, handler)
+    })
+}
+
+// Argument validation test
+func (suite *ToolTestSuite) TestValidation() {
+    request := mcp.CallToolRequest{
+        Params: mcp.CallToolParams{
+            Arguments: map[string]interface{}{
+                // Missing required fields or invalid values
+            },
+        },
+    }
+    
+    handler := suite.tool.GetHandler()
+    result, err := handler(context.Background(), request)
+    
+    suite.NoError(err)
+    suite.True(result.IsError)
+    if textContent, ok := result.Content[0].(mcp.TextContent); ok {
+        suite.Contains(textContent.Text, "Invalid arguments")
+    }
+}
+```
+
 ### Token Deployment Test Architecture
 
 The token deployment E2E tests are located at `/e2e/api/token_deployment_test.go` and follow the same robust patterns as Uniswap deployment tests:

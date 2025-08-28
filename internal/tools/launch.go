@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"text/template"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
@@ -23,8 +24,8 @@ type launchTool struct {
 
 type LaunchArguments struct {
 	// Required fields
-	TemplateID     string         `json:"template_id"`
-	TemplateValues map[string]any `json:"template_values"`
+	TemplateID     string         `json:"template_id" validate:"required"`
+	TemplateValues map[string]any `json:"template_values" validate:"required"`
 
 	// Optional fields
 	ConstructorArgs []any                        `json:"constructor_args,omitempty"`
@@ -82,6 +83,10 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 		var args LaunchArguments
 		if err := request.BindArguments(&args); err != nil {
 			return nil, fmt.Errorf("failed to bind arguments: %w", err)
+		}
+
+		if err := validator.New().Struct(args); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid arguments: %v", err)), nil
 		}
 
 		templateID, err := strconv.ParseUint(args.TemplateID, 10, 32)
@@ -164,6 +169,7 @@ func (l *launchTool) createEvmContractDeploymentTransaction(activeChain *models.
 		Value:           value,
 		Title:           title,
 		Description:     description,
+		Receiver:        "", // Empty for contract deployment
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to get contract deployment transaction: %w", err)
