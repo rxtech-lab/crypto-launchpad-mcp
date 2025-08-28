@@ -291,6 +291,53 @@ func (d *Database) GetActiveUniswapSettings() (*models.UniswapSettings, error) {
 	return &settings, nil
 }
 
+// Uniswap Deployment operations
+func (d *Database) CreateUniswapDeployment(deployment *models.UniswapDeployment) error {
+	return d.DB.Create(deployment).Error
+}
+
+func (d *Database) GetUniswapDeploymentByID(id uint) (*models.UniswapDeployment, error) {
+	var deployment models.UniswapDeployment
+	err := d.DB.Preload("Chain").First(&deployment, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &deployment, nil
+}
+
+func (d *Database) UpdateUniswapDeploymentStatus(id uint, status models.TransactionStatus) error {
+	return d.DB.Model(&models.UniswapDeployment{}).Where("id = ?", id).Update("status", status).Error
+}
+
+func (d *Database) ListUniswapDeployments() ([]models.UniswapDeployment, error) {
+	var deployments []models.UniswapDeployment
+	err := d.DB.Preload("Chain").Find(&deployments).Error
+	return deployments, err
+}
+
+func (d *Database) DeleteUniswapDeployment(id uint) error {
+	return d.DB.Delete(&models.UniswapDeployment{}, id).Error
+}
+
+func (d *Database) GetUniswapDeploymentByChain(chainType, chainID string) (*models.UniswapDeployment, error) {
+	var deployment models.UniswapDeployment
+	var chain models.Chain
+	
+	// First find the chain
+	err := d.DB.Where("chain_type = ? AND chain_id = ?", chainType, chainID).First(&chain).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	// Then find deployment for this chain
+	err = d.DB.Where("chain_id = ?", chain.ID).Preload("Chain").First(&deployment).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	return &deployment, nil
+}
+
 // Liquidity Pool operations
 func (d *Database) CreateLiquidityPool(pool *models.LiquidityPool) error {
 	return d.DB.Create(pool).Error
@@ -446,117 +493,6 @@ func (d *Database) UpdateTransactionSessionStatus(sessionID string, status model
 	}
 
 	return d.DB.Model(&models.TransactionSession{}).Where("id = ?", sessionID).Updates(updates).Error
-}
-
-// UniswapDeployment operations
-func (d *Database) CreateUniswapDeployment(deployment *models.UniswapDeployment) error {
-	return d.DB.Create(deployment).Error
-}
-
-func (d *Database) GetUniswapDeploymentByChain(chainType, chainID string) (*models.UniswapDeployment, error) {
-	var deployment models.UniswapDeployment
-	err := d.DB.
-		Joins("JOIN chains ON chains.id = uniswap_deployments.chain_id").
-		Where("chains.chain_type = ? AND chains.chain_id = ? AND uniswap_deployments.status = ?", chainType, chainID, models.TransactionStatusConfirmed).
-		First(&deployment).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// Manually load the Chain relationship
-	var chain models.Chain
-	err = d.DB.First(&chain, deployment.ChainID).Error
-	if err != nil {
-		return nil, err
-	}
-	deployment.Chain = chain
-
-	return &deployment, nil
-}
-
-func (d *Database) GetUniswapDeploymentByID(id uint) (*models.UniswapDeployment, error) {
-	var deployment models.UniswapDeployment
-	err := d.DB.First(&deployment, id).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// Manually load the Chain relationship
-	var chain models.Chain
-	err = d.DB.First(&chain, deployment.ChainID).Error
-	if err != nil {
-		return nil, err
-	}
-	deployment.Chain = chain
-
-	return &deployment, nil
-}
-
-func (d *Database) UpdateUniswapDeploymentStatus(id uint, status models.TransactionStatus, addresses map[string]string, txHashes map[string]string) error {
-	updates := map[string]interface{}{
-		"status": status,
-	}
-
-	// Update addresses if provided
-	if factoryAddr, ok := addresses["factory"]; ok && factoryAddr != "" {
-		updates["factory_address"] = factoryAddr
-	}
-	if routerAddr, ok := addresses["router"]; ok && routerAddr != "" {
-		updates["router_address"] = routerAddr
-	}
-	if wethAddr, ok := addresses["weth"]; ok && wethAddr != "" {
-		updates["weth_address"] = wethAddr
-	}
-	if deployerAddr, ok := addresses["deployer"]; ok && deployerAddr != "" {
-		updates["deployer_address"] = deployerAddr
-	}
-
-	// Update transaction hashes if provided
-	if factoryTx, ok := txHashes["factory"]; ok && factoryTx != "" {
-		updates["factory_tx_hash"] = factoryTx
-	}
-	if routerTx, ok := txHashes["router"]; ok && routerTx != "" {
-		updates["router_tx_hash"] = routerTx
-	}
-	if wethTx, ok := txHashes["weth"]; ok && wethTx != "" {
-		updates["weth_tx_hash"] = wethTx
-	}
-
-	return d.DB.Model(&models.UniswapDeployment{}).Where("id = ?", id).Updates(updates).Error
-}
-
-func (d *Database) ListUniswapDeployments() ([]models.UniswapDeployment, error) {
-	var deployments []models.UniswapDeployment
-	err := d.DB.Find(&deployments).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// Manually load Chain relationships
-	for i := range deployments {
-		var chain models.Chain
-		err = d.DB.First(&chain, deployments[i].ChainID).Error
-		if err != nil {
-			return nil, err
-		}
-		deployments[i].Chain = chain
-	}
-
-	return deployments, nil
-}
-
-func (d *Database) DeleteUniswapDeployments(ids []uint) (int64, error) {
-	if len(ids) == 0 {
-		return 0, nil
-	}
-
-	result := d.DB.Where("id IN ?", ids).Delete(&models.UniswapDeployment{})
-	return result.RowsAffected, result.Error
-}
-
-func (d *Database) ClearUniswapConfiguration(version string) error {
-	// Delete all Uniswap settings for the specified version
-	return d.DB.Where("version = ?", version).Delete(&models.UniswapSettings{}).Error
 }
 
 func (d *Database) Close() error {

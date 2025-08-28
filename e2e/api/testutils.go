@@ -23,6 +23,7 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/api"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 	"github.com/stretchr/testify/require"
 )
@@ -36,6 +37,7 @@ const (
 // TestSetup holds all test infrastructure
 type TestSetup struct {
 	DB         *database.Database
+	TxService  services.TransactionService
 	APIServer  *api.APIServer
 	ServerPort int
 	EthClient  *ethclient.Client
@@ -66,8 +68,13 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	require.NoError(t, err)
 	setup.DB = db
 
+	// Initialize services
+	txService := services.NewTransactionService(db.DB)
+	setup.TxService = txService
+	hookService := services.NewHookService()
+	
 	// Initialize API server
-	apiServer := api.NewAPIServer(db)
+	apiServer := api.NewAPIServer(db, txService, hookService)
 	port, err := apiServer.Start()
 	require.NoError(t, err)
 	setup.APIServer = apiServer
@@ -130,7 +137,7 @@ func (s *TestSetup) setupDefaultChain() {
 	chain := &models.Chain{
 		ChainType: "ethereum",
 		RPC:       TESTNET_RPC,
-		ChainID:   TESTNET_CHAIN_ID,
+		NetworkID: TESTNET_CHAIN_ID,
 		Name:      "Ethereum Testnet",
 		IsActive:  true,
 	}

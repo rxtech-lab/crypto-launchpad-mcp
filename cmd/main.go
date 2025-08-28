@@ -10,6 +10,7 @@ import (
 
 	"github.com/rxtech-lab/launchpad-mcp/internal/api"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/hooks"
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
@@ -33,6 +34,7 @@ func main() {
 		log.SetOutput(io.Discard)
 	}
 
+	// Show version information
 	if *showVersion {
 		log.Printf("Crypto Launchpad MCP Server\n")
 		log.Printf("Version: %s\n", Version)
@@ -73,9 +75,22 @@ func main() {
 	// Initialize services
 	evmService := services.NewEvmService()
 	txService := services.NewTransactionService(db.DB)
+	uniswapService := services.NewUniswapService(db.DB)
+	hookService := services.NewHookService()
+
+	// Register hooks
+	tokenDeploymentHook := hooks.NewTokenDeploymentHook(db.DB)
+	uniswapDeploymentHook := hooks.NewUniswapDeploymentHook(db.DB)
+	
+	if err := hookService.AddHook(tokenDeploymentHook); err != nil {
+		log.Fatal("Failed to register token deployment hook:", err)
+	}
+	if err := hookService.AddHook(uniswapDeploymentHook); err != nil {
+		log.Fatal("Failed to register uniswap deployment hook:", err)
+	}
 
 	// Initialize and start API server (HTTP server for transaction signing)
-	apiServer := api.NewAPIServer(db, txService)
+	apiServer := api.NewAPIServer(db, txService, hookService)
 
 	// Start API server and get the assigned port
 	port, err := apiServer.Start()
@@ -86,7 +101,7 @@ func main() {
 	log.Printf("API server started on port %d\n", port)
 
 	// Initialize MCP server with the API server port
-	mcpServer := mcp.NewMCPServer(db, port, evmService, txService)
+	mcpServer := mcp.NewMCPServer(db, port, evmService, txService, uniswapService)
 
 	// Set MCP server reference in API server for cross-communication
 	apiServer.SetMCPServer(mcpServer)

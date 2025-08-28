@@ -4,108 +4,99 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
-	"strconv"
-	"strings"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewRemoveUniswapDeploymentTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+type removeUniswapDeploymentTool struct {
+	db             *database.Database
+	uniswapService services.UniswapService
+}
+
+type RemoveUniswapDeploymentArguments struct {
+	Ids []uint `json:"ids" validate:"required,min=1"`
+}
+
+func NewRemoveUniswapDeploymentTool(db *database.Database, uniswapService services.UniswapService) *removeUniswapDeploymentTool {
+	return &removeUniswapDeploymentTool{
+		db:             db,
+		uniswapService: uniswapService,
+	}
+}
+
+func (r *removeUniswapDeploymentTool) GetTool() mcp.Tool {
 	tool := mcp.NewTool("remove_uniswap_deployment",
-		mcp.WithDescription("Remove one or multiple Uniswap deployments by their IDs. Accepts a single ID or comma-separated list of IDs for bulk removal. This will also clear any related Uniswap configuration settings."),
-		mcp.WithString("ids",
+		mcp.WithDescription("Remove one or multiple Uniswap deployments by their IDs. Accepts an array of deployment IDs for bulk removal. This will also clear any related Uniswap configuration settings."),
+		mcp.WithArray("ids",
 			mcp.Required(),
-			mcp.Description("Uniswap deployment ID(s) to remove. Can be a single ID (e.g., '1') or comma-separated list (e.g., '1,2,3,4')"),
+			mcp.Description("Array of Uniswap deployment IDs to remove. Each ID must be a positive integer."),
+			mcp.Items(map[string]any{
+				"type":        "number",
+				"description": "Uniswap deployment ID",
+			}),
 		),
 	)
 
-	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		idsStr, err := request.RequireString("ids")
-		if err != nil {
-			return nil, fmt.Errorf("ids parameter is required: %w", err)
+	return tool
+}
+
+func (r *removeUniswapDeploymentTool) GetHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args RemoveUniswapDeploymentArguments
+		if err := request.BindArguments(&args); err != nil {
+			return nil, fmt.Errorf("failed to bind arguments: %w", err)
 		}
 
-		// Parse IDs from comma-separated string
-		idStrings := strings.Split(strings.TrimSpace(idsStr), ",")
-		if len(idStrings) == 0 {
+		if err := validator.New().Struct(args); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid arguments: %v", err)), nil
+		}
+
+		if len(args.Ids) == 0 {
 			return mcp.NewToolResultError("No deployment IDs provided"), nil
-		}
-
-		var ids []uint
-		var invalidIds []string
-
-		for _, idStr := range idStrings {
-			idStr = strings.TrimSpace(idStr)
-			if idStr == "" {
-				continue
-			}
-
-			id, err := strconv.ParseUint(idStr, 10, 32)
-			if err != nil {
-				invalidIds = append(invalidIds, idStr)
-				continue
-			}
-			ids = append(ids, uint(id))
-		}
-
-		if len(invalidIds) > 0 {
-			return mcp.NewToolResultError(fmt.Sprintf("Invalid ID(s): %s. IDs must be positive integers", strings.Join(invalidIds, ", "))), nil
-		}
-
-		if len(ids) == 0 {
-			return mcp.NewToolResultError("No valid deployment IDs provided"), nil
 		}
 
 		// Check if deployments exist before removal
 		var existingDeployments []uint
-		var deploymentDetails []map[string]interface{}
+		var deploymentDetails []map[string]any
 
-		for _, id := range ids {
-			deployment, err := db.GetUniswapDeploymentByID(id)
+		for _, id := range args.Ids {
+			deployment, err := r.uniswapService.GetUniswapDeployment(id)
 			if err == nil && deployment != nil {
 				existingDeployments = append(existingDeployments, id)
-				deploymentDetails = append(deploymentDetails, map[string]interface{}{
+				deploymentDetails = append(deploymentDetails, map[string]any{
 					"id":      deployment.ID,
 					"version": deployment.Version,
-					"chain":   deployment.Chain,
+					"chain":   deployment.ChainID,
 					"status":  deployment.Status,
 				})
 			}
 		}
 
 		if len(existingDeployments) == 0 {
-			result := map[string]interface{}{
-				"requested_ids": ids,
+			result := map[string]any{
+				"requested_ids": args.Ids,
 				"removed_count": 0,
-				"not_found_ids": ids,
+				"not_found_ids": args.Ids,
 				"message":       "No Uniswap deployments found with the provided IDs",
 			}
 			resultJSON, _ := json.Marshal(result)
 			return mcp.NewToolResultText(fmt.Sprintf("No deployments removed: %s", string(resultJSON))), nil
 		}
 
-		// Perform bulk removal
-		removedCount, err := db.DeleteUniswapDeployments(existingDeployments)
-		if err != nil {
+		// Perform bulk removal using the service method
+		if err := r.uniswapService.DeleteUniswapDeployments(existingDeployments); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error removing Uniswap deployments: %v", err)), nil
 		}
 
-		// Clear Uniswap configuration for removed deployments
-		for _, deployment := range deploymentDetails {
-			version := deployment["version"].(string)
-			// Clear configuration if it matches any of the removed deployments
-			if err := db.ClearUniswapConfiguration(version); err != nil {
-				// Log error but don't fail the operation
-				log.Printf("Warning: Failed to clear Uniswap configuration for version %s: %v\n", version, err)
-			}
-		}
+		removedCount := len(existingDeployments)
 
 		// Find which IDs were not found
 		var notFoundIds []uint
-		for _, requestedId := range ids {
+		for _, requestedId := range args.Ids {
 			found := false
 			for _, existingId := range existingDeployments {
 				if requestedId == existingId {
@@ -119,8 +110,8 @@ func NewRemoveUniswapDeploymentTool(db *database.Database) (mcp.Tool, server.Too
 		}
 
 		// Prepare result
-		result := map[string]interface{}{
-			"requested_ids":       ids,
+		result := map[string]any{
+			"requested_ids":       args.Ids,
 			"removed_count":       removedCount,
 			"removed_ids":         existingDeployments,
 			"removed_deployments": deploymentDetails,
@@ -131,7 +122,7 @@ func NewRemoveUniswapDeploymentTool(db *database.Database) (mcp.Tool, server.Too
 		}
 
 		var message string
-		if len(ids) == 1 {
+		if len(args.Ids) == 1 {
 			if removedCount == 1 {
 				message = "Uniswap deployment removed successfully"
 			} else {
@@ -154,6 +145,4 @@ func NewRemoveUniswapDeploymentTool(db *database.Database) (mcp.Tool, server.Too
 			},
 		}, nil
 	}
-
-	return tool, handler
 }

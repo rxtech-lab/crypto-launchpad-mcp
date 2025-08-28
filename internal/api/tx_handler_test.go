@@ -50,8 +50,11 @@ func (suite *TxHandlerTestSuite) SetupSuite() {
 	// Initialize transaction service
 	txService := services.NewTransactionService(db.DB)
 
+	// Initialize hook service
+	hookService := services.NewHookService()
+
 	// Initialize API server
-	apiServer := NewAPIServer(db, txService)
+	apiServer := NewAPIServer(db, txService, hookService)
 	port, err := apiServer.Start()
 	suite.Require().NoError(err)
 	suite.apiServer = apiServer

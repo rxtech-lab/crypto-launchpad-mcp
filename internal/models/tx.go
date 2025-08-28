@@ -6,6 +6,8 @@ type TransactionStatus string
 
 type TransactionChainType string
 
+type TransactionType string
+
 const (
 	TransactionChainTypeEthereum TransactionChainType = "ethereum"
 	TransactionChainTypeSolana   TransactionChainType = "solana"
@@ -15,6 +17,17 @@ const (
 	TransactionStatusPending   TransactionStatus = "pending"
 	TransactionStatusConfirmed TransactionStatus = "confirmed"
 	TransactionStatusFailed    TransactionStatus = "failed"
+)
+
+const (
+	TransactionTypeUniswapV2RouterDeployment  TransactionType = "uniswap_v2_router_deployment"
+	TransactionTypeUniswapV2FactoryDeployment TransactionType = "uniswap_v2_factory_deployment"
+	TransactionTypeUniswapV2TokenDeployment   TransactionType = "uniswap_v2_token_deployment"
+	TransactionTypeLiquidityPoolDeployment    TransactionType = "liquidity_pool_deployment"
+	TransactionTypeTokenDeployment            TransactionType = "token_deployment"
+	TransactionTypeTokenSwap                  TransactionType = "token_swap"
+	TransactionTypeAddLiquidity               TransactionType = "add_liquidity"
+	TransactionTypeRegular                    TransactionType = "regular"
 )
 
 type TransactionMetadata struct {
@@ -32,8 +45,9 @@ type TransactionDeployment struct {
 	// Value is the value of the transaction for wallet to sign (e.g. 100 WEI)
 	Value string `gorm:"not null" json:"value"`
 	// Receiver is the receiver of the transaction for wallet to sign (e.g. 0x1234567890123456789012345678901234567890)
-	Receiver string            `gorm:"not null" json:"receiver"`
-	Status   TransactionStatus `gorm:"default:pending" json:"status"`
+	Receiver        string            `gorm:"not null" json:"receiver"`
+	Status          TransactionStatus `gorm:"default:pending" json:"status"`
+	TransactionType TransactionType   `gorm:"not null" json:"transaction_type"`
 }
 
 // TransactionSession represents signing session management

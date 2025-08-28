@@ -172,11 +172,11 @@ func (s *TokenDeploymentTestSuite) testContractVerification(page *TokenDeploymen
 
 func (s *TokenDeploymentTestSuite) testDatabaseVerification(sessionID, contractAddress, templateType string) {
 	// Get session from database
-	session, err := s.setup.DB.GetTransactionSession(sessionID)
+	session, err := s.setup.TxService.GetTransactionSession(sessionID)
 	s.Require().NoError(err, "Failed to get transaction session")
 
 	// Verify session status
-	s.Assert().Equal(models.TransactionStatusConfirmed, session.Status, "Session status should be models.TransactionStatusConfirmed")
+	s.Assert().Equal(models.TransactionStatusConfirmed, session.TransactionStatus, "Session status should be models.TransactionStatusConfirmed")
 
 	// Verify deployment record was created
 	deployments, err := s.setup.DB.ListDeployments()

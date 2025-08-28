@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rxtech-lab/launchpad-mcp/internal/contracts"
+	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -264,6 +265,7 @@ func TestGetContractDeploymentTransactionWithContractCode(t *testing.T) {
 			Title:           "Deploy Test Token",
 			Description:     "Deploying a test ERC20 token",
 			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
 		}
 
 		// Generate deployment transaction
@@ -306,6 +308,7 @@ func TestGetContractDeploymentTransactionWithContractCode(t *testing.T) {
 			Title:           "Deploy Test Token",
 			Description:     "Deploying a test ERC20 token to testnet",
 			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
 		}
 
 		// Generate deployment transaction
@@ -350,6 +353,7 @@ func TestGetContractDeploymentTransactionWithContractCode(t *testing.T) {
 			Title:           "Invalid Deploy",
 			Description:     "This should fail",
 			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
 		}
 
 		_, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
@@ -391,6 +395,7 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			Title:           "Deploy WETH9",
 			Description:     "Deploying Wrapped Ether contract",
 			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2FactoryDeployment,
 		}
 
 		// Generate deployment transaction
@@ -432,6 +437,7 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			Title:           "Deploy Uniswap V2 Factory",
 			Description:     "Deploying factory contract",
 			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2FactoryDeployment,
 		}
 
 		// Generate deployment transaction
@@ -514,6 +520,7 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			Title:           "Deploy WETH9",
 			Description:     "Deploying WETH9 for router",
 			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2RouterDeployment,
 		}
 
 		weth9Deployment, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(weth9Args)
@@ -543,6 +550,7 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			Title:           "Deploy Factory",
 			Description:     "Deploying factory for router",
 			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2FactoryDeployment,
 		}
 
 		factoryDeployment, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(factoryArgs)
@@ -572,6 +580,7 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			Title:           "Deploy Uniswap V2 Router",
 			Description:     "Deploying router contract",
 			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2RouterDeployment,
 		}
 
 		// Generate deployment transaction
@@ -673,6 +682,7 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			Title:           "Deploy WETH9",
 			Description:     "Deploying WETH9 to testnet",
 			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
 		}
 
 		// Generate deployment transaction
@@ -713,6 +723,7 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			ConstructorArgs: []any{"Test"},
 			Title:           "Invalid Deploy",
 			Description:     "Should fail",
+			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
 		}
 
 		_, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
@@ -726,6 +737,7 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			ConstructorArgs: []any{},
 			Title:           "Deploy",
 			// Missing Description
+			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
 		}
 
 		_, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)

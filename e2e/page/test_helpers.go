@@ -268,7 +268,7 @@ func (s *ChromedpTestSetup) getOrCreateTestChain() (*models.Chain, error) {
 	testChain := &models.Chain{
 		ChainType: "ethereum",
 		RPC:       "http://localhost:8545",
-		ChainID:   "31337",
+		NetworkID: "31337",
 		Name:      "Anvil Testnet",
 		IsActive:  true,
 	}
@@ -293,10 +293,10 @@ func (s *ChromedpTestSetup) CreateUniswapDeploymentSession() (string, error) {
 	deployment := &models.UniswapDeployment{
 		Version: "v2",
 		ChainID: chain.ID,
-		Status:  "pending",
+		Status:  models.TransactionStatusPending,
 	}
 
-	err = s.DB.CreateUniswapDeployment(deployment)
+	err = s.DB.DB.Create(deployment).Error
 	if err != nil {
 		return "", fmt.Errorf("failed to create uniswap deployment: %w", err)
 	}

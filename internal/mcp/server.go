@@ -17,15 +17,15 @@ type MCPServer struct {
 	db     *database.Database
 }
 
-func NewMCPServer(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService) *MCPServer {
+func NewMCPServer(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService) *MCPServer {
 	mcpServer := &MCPServer{
 		db: db,
 	}
-	mcpServer.InitializeTools(db, serverPort, evmService, txService)
+	mcpServer.InitializeTools(db, serverPort, evmService, txService, uniswapService)
 	return mcpServer
 }
 
-func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService) {
+func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService) {
 	srv := server.NewMCPServer(
 		"Crypto Launchpad MCP Server",
 		"1.0.0",
@@ -120,11 +120,11 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmSe
 	srv.AddTool(monitorPoolTool, monitorPoolHandler)
 
 	// Uniswap Deployment Tools
-	deployUniswapTool, deployUniswapHandler := tools.NewDeployUniswapTool(db, serverPort)
-	srv.AddTool(deployUniswapTool, deployUniswapHandler)
+	deployUniswapTool := tools.NewDeployUniswapTool(db, serverPort, evmService, txService, uniswapService)
+	srv.AddTool(deployUniswapTool.GetTool(), deployUniswapTool.GetHandler())
 
-	removeUniswapDeploymentTool, removeUniswapDeploymentHandler := tools.NewRemoveUniswapDeploymentTool(db)
-	srv.AddTool(removeUniswapDeploymentTool, removeUniswapDeploymentHandler)
+	removeUniswapDeploymentTool := tools.NewRemoveUniswapDeploymentTool(db, uniswapService)
+	srv.AddTool(removeUniswapDeploymentTool.GetTool(), removeUniswapDeploymentTool.GetHandler())
 
 	// Balance Query Tools
 	queryBalanceTool, queryBalanceHandler := tools.NewQueryBalanceTool(db, serverPort)

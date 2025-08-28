@@ -144,22 +144,3 @@ type SwapTransaction struct {
 	CreatedAt         time.Time         `json:"created_at"`
 	UpdatedAt         time.Time         `json:"updated_at"`
 }
-
-// UniswapDeployment represents deployed Uniswap infrastructure contracts
-type UniswapDeployment struct {
-	ID              uint              `gorm:"primaryKey" json:"id"`
-	ChainID         uint              `gorm:"not null" json:"chain_id"`
-	Version         string            `gorm:"not null" json:"version"`       // v2, v3, v4
-	FactoryAddress  string            `json:"factory_address"`               // Uniswap factory contract address
-	RouterAddress   string            `json:"router_address"`                // Uniswap router contract address
-	WETHAddress     string            `json:"weth_address"`                  // WETH contract address
-	DeployerAddress string            `json:"deployer_address"`              // Address that deployed the contracts
-	FactoryTxHash   string            `json:"factory_tx_hash"`               // Factory deployment transaction hash
-	RouterTxHash    string            `json:"router_tx_hash"`                // Router deployment transaction hash
-	WETHTxHash      string            `json:"weth_tx_hash"`                  // WETH deployment transaction hash
-	Status          TransactionStatus `gorm:"default:pending" json:"status"` // pending, models.TransactionStatusConfirmed, failed
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
-
-	Chain Chain `gorm:"foreignKey:ChainID;references:ID" json:"chain,omitempty"`
-}

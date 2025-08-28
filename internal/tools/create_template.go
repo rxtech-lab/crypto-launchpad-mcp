@@ -80,24 +80,14 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 					return mcp.NewToolResultError("Metadata keys cannot be empty"), nil
 				}
 				if str, ok := value.(string); !ok || str != "" {
-					return &mcp.CallToolResult{
-						Content: []mcp.Content{
-							mcp.NewTextContent("Error: "),
-							mcp.NewTextContent(fmt.Sprintf("Metadata values must be empty strings for parameter definitions, got %v for key %s", value, key)),
-						},
-					}, nil
+					return mcp.NewToolResultError(fmt.Sprintf("Metadata values must be empty strings for parameter definitions, got %v for key %s", value, key)), nil
 				}
 			}
 		}
 
 		// Validate chain type
 		if chainType != "ethereum" && chainType != "solana" {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("Invalid chain_type. Supported values: ethereum, solana"),
-				},
-			}, nil
+			return mcp.NewToolResultError("Invalid chain_type. Supported values: ethereum, solana"), nil
 		}
 
 		// Validate template code using Solidity compiler for Ethereum

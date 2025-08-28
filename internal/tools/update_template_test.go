@@ -290,7 +290,7 @@ func TestUpdateTemplateHandler_UpdateChainType(t *testing.T) {
 				// Verify database update
 				updatedTemplate, err := db.GetTemplateByID(1)
 				assert.NoError(t, err)
-				assert.Equal(t, tt.newChainType, updatedTemplate.ChainType)
+				assert.Equal(t, models.TransactionChainType(tt.newChainType), updatedTemplate.ChainType)
 
 				if tt.newTemplateCode != "" {
 					assert.Equal(t, tt.newTemplateCode, updatedTemplate.TemplateCode)

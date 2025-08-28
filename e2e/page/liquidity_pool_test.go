@@ -200,7 +200,7 @@ func (s *CreatePoolChromedpTestSuite) createPoolSession(tokenAddress string) (st
 	sessionID, err := s.setup.DB.CreateTransactionSession(
 		"create_pool",
 		activeChain.ChainType,
-		activeChain.ChainID,
+		activeChain.NetworkID,
 		string(sessionDataJSON),
 	)
 
@@ -250,9 +250,9 @@ func (s *CreatePoolChromedpTestSuite) testPoolCreation(page *LiquidityPoolPage) 
 
 func (s *CreatePoolChromedpTestSuite) verifyPoolDatabaseState(sessionID string, poolID uint) {
 	// Verify session status
-	session, err := s.setup.DB.GetTransactionSession(sessionID)
+	session, err := s.setup.TxService.GetTransactionSession(sessionID)
 	s.Require().NoError(err, "Failed to get transaction session")
-	s.Assert().Equal(models.TransactionStatusConfirmed, session.Status, "Session should be confirmed")
+	s.Assert().Equal(models.TransactionStatusConfirmed, session.TransactionStatus, "Session should be confirmed")
 
 	// Verify pool record
 	pool, err := s.setup.DB.GetLiquidityPoolByID(poolID)
@@ -381,7 +381,7 @@ func (s *AddLiquidityChromedpTestSuite) createAddLiquiditySession(poolID uint) (
 	sessionID, err := s.setup.DB.CreateTransactionSession(
 		"add_liquidity",
 		activeChain.ChainType,
-		activeChain.ChainID,
+		activeChain.NetworkID,
 		string(sessionDataJSON),
 	)
 
@@ -418,9 +418,9 @@ func (s *AddLiquidityChromedpTestSuite) testAddLiquidity(page *LiquidityPoolPage
 }
 
 func (s *AddLiquidityChromedpTestSuite) verifyPositionDatabaseState(sessionID string, positionID uint) {
-	session, err := s.setup.DB.GetTransactionSession(sessionID)
+	session, err := s.setup.TxService.GetTransactionSession(sessionID)
 	s.Require().NoError(err)
-	s.Assert().Equal(models.TransactionStatusConfirmed, session.Status)
+	s.Assert().Equal(models.TransactionStatusConfirmed, session.TransactionStatus)
 
 	position, err := s.setup.DB.GetLiquidityPositionByID(positionID)
 	s.Require().NoError(err)
@@ -474,7 +474,7 @@ func (s *LiquidityErrorHandlingTestSuite) TestExpiredLiquiditySession() {
 	sessionID, _ := s.setup.DB.CreateTransactionSession(
 		"create_pool",
 		activeChain.ChainType,
-		activeChain.ChainID,
+		activeChain.NetworkID,
 		string(sessionData),
 	)
 
@@ -525,7 +525,7 @@ func (s *LiquidityPageLoadTestSuite) TestCreatePoolPageLoad() {
 	sessionID, _ := s.setup.DB.CreateTransactionSession(
 		"create_pool",
 		activeChain.ChainType,
-		activeChain.ChainID,
+		activeChain.NetworkID,
 		string(sessionData),
 	)
 
@@ -573,7 +573,7 @@ func (s *LiquidityPageLoadTestSuite) TestAddLiquidityPageLoad() {
 	sessionID, _ := s.setup.DB.CreateTransactionSession(
 		"add_liquidity",
 		activeChain.ChainType,
-		activeChain.ChainID,
+		activeChain.NetworkID,
 		string(sessionData),
 	)
 

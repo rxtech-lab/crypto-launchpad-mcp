@@ -245,11 +245,10 @@ func TestSetChainHandler(t *testing.T) {
 
 			// For invalid inputs, check error content
 			if tt.name == "invalid_chain_type" || tt.name == "solana_missing_chain_id" {
-				assert.Len(t, result.Content, 2)
+				assert.True(t, result.IsError)
+				assert.Len(t, result.Content, 1)
 				textContent0 := result.Content[0].(mcp.TextContent)
-				textContent1 := result.Content[1].(mcp.TextContent)
-				assert.Equal(t, "Error: ", textContent0.Text)
-				assert.NotEmpty(t, textContent1.Text)
+				assert.NotEmpty(t, textContent0.Text)
 				return
 			}
 
@@ -275,7 +274,7 @@ func TestSetChainHandler(t *testing.T) {
 				var resultData map[string]interface{}
 				err = json.Unmarshal([]byte(textContent1.Text), &resultData)
 				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedChain.ChainType, resultData["chain_type"])
+				assert.Equal(t, string(tt.expectedChain.ChainType), resultData["chain_type"])
 				assert.Equal(t, tt.expectedChain.RPC, resultData["rpc"])
 				assert.Equal(t, tt.expectedChain.NetworkID, resultData["chain_id"])
 				assert.Equal(t, tt.expectedChain.Name, resultData["name"])
@@ -322,7 +321,7 @@ func TestSetChainUpdateExisting(t *testing.T) {
 	assert.Len(t, chains, 1)
 
 	chain := chains[0]
-	assert.Equal(t, "ethereum", chain.ChainType)
+	assert.Equal(t, models.TransactionChainType("ethereum"), chain.ChainType)
 	assert.Equal(t, "https://new-rpc.com", chain.RPC)
 	assert.Equal(t, "11155111", chain.NetworkID)
 	// Note: Name is not updated by UpdateChainConfig, only RPC and ChainID

@@ -170,6 +170,7 @@ func (l *launchTool) createEvmContractDeploymentTransaction(activeChain *models.
 		Title:           title,
 		Description:     description,
 		Receiver:        "", // Empty for contract deployment
+		TransactionType: models.TransactionTypeTokenDeployment,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to get contract deployment transaction: %w", err)

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,9 +68,9 @@ func (t *transactionService) GetTransactionSession(sessionID string) (*models.Tr
 	}
 
 	// Check if session is expired
-	// if time.Now().After(session.ExpiresAt) {
-	// 	return nil, fmt.Errorf("session expired")
-	// }
+	if time.Now().After(session.ExpiresAt) {
+		return nil, fmt.Errorf("session expired")
+	}
 
 	return &session, nil
 }
