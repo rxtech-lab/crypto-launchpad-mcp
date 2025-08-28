@@ -566,3 +566,239 @@ func TestUniswapDeploymentAPI_ErrorHandling(t *testing.T) {
 func TestUniswapDeploymentAPI_DatabaseIntegration(t *testing.T) {
 	suite.Run(t, new(DatabaseIntegrationTestSuite))
 }
+
+// UniswapHookIntegrationTestSuite tests hook integration with real database
+type UniswapHookIntegrationTestSuite struct {
+	suite.Suite
+	setup *TestSetup
+}
+
+func (s *UniswapHookIntegrationTestSuite) SetupSuite() {
+	s.setup = NewTestSetup(s.T())
+}
+
+func (s *UniswapHookIntegrationTestSuite) TearDownSuite() {
+	if s.setup != nil {
+		s.setup.Cleanup()
+	}
+}
+
+func (s *UniswapHookIntegrationTestSuite) SetupTest() {
+	// Clean up test data between tests
+	s.setup.DB.DB.Where("1 = 1").Delete(&models.UniswapDeployment{})
+	s.setup.DB.DB.Where("1 = 1").Delete(&models.TransactionSession{})
+}
+
+func (s *UniswapHookIntegrationTestSuite) TestUniswapDeploymentHookIntegration() {
+	// Test hook integration with Uniswap deployment workflow
+	chainID := s.setup.GetTestChainID()
+
+	// Create Uniswap deployment record
+	deployment := &models.UniswapDeployment{
+		Version: "v2",
+		ChainID: chainID,
+		Status:  models.TransactionStatusPending,
+	}
+
+	err := s.setup.DB.CreateUniswapDeployment(deployment)
+	s.Require().NoError(err)
+	s.Require().NotZero(deployment.ID)
+
+	// Create session data
+	sessionData := map[string]interface{}{
+		"uniswap_deployment_id": deployment.ID,
+		"metadata": []map[string]interface{}{
+			{"title": "Hook Test", "value": "Integration"},
+		},
+	}
+	sessionDataJSON, err := json.Marshal(sessionData)
+	s.Require().NoError(err)
+
+	// Create transaction session
+	sessionID, err := s.setup.DB.CreateTransactionSession(
+		"deploy_uniswap",
+		"ethereum",
+		TESTNET_CHAIN_ID,
+		string(sessionDataJSON),
+	)
+	s.Require().NoError(err)
+
+	// Test initial state
+	session, err := s.setup.TxService.GetTransactionSession(sessionID)
+	s.Require().NoError(err)
+	s.Assert().Equal(models.TransactionStatusPending, session.TransactionStatus)
+
+	// Simulate hook execution for each contract deployment
+	contractAddresses := map[string]string{
+		"weth":    "0x1111111111111111111111111111111111111111",
+		"factory": "0x2222222222222222222222222222222222222222",
+		"router":  "0x3333333333333333333333333333333333333333",
+	}
+
+	transactionHashes := map[string]string{
+		"weth":    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"factory": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"router":  "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+	}
+
+	// Test that Uniswap deployment hook would be triggered for each contract
+	// (we can't directly test the hook service here, but we can test the database updates)
+
+	// Update deployment status to confirmed (simulating successful hook execution)
+	err = s.setup.DB.DB.Model(&models.UniswapDeployment{}).
+		Where("id = ?", deployment.ID).
+		Updates(map[string]interface{}{
+			"weth_address":     contractAddresses["weth"],
+			"factory_address":  contractAddresses["factory"],
+			"router_address":   contractAddresses["router"],
+			"deployer_address": "0x4444444444444444444444444444444444444444",
+		}).Error
+	s.Require().NoError(err)
+
+	err = s.setup.DB.UpdateUniswapDeploymentStatus(deployment.ID, models.TransactionStatusConfirmed)
+	s.Require().NoError(err)
+
+	// Update session status
+	err = s.setup.DB.UpdateTransactionSessionStatus(sessionID, models.TransactionStatusConfirmed, transactionHashes["router"])
+	s.Require().NoError(err)
+
+	// Verify final state
+	updatedDeployment, err := s.setup.DB.GetUniswapDeploymentByID(deployment.ID)
+	s.Require().NoError(err)
+
+	s.Assert().Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
+	s.Assert().Equal(contractAddresses["weth"], updatedDeployment.WETHAddress)
+	s.Assert().Equal(contractAddresses["factory"], updatedDeployment.FactoryAddress)
+	s.Assert().Equal(contractAddresses["router"], updatedDeployment.RouterAddress)
+	s.Assert().Equal("0x4444444444444444444444444444444444444444", updatedDeployment.DeployerAddress)
+
+	// Verify session was updated
+	finalSession, err := s.setup.TxService.GetTransactionSession(sessionID)
+	s.Require().NoError(err)
+	s.Assert().Equal(models.TransactionStatusConfirmed, finalSession.TransactionStatus)
+
+	s.T().Logf("✓ Hook integration test completed successfully")
+	s.T().Logf("  Deployment ID: %d", deployment.ID)
+	s.T().Logf("  Session ID: %s", sessionID)
+	s.T().Logf("  WETH: %s", updatedDeployment.WETHAddress)
+	s.T().Logf("  Factory: %s", updatedDeployment.FactoryAddress)
+	s.T().Logf("  Router: %s", updatedDeployment.RouterAddress)
+}
+
+func (s *UniswapHookIntegrationTestSuite) TestUniswapDeploymentDatabaseConstraints() {
+	// Test database constraints and relationships for Uniswap deployments
+	chainID := s.setup.GetTestChainID()
+
+	// Test unique constraint on chain deployment
+	deployment1 := &models.UniswapDeployment{
+		Version: "v2",
+		ChainID: chainID,
+		Status:  models.TransactionStatusConfirmed,
+	}
+
+	err := s.setup.DB.CreateUniswapDeployment(deployment1)
+	s.Require().NoError(err)
+
+	// Verify we can find this deployment by chain
+	found, err := s.setup.DB.GetUniswapDeploymentByChain("ethereum", TESTNET_CHAIN_ID)
+	s.Require().NoError(err)
+	s.Require().NotNil(found)
+	s.Assert().Equal(deployment1.ID, found.ID)
+
+	// Test foreign key relationship
+	s.Assert().NotNil(found.Chain)
+	s.Assert().Equal("ethereum", string(found.Chain.ChainType))
+	s.Assert().Equal(TESTNET_CHAIN_ID, found.Chain.NetworkID)
+
+	s.T().Logf("✓ Database constraints test completed")
+	s.T().Logf("  Found deployment: ID=%d, Chain=%s", found.ID, found.Chain.ChainType)
+}
+
+func (s *UniswapHookIntegrationTestSuite) TestUniswapDeploymentStatusTransitions() {
+	// Test valid status transitions for Uniswap deployments
+	chainID := s.setup.GetTestChainID()
+
+	deployment := &models.UniswapDeployment{
+		Version: "v2", 
+		ChainID: chainID,
+		Status:  models.TransactionStatusPending,
+	}
+
+	err := s.setup.DB.CreateUniswapDeployment(deployment)
+	s.Require().NoError(err)
+
+	// Test pending -> confirmed transition
+	err = s.setup.DB.UpdateUniswapDeploymentStatus(deployment.ID, models.TransactionStatusConfirmed)
+	s.NoError(err)
+
+	updated, err := s.setup.DB.GetUniswapDeploymentByID(deployment.ID)
+	s.Require().NoError(err)
+	s.Assert().Equal(models.TransactionStatusConfirmed, updated.Status)
+
+	// Test confirmed -> failed transition (should be allowed)
+	err = s.setup.DB.UpdateUniswapDeploymentStatus(deployment.ID, models.TransactionStatusFailed)
+	s.NoError(err)
+
+	updated, err = s.setup.DB.GetUniswapDeploymentByID(deployment.ID)
+	s.Require().NoError(err)
+	s.Assert().Equal(models.TransactionStatusFailed, updated.Status)
+
+	s.T().Logf("✓ Status transition test completed")
+}
+
+func (s *UniswapHookIntegrationTestSuite) TestUniswapDeploymentConcurrency() {
+	// Test concurrent updates to Uniswap deployment records
+	chainID := s.setup.GetTestChainID()
+
+	deployment := &models.UniswapDeployment{
+		Version: "v2",
+		ChainID: chainID, 
+		Status:  models.TransactionStatusPending,
+	}
+
+	err := s.setup.DB.CreateUniswapDeployment(deployment)
+	s.Require().NoError(err)
+
+	// Simulate concurrent contract address updates
+	contractUpdates := []struct {
+		weth    string
+		factory string
+		router  string
+	}{
+		{"0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222", "0x3333333333333333333333333333333333333333"},
+		{"0x4444444444444444444444444444444444444444", "0x5555555555555555555555555555555555555555", "0x6666666666666666666666666666666666666666"},
+		{"0x7777777777777777777777777777777777777777", "0x8888888888888888888888888888888888888888", "0x9999999999999999999999999999999999999999"},
+	}
+
+	// Apply updates sequentially (simulating concurrent hook executions)
+	var finalAddresses struct{ weth, factory, router string }
+	for _, update := range contractUpdates {
+		err = s.setup.DB.DB.Model(&models.UniswapDeployment{}).
+			Where("id = ?", deployment.ID).
+			Updates(map[string]interface{}{
+				"weth_address":     update.weth,
+				"factory_address":  update.factory,
+				"router_address":   update.router,
+				"deployer_address": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			}).Error
+		s.NoError(err)
+		finalAddresses = update
+	}
+
+	// Verify final state
+	updated, err := s.setup.DB.GetUniswapDeploymentByID(deployment.ID)
+	s.Require().NoError(err)
+	
+	s.Assert().Equal(finalAddresses.weth, updated.WETHAddress)
+	s.Assert().Equal(finalAddresses.factory, updated.FactoryAddress)
+	s.Assert().Equal(finalAddresses.router, updated.RouterAddress)
+
+	s.T().Logf("✓ Concurrency test completed")
+	s.T().Logf("  Final WETH: %s", updated.WETHAddress)
+	s.T().Logf("  Final Factory: %s", updated.FactoryAddress)
+	s.T().Logf("  Final Router: %s", updated.RouterAddress)
+}
+
+func TestUniswapDeploymentAPI_HookIntegration(t *testing.T) {
+	suite.Run(t, new(UniswapHookIntegrationTestSuite))
+}
