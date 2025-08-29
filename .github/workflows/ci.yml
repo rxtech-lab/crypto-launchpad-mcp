@@ -18,8 +18,9 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
           check-latest: true
+      - uses: oven-sh/setup-bun@v2
       - name: Download dependencies
         run: make deps
       - name: Install foundry
