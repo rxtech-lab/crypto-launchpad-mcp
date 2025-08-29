@@ -13,17 +13,22 @@ interface HorizontalStepperProps {
 
 export function HorizontalStepper({ steps, currentStep }: HorizontalStepperProps) {
   return (
-    <div className="w-full">
+    <div data-testid="stepper-container" className="w-full">
       <div className="flex items-center justify-between">
         {steps.map((step, index) => {
           const isActive = currentStep === index;
           const isCompleted = currentStep > index;
 
           return (
-            <div key={step.id} className="flex items-center flex-1">
+            <div 
+              key={step.id} 
+              data-testid={`stepper-step-${index}`}
+              className="flex items-center flex-1"
+            >
               <div className="flex items-center relative">
                 {/* Step indicator */}
                 <div
+                  data-testid={`stepper-step-indicator-${index}`}
                   className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${
                     isCompleted
                       ? "bg-green-500 text-white"
@@ -42,6 +47,7 @@ export function HorizontalStepper({ steps, currentStep }: HorizontalStepperProps
                 {/* Step label */}
                 <div className="ml-3 hidden sm:block">
                   <p
+                    data-testid={`stepper-step-label-${index}`}
                     className={`text-sm font-medium transition-colors duration-300 ${
                       isActive
                         ? "text-gray-900"
@@ -71,7 +77,10 @@ export function HorizontalStepper({ steps, currentStep }: HorizontalStepperProps
       </div>
 
       {/* Mobile step labels */}
-      <div className="sm:hidden mt-4 text-center">
+      <div 
+        data-testid="stepper-mobile-label"
+        className="sm:hidden mt-4 text-center"
+      >
         <p className="text-sm font-medium text-gray-900">
           {steps[currentStep]?.title}
         </p>

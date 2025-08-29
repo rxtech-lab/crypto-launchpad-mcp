@@ -96,6 +96,7 @@ export function TransactionSigner({
   return (
     <div className="space-y-4">
       <button
+        data-testid="transaction-sign-button"
         onClick={error ? onRetry : onSign}
         disabled={isDisabled && !error}
         className={`
@@ -114,17 +115,24 @@ export function TransactionSigner({
       </button>
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg animate-fade-in">
+        <div 
+          data-testid="transaction-error-message"
+          className="p-4 bg-red-50 border border-red-200 rounded-lg animate-fade-in"
+        >
           <div className="flex items-start space-x-3">
             <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div className="flex-grow">
               <p className="text-sm font-medium text-red-800">
                 Transaction Error
               </p>
-              <p className="text-sm text-red-600 mt-1 break-all line-clamp-4">
+              <p 
+                data-testid="transaction-error-details"
+                className="text-sm text-red-600 mt-1 break-all line-clamp-4"
+              >
                 {error.message}
               </p>
               <button
+                data-testid="transaction-retry-button"
                 onClick={onRetry}
                 className="mt-3 flex items-center space-x-1 text-sm text-red-700 hover:text-red-800 font-medium"
               >
@@ -137,20 +145,29 @@ export function TransactionSigner({
       )}
 
       {!isConnected && (
-        <p className="text-sm text-gray-500 text-center">
+        <p 
+          data-testid="transaction-status-message"
+          className="text-sm text-gray-500 text-center"
+        >
           Connect your wallet to sign transactions
         </p>
       )}
 
       {networkMismatch && (
-        <p className="text-sm text-amber-600 text-center">
+        <p 
+          data-testid="transaction-status-message"
+          className="text-sm text-amber-600 text-center"
+        >
           Network mismatch detected. Please switch to the correct network to
           proceed.
         </p>
       )}
 
       {isExecuting && (
-        <div className="flex justify-center">
+        <div 
+          data-testid="transaction-status-message"
+          className="flex justify-center"
+        >
           <div className="flex items-center space-x-2 text-sm text-blue-600">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>
@@ -161,7 +178,10 @@ export function TransactionSigner({
       )}
 
       {allCompleted && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg animate-fade-in">
+        <div 
+          data-testid="transaction-success-message"
+          className="p-4 bg-green-50 border border-green-200 rounded-lg animate-fade-in"
+        >
           <div className="flex items-center space-x-3">
             <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
             <div>

@@ -18,7 +18,10 @@ export function ConnectionStatus({
 
   if (!isConnected) {
     return (
-      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg animate-fade-in">
+      <div 
+        data-testid="wallet-not-connected-warning"
+        className="p-4 bg-amber-50 border border-amber-200 rounded-lg animate-fade-in"
+      >
         <div className="flex items-center space-x-3">
           <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
           <div>
@@ -33,19 +36,31 @@ export function ConnectionStatus({
   }
 
   return (
-    <div className="space-y-3 animate-fade-in">
-      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+    <div 
+      data-testid="connection-status-container"
+      className="space-y-3 animate-fade-in"
+    >
+      <div 
+        data-testid="wallet-connected-info"
+        className="p-4 bg-green-50 border border-green-200 rounded-lg"
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-green-800">Wallet Connected</p>
-              <p className="text-sm text-green-600 mt-1 font-mono">
+              <p 
+                data-testid="wallet-address"
+                className="text-sm text-green-600 mt-1 font-mono"
+              >
                 {formatAddress(account || '')}
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
+          <div 
+            data-testid="chain-info"
+            className="flex items-center space-x-2 text-sm text-gray-600"
+          >
             <Link className="h-4 w-4" />
             <span>{getChainName(chainId || 0)}</span>
           </div>
@@ -53,7 +68,10 @@ export function ConnectionStatus({
       </div>
 
       {requiredChainId && !isCorrectChain && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+        <div 
+          data-testid="wrong-network-warning"
+          className="p-4 bg-amber-50 border border-amber-200 rounded-lg"
+        >
           <div className="flex items-center space-x-3">
             <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
             <div>

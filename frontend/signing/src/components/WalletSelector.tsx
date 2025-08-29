@@ -60,7 +60,10 @@ export function WalletSelector({
 
   if (isConnected && selectedProvider) {
     return (
-      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+      <div 
+        data-testid="wallet-connected-status"
+        className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl"
+      >
         <div className="flex items-center gap-3">
           <div className="p-2 bg-white rounded-lg shadow-sm">
             <Wallet className="h-5 w-5 text-emerald-600" />
@@ -75,6 +78,7 @@ export function WalletSelector({
         </div>
         {onDisconnect && (
           <button
+            data-testid="wallet-disconnect-button"
             onClick={handleDisconnect}
             className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all duration-200 flex items-center gap-2"
             title="Disconnect wallet"
@@ -94,6 +98,7 @@ export function WalletSelector({
           <Wallet className="h-5 w-5 text-gray-400" />
         </div>
         <select
+          data-testid="wallet-selector-dropdown"
           value={selectedProvider?.info.uuid || ""}
           onChange={handleChange}
           disabled={isConnecting || providers.length === 0}
@@ -118,8 +123,12 @@ export function WalletSelector({
               ? "Select a wallet"
               : "No wallets detected"}
           </option>
-          {providers.map((provider) => (
-            <option key={provider.info.uuid} value={provider.info.uuid}>
+          {providers.map((provider, index) => (
+            <option 
+              key={provider.info.uuid} 
+              value={provider.info.uuid}
+              data-testid={`wallet-selector-option-${index}`}
+            >
               {provider.info.name}
             </option>
           ))}
@@ -134,7 +143,10 @@ export function WalletSelector({
       </div>
       
       {providers.length === 0 && (
-        <p className="mt-3 text-sm text-gray-500">
+        <p 
+          data-testid="wallet-no-wallets-message"
+          className="mt-3 text-sm text-gray-500"
+        >
           Please install a Web3 wallet extension like MetaMask to continue.
         </p>
       )}
