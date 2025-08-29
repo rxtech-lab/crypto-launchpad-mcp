@@ -99,7 +99,7 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmSe
 	liqudityPoolTool := tools.NewCreateLiquidityPoolTool(db, serverPort, evmService, txService, liquidityService, uniswapService)
 	srv.AddTool(liqudityPoolTool.GetTool(), liqudityPoolTool.GetHandler())
 
-	addLiquidityTool := tools.NewAddLiquidityTool(db, serverPort, evmService, txService, liquidityService)
+	addLiquidityTool := tools.NewAddLiquidityTool(db, serverPort, evmService, txService, liquidityService, uniswapService)
 	srv.AddTool(addLiquidityTool.GetTool(), addLiquidityTool.GetHandler())
 
 	removeLiquidityTool, removeLiquidityHandler := tools.NewRemoveLiquidityTool(db, serverPort)

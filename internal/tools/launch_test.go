@@ -247,7 +247,7 @@ func (suite *LaunchToolTestSuite) TestHandlerSuccess() {
 
 	if len(result.Content) > 1 {
 		if textContent, ok := result.Content[1].(mcp.TextContent); ok {
-			suite.Contains(textContent.Text, "Please sign the transaction in the URL")
+			suite.Contains(textContent.Text, "Please return the following url to the user")
 		}
 	}
 
