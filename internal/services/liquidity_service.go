@@ -39,7 +39,7 @@ func (l *liquidityService) CreateLiquidityPool(pool *models.LiquidityPool) (uint
 	if pool.Status == "" {
 		pool.Status = models.TransactionStatusPending
 	}
-	
+
 	err := l.db.Create(pool).Error
 	if err != nil {
 		return 0, err
@@ -69,11 +69,11 @@ func (l *liquidityService) UpdateLiquidityPoolStatus(poolID uint, status models.
 	updates := map[string]interface{}{
 		"status": status,
 	}
-	
+
 	if pairAddress != "" {
 		updates["pair_address"] = pairAddress
 	}
-	
+
 	if txHash != "" {
 		updates["transaction_hash"] = txHash
 	}
@@ -104,7 +104,7 @@ func (l *liquidityService) CreateLiquidityPosition(position *models.LiquidityPos
 	if position.Status == "" {
 		position.Status = models.TransactionStatusPending
 	}
-	
+
 	err := l.db.Create(position).Error
 	if err != nil {
 		return 0, err
@@ -143,7 +143,7 @@ func (l *liquidityService) UpdateLiquidityPositionStatus(positionID uint, status
 	updates := map[string]interface{}{
 		"status": status,
 	}
-	
+
 	if txHash != "" {
 		updates["transaction_hash"] = txHash
 	}
@@ -155,7 +155,7 @@ func (l *liquidityService) UpdateLiquidityPositionStatus(positionID uint, status
 
 func (l *liquidityService) UpdateLiquidityPositionAmounts(positionID uint, liquidityAmount, token0Amount, token1Amount string) error {
 	updates := map[string]interface{}{}
-	
+
 	if liquidityAmount != "" {
 		updates["liquidity_amount"] = liquidityAmount
 	}

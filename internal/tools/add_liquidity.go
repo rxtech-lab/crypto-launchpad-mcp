@@ -253,9 +253,9 @@ func (a *addLiquidityTool) createAddLiquidityTransactionSession(
 	tx := models.TransactionDeployment{
 		Title:       "Add Liquidity",
 		Description: fmt.Sprintf("Add liquidity to %s pool", pool.TokenAddress),
-		Value:       args.ETHAmount, // ETH amount to be sent with transaction
+		Value:       args.ETHAmount,                  // ETH amount to be sent with transaction
 		Receiver:    uniswapDeployment.RouterAddress, // Router is the receiver for add liquidity
-		Data:        "", // Will be populated on frontend with addLiquidityETH call
+		Data:        "",                              // Will be populated on frontend with addLiquidityETH call
 	}
 
 	// Create transaction session
@@ -283,29 +283,29 @@ func (a *addLiquidityTool) createEthereumAddLiquidityTransaction(
 	args AddLiquidityArguments,
 	metadata []models.TransactionMetadata,
 	userAddress string, // Would need to be passed from frontend
-	deadline string,    // Unix timestamp for deadline
+	deadline string, // Unix timestamp for deadline
 ) (string, error) {
 	// This would use the router ABI to encode the addLiquidityETH function call
 	// Example structure (would need actual router ABI):
 	/*
-	routerABI := `[{"name":"addLiquidityETH","inputs":[...],"outputs":[...],"type":"function"}]`
-	
-	txData, err := a.evmService.GetTransactionData(services.GetTransactionDataArgs{
-		ContractAddress: uniswapDeployment.RouterAddress,
-		FunctionName:    "addLiquidityETH",
-		FunctionArgs: []any{
-			pool.TokenAddress,  // token
-			args.TokenAmount,   // amountTokenDesired
-			args.MinTokenAmount,// amountTokenMin
-			args.MinETHAmount,  // amountETHMin
-			userAddress,        // to
-			deadline,           // deadline
-		},
-		Abi:         routerABI,
-		Value:       args.ETHAmount,
-		Title:       "Add Liquidity",
-		Description: fmt.Sprintf("Add liquidity to %s pool", pool.TokenAddress),
-	})
+		routerABI := `[{"name":"addLiquidityETH","inputs":[...],"outputs":[...],"type":"function"}]`
+
+		txData, err := a.evmService.GetTransactionData(services.GetTransactionDataArgs{
+			ContractAddress: uniswapDeployment.RouterAddress,
+			FunctionName:    "addLiquidityETH",
+			FunctionArgs: []any{
+				pool.TokenAddress,  // token
+				args.TokenAmount,   // amountTokenDesired
+				args.MinTokenAmount,// amountTokenMin
+				args.MinETHAmount,  // amountETHMin
+				userAddress,        // to
+				deadline,           // deadline
+			},
+			Abi:         routerABI,
+			Value:       args.ETHAmount,
+			Title:       "Add Liquidity",
+			Description: fmt.Sprintf("Add liquidity to %s pool", pool.TokenAddress),
+		})
 	*/
 
 	// For now, return a placeholder as the actual implementation

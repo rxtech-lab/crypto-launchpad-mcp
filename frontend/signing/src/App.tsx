@@ -240,7 +240,10 @@ function App() {
     if (currentStep === 2) {
       return (
         <>
-          <h2 className="text-xl font-semibold text-gray-800 mb-6">
+          <h2
+            className="text-xl font-semibold text-gray-800 mb-6"
+            data-testid="transaction-success-message"
+          >
             All Transactions Complete
           </h2>
 
@@ -276,7 +279,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto p-6">
+      <div className="max-w-3xl mx-auto p-6" data-testid="content-container">
         {/* Header */}
         <header className="mb-8 text-center">
           <div className="flex items-center justify-center space-x-3 mb-2">

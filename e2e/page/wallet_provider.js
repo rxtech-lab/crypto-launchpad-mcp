@@ -88,6 +88,24 @@ class TestWalletProvider {
       case "eth_getTransactionReceipt":
         return await this.getTransactionReceipt(params[0]);
 
+      case "eth_blockNumber":
+        // Mock block number - in real tests this would query the testnet
+        return "0x1"; // Block 1
+
+      case "eth_estimateGas":
+        // Mock gas estimate - return reasonable gas limit for contract deployment
+        const transaction = params[0];
+        if (transaction.data && transaction.data.length > 100) {
+          // Contract deployment - higher gas limit
+          return "0x2dc6c0"; // 3,000,000 gas
+        } else {
+          // Regular transaction - standard gas limit
+          return "0x5208"; // 21,000 gas
+        }
+
+      case "eth_getTransactionByHash":
+        return await this.getTransactionByHash(params[0]);
+
       default:
         throw new Error(`Unsupported method: ${method}`);
     }
@@ -171,6 +189,36 @@ class TestWalletProvider {
       return result.result;
     } catch (error) {
       console.error("Get transaction receipt failed:", error);
+      throw error;
+    }
+  }
+
+  // Get transaction by hash from testnet via direct RPC call
+  async getTransactionByHash(txHash) {
+    try {
+      const response = await fetch("http://localhost:8545", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "eth_getTransactionByHash",
+          params: [txHash],
+          id: 1
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.error) {
+        throw new Error(`RPC error: ${result.error.message}`);
+      }
+      
+      // Return null if transaction is not found (standard behavior)
+      return result.result;
+    } catch (error) {
+      console.error("Get transaction by hash failed:", error);
       throw error;
     }
   }

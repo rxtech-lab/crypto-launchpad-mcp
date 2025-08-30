@@ -15,14 +15,14 @@ import (
 
 type AddLiquidityToolTestSuite struct {
 	suite.Suite
-	db               *database.Database
-	tool             *addLiquidityTool
-	liquidityService services.LiquidityService
-	uniswapService   services.UniswapService
-	txService        services.TransactionService
-	evmService       services.EvmService
-	chain            *models.Chain
-	pool             *models.LiquidityPool
+	db                *database.Database
+	tool              *addLiquidityTool
+	liquidityService  services.LiquidityService
+	uniswapService    services.UniswapService
+	txService         services.TransactionService
+	evmService        services.EvmService
+	chain             *models.Chain
+	pool              *models.LiquidityPool
 	uniswapDeployment *models.UniswapDeployment
 }
 
@@ -98,19 +98,19 @@ func (suite *AddLiquidityToolTestSuite) setupUniswapDeployment() {
 	// Update with addresses
 	err = suite.uniswapService.UpdateWETHAddress(deploymentID, "0x1111111111111111111111111111111111111111")
 	suite.Require().NoError(err)
-	
+
 	err = suite.uniswapService.UpdateFactoryAddress(deploymentID, "0x2222222222222222222222222222222222222222")
 	suite.Require().NoError(err)
-	
+
 	err = suite.uniswapService.UpdateRouterAddress(deploymentID, "0x3333333333333333333333333333333333333333")
 	suite.Require().NoError(err)
-	
+
 	err = suite.uniswapService.UpdateDeployerAddress(deploymentID, "0x4444444444444444444444444444444444444444")
 	suite.Require().NoError(err)
-	
+
 	err = suite.uniswapService.UpdateStatus(deploymentID, models.TransactionStatusConfirmed)
 	suite.Require().NoError(err)
-	
+
 	suite.uniswapDeployment, err = suite.uniswapService.GetUniswapDeployment(deploymentID)
 	suite.Require().NoError(err)
 }
@@ -129,7 +129,7 @@ func (suite *AddLiquidityToolTestSuite) setupTestPool() {
 
 	poolID, err := suite.liquidityService.CreateLiquidityPool(pool)
 	suite.Require().NoError(err)
-	
+
 	pool.ID = poolID
 	suite.pool = pool
 }
@@ -137,7 +137,7 @@ func (suite *AddLiquidityToolTestSuite) setupTestPool() {
 func (suite *AddLiquidityToolTestSuite) cleanupTestData() {
 	// Clean up transaction sessions
 	suite.db.DB.Where("1 = 1").Delete(&models.TransactionSession{})
-	
+
 	// Clean up liquidity positions
 	suite.db.DB.Where("1 = 1").Delete(&models.LiquidityPosition{})
 }
@@ -196,10 +196,10 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerSuccess() {
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
 				"token_address":    suite.pool.TokenAddress,
-				"token_amount":     "500000000000000000",  // 0.5 token
-				"eth_amount":       "500000000000000000",  // 0.5 ETH
-				"min_token_amount": "490000000000000000",  // 0.49 token (2% slippage)
-				"min_eth_amount":   "490000000000000000",  // 0.49 ETH (2% slippage)
+				"token_amount":     "500000000000000000", // 0.5 token
+				"eth_amount":       "500000000000000000", // 0.5 ETH
+				"min_token_amount": "490000000000000000", // 0.49 token (2% slippage)
+				"min_eth_amount":   "490000000000000000", // 0.49 ETH (2% slippage)
 				"metadata": []interface{}{
 					map[string]interface{}{
 						"key":   "Liquidity Provider",
@@ -215,7 +215,7 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerSuccess() {
 
 	suite.NoError(err)
 	suite.NotNil(result)
-	
+
 	// Check for errors
 	if result.IsError {
 		if len(result.Content) > 0 {
@@ -233,11 +233,11 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerSuccess() {
 	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
 		suite.Contains(textContent.Text, "Transaction session created:")
 	}
-	
+
 	if textContent, ok := result.Content[1].(mcp.TextContent); ok {
 		suite.Equal("Please return the following url to the user:", textContent.Text)
 	}
-	
+
 	if textContent, ok := result.Content[2].(mcp.TextContent); ok {
 		suite.Contains(textContent.Text, "http://localhost:9999/tx/")
 	}
@@ -270,7 +270,7 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerPoolNotFound() {
 	suite.NoError(err)
 	suite.NotNil(result)
 	suite.True(result.IsError)
-	
+
 	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
 		suite.Contains(textContent.Text, "Liquidity pool not found")
 	}
@@ -307,7 +307,7 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerPoolNotConfirmed() {
 	suite.NoError(err)
 	suite.NotNil(result)
 	suite.True(result.IsError)
-	
+
 	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
 		suite.Contains(textContent.Text, "not confirmed yet")
 	}
@@ -345,7 +345,7 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerPoolNoPairAddress() {
 	suite.NoError(err)
 	suite.NotNil(result)
 	suite.True(result.IsError)
-	
+
 	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
 		suite.Contains(textContent.Text, "does not have a pair address")
 	}
@@ -355,14 +355,14 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerNoRouterAddress() {
 	// Delete the existing deployment and create one without router
 	err := suite.uniswapService.DeleteUniswapDeployment(suite.uniswapDeployment.ID)
 	suite.Require().NoError(err)
-	
+
 	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
 	suite.Require().NoError(err)
-	
+
 	// Only set WETH and Factory, but not Router
 	err = suite.uniswapService.UpdateWETHAddress(deploymentID, "0x1111111111111111111111111111111111111111")
 	suite.Require().NoError(err)
-	
+
 	err = suite.uniswapService.UpdateFactoryAddress(deploymentID, "0x2222222222222222222222222222222222222222")
 	suite.Require().NoError(err)
 
@@ -384,7 +384,7 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerNoRouterAddress() {
 	suite.NoError(err)
 	suite.NotNil(result)
 	suite.True(result.IsError)
-	
+
 	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
 		suite.Contains(textContent.Text, "router address not found")
 	}
@@ -414,7 +414,7 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerInvalidArguments() {
 	suite.NoError(err)
 	suite.NotNil(result)
 	suite.True(result.IsError)
-	
+
 	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
 		suite.Contains(textContent.Text, "Invalid arguments")
 	}
@@ -429,7 +429,7 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerNonEthereumChain() {
 		Name:      "Solana Devnet",
 		IsActive:  true,
 	}
-	
+
 	err := suite.db.CreateChain(solanaChain)
 	suite.Require().NoError(err)
 
@@ -455,7 +455,7 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerNonEthereumChain() {
 	suite.NoError(err)
 	suite.NotNil(result)
 	suite.True(result.IsError)
-	
+
 	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
 		suite.Contains(textContent.Text, "only supported on Ethereum")
 	}
@@ -463,7 +463,7 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerNonEthereumChain() {
 	// Clean up
 	err = suite.db.DB.Model(&models.Chain{}).Where("id = ?", solanaChain.ID).Update("is_active", false).Error
 	suite.Require().NoError(err)
-	
+
 	err = suite.db.DB.Model(&models.Chain{}).Where("id = ?", suite.chain.ID).Update("is_active", true).Error
 	suite.Require().NoError(err)
 }
@@ -515,7 +515,7 @@ func (suite *AddLiquidityToolTestSuite) TestMetadataEnhancement() {
 
 	// Check user metadata
 	suite.Equal("custom_value", metadataMap["custom_key"])
-	
+
 	// Check system-added metadata
 	suite.NotEmpty(metadataMap["position_id"])
 	suite.Equal(fmt.Sprintf("%d", suite.pool.ID), metadataMap["pool_id"])
@@ -538,10 +538,10 @@ func (suite *AddLiquidityToolTestSuite) TestMetadataEnhancement() {
 func (suite *AddLiquidityToolTestSuite) TestToolRegistration() {
 	// Test that the tool can be registered with an MCP server
 	mcpServer := server.NewMCPServer("test", "1.0.0")
-	
+
 	tool := suite.tool.GetTool()
 	handler := suite.tool.GetHandler()
-	
+
 	// This should not panic
 	suite.NotPanics(func() {
 		mcpServer.AddTool(tool, handler)

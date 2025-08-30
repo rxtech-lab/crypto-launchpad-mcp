@@ -1,10 +1,11 @@
 module github.com/rxtech-lab/launchpad-mcp
 
-go 1.24.5
+go 1.25
 
 require (
 	github.com/chromedp/chromedp v0.14.1
 	github.com/ethereum/go-ethereum v1.15.11
+	github.com/go-playground/validator/v10 v10.27.0
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/google/uuid v1.6.0
 	github.com/mark3labs/mcp-go v0.37.0
@@ -38,7 +39,6 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.27.0 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect

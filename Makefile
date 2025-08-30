@@ -16,6 +16,7 @@ all: deps build test
 deps:
 	go mod download
 	go mod tidy
+	cd frontend/signing && bun install
 
 # Generate embedded contract files
 generate:

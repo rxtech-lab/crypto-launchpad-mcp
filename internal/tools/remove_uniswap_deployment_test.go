@@ -77,10 +77,10 @@ func (suite *RemoveUniswapDeploymentTestSuite) TestGetTool() {
 
 	// Check parameters
 	suite.Require().Len(tool.InputSchema.Properties, 1)
-	
+
 	idsParam, exists := tool.InputSchema.Properties["ids"]
 	suite.True(exists)
-	
+
 	// Type assert to get the parameter properties
 	if param, ok := idsParam.(map[string]any); ok {
 		suite.Equal("array", param["type"])

@@ -21,7 +21,7 @@ func NewTokenDeploymentPage(ctx context.Context) *TokenDeploymentPage {
 
 // NavigateToSession navigates to the token deployment session URL
 func (p *TokenDeploymentPage) NavigateToSession(baseURL, sessionID string) error {
-	url := fmt.Sprintf("%s/deploy/%s", baseURL, sessionID)
+	url := fmt.Sprintf("%s/tx/%s", baseURL, sessionID)
 	return chromedp.Run(p.ctx, chromedp.Navigate(url))
 }
 
@@ -29,21 +29,12 @@ func (p *TokenDeploymentPage) NavigateToSession(baseURL, sessionID string) error
 func (p *TokenDeploymentPage) WaitForPageLoad() error {
 	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
 	defer cancel()
-	// Wait for the main content div to be visible
+	// Wait for the metadata container to be visible (indicates page loaded)
 	err := chromedp.Run(ctx,
-		chromedp.WaitVisible("#content", chromedp.ByID),
+		chromedp.WaitVisible(`[data-testid="content-container"]`, chromedp.ByQuery),
 	)
 	if err != nil {
 		return fmt.Errorf("page did not load: %w", err)
-	}
-
-	// Wait for JavaScript to load session data and replace the loading state
-	// The deploy-tokens.js script will replace the content with deployment details
-	err = chromedp.Run(ctx,
-		chromedp.WaitVisible("h2", chromedp.ByQuery), // Wait for any h2 element (deployment details header)
-	)
-	if err != nil {
-		return fmt.Errorf("deployment details did not load: %w", err)
 	}
 
 	return nil
@@ -54,36 +45,35 @@ func (p *TokenDeploymentPage) WaitForWalletSelection() error {
 	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
 	defer cancel()
 	return chromedp.Run(ctx,
-		chromedp.WaitVisible("#wallet-select", chromedp.ByID),
+		chromedp.WaitVisible(`[data-testid="wallet-selector-dropdown"]`, chromedp.ByQuery),
 	)
 }
 
-// SelectWallet selects a wallet from the dropdown
-func (p *TokenDeploymentPage) SelectWallet(walletUUID string) error {
+// SelectWallet selects a wallet from the dropdown by option value (provider UUID)
+func (p *TokenDeploymentPage) SelectWallet(walletValue string) error {
 	// Wait for wallet select to be available
 	err := p.WaitForWalletSelection()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to wait for wallet selection: %w", err)
 	}
 
-	// Use JavaScript to set the value and trigger change event
-	js := fmt.Sprintf(`
-		const select = document.getElementById('wallet-select');
-		select.value = '%s';
-		select.dispatchEvent(new Event('change', { bubbles: true }));
-	`, walletUUID)
+	// 10 seconds timeout
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
 
-	return chromedp.Run(p.ctx,
-		chromedp.Evaluate(js, nil),
+	// Select the wallet option by setting the select element's value
+	chromedp.Run(ctx,
+		chromedp.SetValue(`[data-testid="wallet-selector-dropdown"]`, walletValue, chromedp.ByQuery),
 	)
+
+	return nil
 }
 
-// ClickConnectWallet clicks the connect wallet button
+// ClickConnectWallet clicks the connect wallet button (wallet connection now automatic after selection)
 func (p *TokenDeploymentPage) ClickConnectWallet() error {
-	return chromedp.Run(p.ctx,
-		chromedp.WaitVisible("#connect-button", chromedp.ByID),
-		chromedp.Click("#connect-button", chromedp.ByID),
-	)
+	// In the new frontend, wallet connection happens automatically after selection
+	// Just wait for the wallet to be connected
+	return p.WaitForWalletConnection()
 }
 
 // WaitForWalletConnection waits for the wallet to be connected
@@ -92,7 +82,7 @@ func (p *TokenDeploymentPage) WaitForWalletConnection() error {
 	defer cancel()
 	// Wait for connection status to show success
 	err := chromedp.Run(ctx,
-		chromedp.WaitVisible(".bg-green-50", chromedp.ByQuery),
+		chromedp.WaitVisible(`[data-testid="wallet-connected-status"]`, chromedp.ByQuery),
 	)
 	if err != nil {
 		return fmt.Errorf("wallet connection failed: %w", err)
@@ -100,7 +90,7 @@ func (p *TokenDeploymentPage) WaitForWalletConnection() error {
 
 	// Verify the sign button is visible
 	err = chromedp.Run(ctx,
-		chromedp.WaitVisible("#sign-button", chromedp.ByID),
+		chromedp.WaitVisible(`[data-testid="transaction-sign-button"]`, chromedp.ByQuery),
 	)
 	if err != nil {
 		return fmt.Errorf("sign button not visible after connection: %w", err)
@@ -114,8 +104,8 @@ func (p *TokenDeploymentPage) ClickDeployButton() error {
 	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
 	defer cancel()
 	return chromedp.Run(ctx,
-		chromedp.WaitVisible("#sign-button", chromedp.ByID),
-		chromedp.Click("#sign-button", chromedp.ByID),
+		chromedp.WaitVisible(`[data-testid="transaction-sign-button"]`, chromedp.ByQuery),
+		chromedp.Click(`[data-testid="transaction-sign-button"]`, chromedp.ByQuery),
 	)
 }
 
@@ -124,28 +114,8 @@ func (p *TokenDeploymentPage) WaitForSuccessState() error {
 	ctx, cancel := context.WithTimeout(p.ctx, 30*time.Second) // Token deployment might take longer
 	defer cancel()
 	return chromedp.Run(ctx,
-		chromedp.WaitVisible("#success-state", chromedp.ByID),
+		chromedp.WaitVisible(`[data-testid="transaction-success-message"]`, chromedp.ByQuery),
 	)
-}
-
-// GetContractAddress gets the deployed contract address from the success state
-func (p *TokenDeploymentPage) GetContractAddress() (string, error) {
-	var text string
-	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
-	defer cancel()
-	err := chromedp.Run(ctx,
-		chromedp.WaitVisible("#contract-address-display", chromedp.ByID),
-		chromedp.Text("#contract-address-display", &text, chromedp.ByID),
-	)
-	if err != nil {
-		return "", fmt.Errorf("contract address not found: %w", err)
-	}
-
-	if text == "Loading..." {
-		return "", fmt.Errorf("contract address still loading")
-	}
-
-	return text, nil
 }
 
 // TakeScreenshot takes a screenshot of the current page state
@@ -162,6 +132,78 @@ func (p *TokenDeploymentPage) TakeScreenshot(filename string) error {
 
 	// Save screenshot to file
 	return os.WriteFile(filename, buf, 0644)
+}
+
+// WaitForErrorState waits for an error to be displayed
+func (p *TokenDeploymentPage) WaitForErrorState() error {
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
+	return chromedp.Run(ctx,
+		chromedp.WaitVisible(`[data-testid="error-display-container"]`, chromedp.ByQuery),
+	)
+}
+
+// GetErrorMessage gets the error message text
+func (p *TokenDeploymentPage) GetErrorMessage() (string, error) {
+	var text string
+	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
+	defer cancel()
+	err := chromedp.Run(ctx,
+		chromedp.WaitVisible(`[data-testid="error-message"]`, chromedp.ByQuery),
+		chromedp.Text(`[data-testid="error-message"]`, &text, chromedp.ByQuery),
+	)
+	return text, err
+}
+
+// ClickRetryButton clicks the retry button if visible
+func (p *TokenDeploymentPage) ClickRetryButton() error {
+	return chromedp.Run(p.ctx,
+		chromedp.WaitVisible(`[data-testid="error-retry-button"]`, chromedp.ByQuery),
+		chromedp.Click(`[data-testid="error-retry-button"]`, chromedp.ByQuery),
+	)
+}
+
+// WaitForNoWalletsMessage waits for the no wallets detected message
+func (p *TokenDeploymentPage) WaitForNoWalletsMessage() error {
+	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
+	defer cancel()
+	return chromedp.Run(ctx,
+		chromedp.WaitVisible(`[data-testid="wallet-no-wallets-message"]`, chromedp.ByQuery),
+	)
+}
+
+// CheckConnectionStatus checks if wallet is connected or shows warning
+func (p *TokenDeploymentPage) CheckConnectionStatus() (string, error) {
+	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
+	defer cancel()
+
+	// Check if wallet is connected
+	var connectedVisible bool
+	err := chromedp.Run(ctx,
+		chromedp.Evaluate(`document.querySelector('[data-testid="wallet-connected-info"]') !== null`, &connectedVisible),
+	)
+	if err != nil {
+		return "error", err
+	}
+
+	if connectedVisible {
+		return "connected", nil
+	}
+
+	// Check if showing not connected warning
+	var warningVisible bool
+	err = chromedp.Run(ctx,
+		chromedp.Evaluate(`document.querySelector('[data-testid="wallet-not-connected-warning"]') !== null`, &warningVisible),
+	)
+	if err != nil {
+		return "error", err
+	}
+
+	if warningVisible {
+		return "not_connected", nil
+	}
+
+	return "unknown", nil
 }
 
 // GetPageTitle gets the page title

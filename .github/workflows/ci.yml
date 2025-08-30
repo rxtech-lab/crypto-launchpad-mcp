@@ -46,12 +46,14 @@ jobs:
             git status --porcelain
             exit 1
           fi
-
-      - name: Run tests
-        run: make generate && make test
+      - name: Install dependencies
+        run: make deps && make generate
 
       - name: Run build
-        run: make build
+        run: make build-frontend && make build
+
+      - name: Run tests
+        run: make test
 
       - name: Verify build artifacts
         run: |

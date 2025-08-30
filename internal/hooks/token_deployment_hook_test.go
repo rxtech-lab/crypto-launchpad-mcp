@@ -226,7 +226,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_EmptyContractA
 func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultipleRecords() {
 	// Create multiple deployment records with same transaction hash
 	txHash := "0x1111111111111111111111111111111111111111111111111111111111111111"
-	
+
 	deployment1 := &models.Deployment{
 		TemplateID:      1,
 		ChainID:         1,

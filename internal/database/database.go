@@ -322,19 +322,19 @@ func (d *Database) DeleteUniswapDeployment(id uint) error {
 func (d *Database) GetUniswapDeploymentByChain(chainType, chainID string) (*models.UniswapDeployment, error) {
 	var deployment models.UniswapDeployment
 	var chain models.Chain
-	
+
 	// First find the chain
 	err := d.DB.Where("chain_type = ? AND chain_id = ?", chainType, chainID).First(&chain).Error
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Then find deployment for this chain
 	err = d.DB.Where("chain_id = ?", chain.ID).Preload("Chain").First(&deployment).Error
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &deployment, nil
 }
 
@@ -486,7 +486,7 @@ func (d *Database) CreateTransactionSession(sessionType string, chainType models
 
 func (d *Database) UpdateTransactionSessionStatus(sessionID string, status models.TransactionStatus, txHash string) error {
 	updates := map[string]interface{}{
-		"status": status,
+		"transaction_status": status,
 	}
 	if txHash != "" {
 		updates["transaction_hash"] = txHash

@@ -2,36 +2,91 @@ package api
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/chromedp/chromedp"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	e2e "github.com/rxtech-lab/launchpad-mcp/e2e/api"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/rxtech-lab/launchpad-mcp/internal/api"
+	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/stretchr/testify/require"
 )
 
+// Constants for testing
+const (
+	TESTNET_RPC      = "http://localhost:8545"
+	TESTNET_CHAIN_ID = "31337"
+	TESTING_PK_1     = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	TESTING_PK_2     = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+)
+
+// TestSetup provides the core test infrastructure
+type TestSetup struct {
+	t          *testing.T
+	DB         *database.Database
+	EthClient  *ethclient.Client
+	TxService  services.TransactionService
+	ServerPort int
+}
+
 // ChromedpTestSetup extends the base TestSetup with chromedp capabilities
 type ChromedpTestSetup struct {
-	*e2e.TestSetup
+	*TestSetup
+	apiServer            *api.APIServer
 	ctx                  context.Context
 	cancel               context.CancelFunc
-	t                    *testing.T
 	walletProviderScript string
+}
+
+// NewTestSetup creates the base test infrastructure
+func NewTestSetup(t *testing.T) *TestSetup {
+	// Create in-memory database
+	db, err := database.NewDatabase(":memory:")
+	require.NoError(t, err)
+
+	// Connect to Ethereum testnet
+	ethClient, err := ethclient.Dial(TESTNET_RPC)
+	require.NoError(t, err)
+
+	// Create transaction service
+	txService := services.NewTransactionService(db.DB)
+
+	// Get a random port for test server
+	listener, err := net.Listen("tcp", ":0")
+	require.NoError(t, err)
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	return &TestSetup{
+		t:          t,
+		DB:         db,
+		EthClient:  ethClient,
+		TxService:  txService,
+		ServerPort: port,
+	}
 }
 
 // NewChromedpTestSetup creates a complete chromedp test environment
 func NewChromedpTestSetup(t *testing.T) *ChromedpTestSetup {
 	setup := &ChromedpTestSetup{
-		TestSetup: e2e.NewTestSetup(t),
-		t:         t,
+		TestSetup: NewTestSetup(t),
 	}
+
+	// Start HTTP server for E2E tests
+	err := setup.startAPIServer()
+	require.NoError(t, err)
 
 	// Setup Chrome options
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
@@ -56,6 +111,27 @@ func NewChromedpTestSetup(t *testing.T) *ChromedpTestSetup {
 	setup.injectWalletProvider()
 
 	return setup
+}
+
+// startAPIServer starts the HTTP API server for E2E testing
+func (s *ChromedpTestSetup) startAPIServer() error {
+	// Initialize hook service
+	hookService := services.NewHookService()
+
+	// Initialize API server
+	apiServer := api.NewAPIServer(s.TestSetup.DB, s.TestSetup.TxService, hookService)
+	port, err := apiServer.Start()
+	if err != nil {
+		return fmt.Errorf("failed to start API server: %w", err)
+	}
+
+	s.apiServer = apiServer
+	s.TestSetup.ServerPort = port
+
+	// Wait for server to be ready
+	time.Sleep(100 * time.Millisecond)
+
+	return nil
 }
 
 // injectWalletProvider injects the test wallet provider script
@@ -220,15 +296,18 @@ func (s *ChromedpTestSetup) InitializeTestWallet() error {
 					console.log("No walletManager found");
 				}
 				
-				// Check wallet select element
-				const walletSelect = document.getElementById("wallet-select");
+				// Check wallet select element (new data-testid approach)
+				const walletSelect = document.querySelector('[data-testid="wallet-selector-dropdown"]');
 				if (walletSelect) {
-					console.log("Wallet select found with", walletSelect.options.length, "options");
-					for (let i = 0; i < walletSelect.options.length; i++) {
-						console.log("  Option", i + ":", walletSelect.options[i].value, walletSelect.options[i].text);
-					}
+					console.log("Wallet selector dropdown found");
+					// Check for wallet options
+					const walletOptions = document.querySelectorAll('[data-testid^="wallet-selector-option-"]');
+					console.log("Found", walletOptions.length, "wallet options");
+					walletOptions.forEach((option, index) => {
+						console.log("  Option", index + ":", option.textContent);
+					});
 				} else {
-					console.log("No wallet-select element found");
+					console.log("No wallet-selector-dropdown element found");
 				}
 			}, 500);
 		}, 100);
@@ -259,7 +338,7 @@ func (s *ChromedpTestSetup) InitializeTestWallet() error {
 // getOrCreateTestChain gets or creates a test chain for e2e testing
 func (s *ChromedpTestSetup) getOrCreateTestChain() (*models.Chain, error) {
 	// Try to get existing active chain
-	activeChain, err := s.DB.GetActiveChain()
+	activeChain, err := s.TestSetup.DB.GetActiveChain()
 	if err == nil && activeChain != nil {
 		return activeChain, nil
 	}
@@ -273,7 +352,7 @@ func (s *ChromedpTestSetup) getOrCreateTestChain() (*models.Chain, error) {
 		IsActive:  true,
 	}
 
-	err = s.DB.CreateChain(testChain)
+	err = s.TestSetup.DB.CreateChain(testChain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create test chain: %w", err)
 	}
@@ -296,7 +375,7 @@ func (s *ChromedpTestSetup) CreateUniswapDeploymentSession() (string, error) {
 		Status:  models.TransactionStatusPending,
 	}
 
-	err = s.DB.DB.Create(deployment).Error
+	err = s.TestSetup.DB.DB.Create(deployment).Error
 	if err != nil {
 		return "", fmt.Errorf("failed to create uniswap deployment: %w", err)
 	}
@@ -319,7 +398,7 @@ func (s *ChromedpTestSetup) CreateUniswapDeploymentSession() (string, error) {
 	}
 
 	// Create transaction session in database
-	sessionID, err := s.DB.CreateTransactionSession(
+	sessionID, err := s.TestSetup.DB.CreateTransactionSession(
 		"deploy_uniswap",
 		"ethereum",
 		"31337",
@@ -350,7 +429,7 @@ contract TestToken is ERC20 {
 }`,
 	}
 
-	err := s.DB.CreateTemplate(template)
+	err := s.TestSetup.DB.CreateTemplate(template)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create OpenZeppelin template: %w", err)
 	}
@@ -412,7 +491,7 @@ contract CustomToken {
 }`,
 	}
 
-	err := s.DB.CreateTemplate(template)
+	err := s.TestSetup.DB.CreateTemplate(template)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create custom template: %w", err)
 	}
@@ -420,10 +499,10 @@ contract CustomToken {
 	return template.ID, nil
 }
 
-// CreateTokenDeploymentSession creates a token deployment session for testing
+// CreateTokenDeploymentSession creates a token deployment session for testing using the proper TransactionService
 func (s *ChromedpTestSetup) CreateTokenDeploymentSession(templateID uint) (string, error) {
 	// Get the template to include in session data
-	template, err := s.DB.GetTemplateByID(templateID)
+	template, err := s.TestSetup.DB.GetTemplateByID(templateID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get template: %w", err)
 	}
@@ -443,39 +522,37 @@ func (s *ChromedpTestSetup) CreateTokenDeploymentSession(templateID uint) (strin
 		Status:      "pending",
 	}
 
-	err = s.DB.CreateDeployment(deployment)
+	err = s.TestSetup.DB.CreateDeployment(deployment)
 	if err != nil {
 		return "", fmt.Errorf("failed to create deployment record: %w", err)
 	}
 
-	// Create session data that matches the expected format
-	sessionData := map[string]interface{}{
-		"deployment_id": deployment.ID,
-		"template_id":   templateID,
-		"template_name": template.Name,
-		"chain_id":      "31337",
-		"parameters": map[string]interface{}{
-			"name":   "Test Token",
-			"symbol": "TEST",
-		},
-		"metadata": map[string]interface{}{
-			"chain":     "Ethereum Testnet",
-			"initiator": "E2E Test",
-		},
-	}
+	// Create a simple transaction deployment with basic contract bytecode for testing
+	// We'll use a minimal ERC20-like bytecode that deploys successfully
+	testBytecode := "0x608060405234801561001057600080fd5b50336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555061003e8061005d6000396000f3fe6080604052600080fdfea26469706673582212205c6b0e6b8f8e1a4c5e8e9f4d8f3b6c4e8f9f1c8e5f4c8e6f4c8e6f4c8e6f4c8e64736f6c63430008130033"
 
-	sessionDataJSON, err := json.Marshal(sessionData)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal session data: %w", err)
-	}
-
-	// Create transaction session in database
-	sessionID, err := s.DB.CreateTransactionSession(
-		"deploy",
-		"ethereum",
-		"31337",
-		string(sessionDataJSON),
-	)
+	// Create transaction session using the proper service (like launch.go does)
+	sessionID, err := s.TestSetup.TxService.CreateTransactionSession(services.CreateTransactionSessionRequest{
+		Metadata: []models.TransactionMetadata{
+			{Key: "deployment_id", Value: fmt.Sprintf("%d", deployment.ID)},
+			{Key: "template_id", Value: fmt.Sprintf("%d", templateID)},
+			{Key: "template_name", Value: template.Name},
+			{Key: "chain", Value: "Ethereum Testnet"},
+			{Key: "initiator", Value: "E2E Test"},
+		},
+		TransactionDeployments: []models.TransactionDeployment{
+			{
+				Title:       fmt.Sprintf("Deploy %s", template.Name),
+				Description: fmt.Sprintf("Deploy %s token contract", template.Name),
+				Data:        testBytecode,
+				Value:       "0",
+				Receiver:    "0x0000000000000000000000000000000000000000",
+				Status:      models.TransactionStatusPending,
+			},
+		},
+		ChainType: models.TransactionChainTypeEthereum,
+		ChainID:   chain.ID,
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to create transaction session: %w", err)
 	}
@@ -485,13 +562,13 @@ func (s *ChromedpTestSetup) CreateTokenDeploymentSession(templateID uint) (strin
 
 // GetBaseURL returns the base URL for the test server
 func (s *ChromedpTestSetup) GetBaseURL() string {
-	return fmt.Sprintf("http://localhost:%d", s.ServerPort)
+	return fmt.Sprintf("http://localhost:%d", s.TestSetup.ServerPort)
 }
 
 // TakeScreenshotOnFailure takes a screenshot if the test fails
 func (s *ChromedpTestSetup) TakeScreenshotOnFailure(t *testing.T, testName string) {
 	if t.Failed() {
-		filename := fmt.Sprintf("screenshot_%s_%d.png", testName, s.ServerPort)
+		filename := fmt.Sprintf("screenshot_%s_%d.png", testName, s.TestSetup.ServerPort)
 		var buf []byte
 		if err := chromedp.Run(s.ctx, chromedp.FullScreenshot(&buf, 90)); err == nil {
 			os.WriteFile(filename, buf, 0644)
@@ -505,7 +582,7 @@ func (s *ChromedpTestSetup) VerifyContractDeployment(contractAddress string) err
 	ctx := context.Background()
 
 	address := common.HexToAddress(contractAddress)
-	code, err := s.EthClient.CodeAt(ctx, address, nil)
+	code, err := s.TestSetup.EthClient.CodeAt(ctx, address, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get contract code: %w", err)
 	}
@@ -520,7 +597,7 @@ func (s *ChromedpTestSetup) VerifyContractDeployment(contractAddress string) err
 // WaitForTransactionConfirmation waits for a transaction to be models.TransactionStatusConfirmed
 func (s *ChromedpTestSetup) WaitForTransactionConfirmation(txHash string) error {
 	hash := common.HexToHash(txHash)
-	receipt, err := s.WaitForTransaction(hash, 60) // 60 second timeout
+	receipt, err := s.TestSetup.WaitForTransaction(hash, 60) // 60 second timeout
 	if err != nil {
 		return fmt.Errorf("transaction confirmation failed: %w", err)
 	}
@@ -530,6 +607,67 @@ func (s *ChromedpTestSetup) WaitForTransactionConfirmation(txHash string) error 
 	}
 
 	return nil
+}
+
+// VerifyEthereumConnection verifies connection to Ethereum testnet
+func (s *TestSetup) VerifyEthereumConnection() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := s.EthClient.NetworkID(ctx)
+	return err
+}
+
+// GetPrimaryTestAccount returns the primary test account
+func (s *ChromedpTestSetup) GetPrimaryTestAccount() *TestAccount {
+	privateKey, err := crypto.HexToECDSA(TESTING_PK_1[2:]) // Remove 0x prefix
+	require.NoError(s.TestSetup.t, err)
+
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	require.True(s.TestSetup.t, ok)
+
+	address := crypto.PubkeyToAddress(*publicKeyECDSA)
+
+	return &TestAccount{
+		PrivateKey: privateKey,
+		Address:    address,
+	}
+}
+
+// TestAccount represents a test account
+type TestAccount struct {
+	PrivateKey *ecdsa.PrivateKey
+	Address    common.Address
+}
+
+// WaitForTransaction waits for transaction confirmation
+func (s *TestSetup) WaitForTransaction(txHash common.Hash, timeoutSeconds int) (*types.Receipt, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("timeout waiting for transaction %s", txHash.Hex())
+		default:
+			receipt, err := s.EthClient.TransactionReceipt(ctx, txHash)
+			if err == nil {
+				return receipt, nil
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+}
+
+// Cleanup properly shuts down the TestSetup
+func (s *TestSetup) Cleanup() {
+	if s.EthClient != nil {
+		s.EthClient.Close()
+	}
+	if s.DB != nil {
+		s.DB.Close()
+	}
 }
 
 // Cleanup properly shuts down all test infrastructure
@@ -581,6 +719,11 @@ func (s *ChromedpTestSetup) Cleanup() {
 				s.t.Logf("  %+v", entry)
 			}
 		}
+	}
+
+	// Shutdown API server
+	if s.apiServer != nil {
+		s.apiServer.Shutdown()
 	}
 
 	if s.cancel != nil {
