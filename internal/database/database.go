@@ -448,6 +448,11 @@ func (d *Database) GetSwapTransactionsByUser(userAddress string) ([]models.SwapT
 }
 
 func (d *Database) CreateTransactionSession(sessionType string, chainType models.TransactionChainType, chainID, data string) (string, error) {
+	return d.CreateTransactionSessionWithUser(sessionType, chainType, chainID, data, nil)
+}
+
+// CreateTransactionSessionWithUser creates a transaction session with optional user ID
+func (d *Database) CreateTransactionSessionWithUser(sessionType string, chainType models.TransactionChainType, chainID, data string, userID *string) (string, error) {
 	// Generate a UUID for the session ID
 	sessionID := fmt.Sprintf("%s-%d", sessionType, time.Now().UnixNano())
 
@@ -470,6 +475,7 @@ func (d *Database) CreateTransactionSession(sessionType string, chainType models
 
 	session := &models.TransactionSession{
 		ID:                   sessionID,
+		UserID:               userID,
 		Metadata:             metadata,
 		TransactionStatus:    models.TransactionStatusPending,
 		TransactionChainType: chainType,
@@ -501,4 +507,62 @@ func (d *Database) Close() error {
 		return err
 	}
 	return sqlDB.Close()
+}
+
+// User-filtered query methods
+
+// ListDeploymentsByUser returns all deployments for a specific user
+func (d *Database) ListDeploymentsByUser(userID string) ([]models.Deployment, error) {
+	var deployments []models.Deployment
+	err := d.DB.Preload("Template").Where("user_id = ?", userID).Find(&deployments).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// Manually load Chain relationships
+	for i := range deployments {
+		var chain models.Chain
+		err = d.DB.First(&chain, deployments[i].ChainID).Error
+		if err != nil {
+			return nil, err
+		}
+		deployments[i].Chain = chain
+	}
+
+	return deployments, nil
+}
+
+// ListTransactionSessionsByUser returns all transaction sessions for a specific user
+func (d *Database) ListTransactionSessionsByUser(userID string) ([]models.TransactionSession, error) {
+	var sessions []models.TransactionSession
+	err := d.DB.Preload("Chain").Where("user_id = ?", userID).Find(&sessions).Error
+	return sessions, err
+}
+
+// ListUniswapDeploymentsByUser returns all Uniswap deployments for a specific user
+func (d *Database) ListUniswapDeploymentsByUser(userID string) ([]models.UniswapDeployment, error) {
+	var deployments []models.UniswapDeployment
+	err := d.DB.Preload("Chain").Where("user_id = ?", userID).Find(&deployments).Error
+	return deployments, err
+}
+
+// ListLiquidityPoolsByUser returns all liquidity pools created by a specific user
+func (d *Database) ListLiquidityPoolsByUser(userID string) ([]models.LiquidityPool, error) {
+	var pools []models.LiquidityPool
+	err := d.DB.Where("user_id = ?", userID).Find(&pools).Error
+	return pools, err
+}
+
+// ListLiquidityPositionsByUser returns all liquidity positions for a specific user
+func (d *Database) ListLiquidityPositionsByUser(userID string) ([]models.LiquidityPosition, error) {
+	var positions []models.LiquidityPosition
+	err := d.DB.Preload("Pool").Where("user_id = ?", userID).Find(&positions).Error
+	return positions, err
+}
+
+// ListSwapTransactionsByUser returns all swap transactions for a specific user
+func (d *Database) ListSwapTransactionsByUser(userID string) ([]models.SwapTransaction, error) {
+	var swaps []models.SwapTransaction
+	err := d.DB.Where("user_id = ?", userID).Find(&swaps).Error
+	return swaps, err
 }

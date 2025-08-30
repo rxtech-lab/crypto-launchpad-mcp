@@ -55,6 +55,7 @@ type TransactionDeployment struct {
 // TransactionSession represents signing session management
 type TransactionSession struct {
 	ID                   string                `gorm:"primaryKey" json:"id"`
+	UserID               *string               `gorm:"index;type:varchar(255)" json:"user_id,omitempty"`
 	Metadata             []TransactionMetadata `gorm:"serializer:json" json:"metadata"`
 	TransactionStatus    TransactionStatus     `gorm:"default:pending" json:"status"`
 	TransactionChainType TransactionChainType  `gorm:"not null" json:"chain_type"`

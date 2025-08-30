@@ -12,12 +12,14 @@ type UniswapService interface {
 	GetUniswapDeployment(deploymentID uint) (*models.UniswapDeployment, error)
 	GetUniswapDeploymentByChain(chainID uint) (*models.UniswapDeployment, error)
 	CreateUniswapDeployment(chainID uint, version string) (uint, error)
+	CreateUniswapDeploymentWithUser(chainID uint, version string, userID *string) (uint, error)
 	UpdateFactoryAddress(deploymentID uint, factoryAddress string) error
 	UpdateRouterAddress(deploymentID uint, routerAddress string) error
 	UpdateWETHAddress(deploymentID uint, wethAddress string) error
 	UpdateDeployerAddress(deploymentID uint, deployerAddress string) error
 	UpdateStatus(deploymentID uint, status models.TransactionStatus) error
 	ListUniswapDeployments(skip, limit int) ([]models.UniswapDeployment, error)
+	ListUniswapDeploymentsByUser(userID string, skip, limit int) ([]models.UniswapDeployment, error)
 	DeleteUniswapDeployment(deploymentID uint) error
 	DeleteUniswapDeployments(deploymentIDs []uint) error
 }
@@ -66,9 +68,14 @@ func NewUniswapService(db *gorm.DB) UniswapService {
 }
 
 func (u *uniswapService) CreateUniswapDeployment(chainID uint, version string) (uint, error) {
+	return u.CreateUniswapDeploymentWithUser(chainID, version, nil)
+}
+
+func (u *uniswapService) CreateUniswapDeploymentWithUser(chainID uint, version string, userID *string) (uint, error) {
 	deployment := &models.UniswapDeployment{
 		ChainID: chainID,
 		Version: version,
+		UserID:  userID,
 		Status:  models.TransactionStatusPending,
 	}
 	err := u.db.Create(deployment).Error
@@ -123,6 +130,15 @@ func (u *uniswapService) GetUniswapDeploymentByChain(chainID uint) (*models.Unis
 func (u *uniswapService) ListUniswapDeployments(skip, limit int) ([]models.UniswapDeployment, error) {
 	var deployments []models.UniswapDeployment
 	err := u.db.Offset(skip).Limit(limit).Find(&deployments).Error
+	if err != nil {
+		return nil, err
+	}
+	return deployments, nil
+}
+
+func (u *uniswapService) ListUniswapDeploymentsByUser(userID string, skip, limit int) ([]models.UniswapDeployment, error) {
+	var deployments []models.UniswapDeployment
+	err := u.db.Where("user_id = ?", userID).Offset(skip).Limit(limit).Find(&deployments).Error
 	if err != nil {
 		return nil, err
 	}
