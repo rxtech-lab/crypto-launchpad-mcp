@@ -58,7 +58,7 @@ func (s *DeploymentService) UpdateDeploymentStatus(id uint, status models.Transa
 	if contractAddress != "" {
 		updates["contract_address"] = contractAddress
 	}
-	
+
 	return s.db.Model(&models.Deployment{}).Where("id = ?", id).Updates(updates).Error
 }
 
