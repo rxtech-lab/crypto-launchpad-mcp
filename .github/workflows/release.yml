@@ -26,9 +26,9 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
           check-latest: true
-
+      - uses: oven-sh/setup-bun@v2
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -38,7 +38,7 @@ jobs:
         run: make deps && make generate
 
       - name: Build Ubuntu binary
-        run: make build
+        run: make build-frontend && make build
         env:
           VERSION: ${{ github.event_name == 'release' && github.ref_name || format('dev-{0}', github.sha) }}
 
@@ -71,14 +71,15 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
           check-latest: true
+      - uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
         run: make deps && make generate
 
       - name: Build the binary
-        run: make build
+        run: make build-frontend && make build
         env:
           VERSION: ${{ github.event_name == 'release' && github.ref_name || format('dev-{0}', github.sha) }}
 

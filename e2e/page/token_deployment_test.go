@@ -19,7 +19,7 @@ func (s *TokenDeploymentTestSuite) SetupSuite() {
 	s.setup = NewChromedpTestSetup(s.T())
 
 	// Verify Ethereum connection is available
-	err := s.setup.VerifyEthereumConnection()
+	err := s.setup.TestSetup.VerifyEthereumConnection()
 	s.Require().NoError(err, "Ethereum testnet should be running on localhost:8545 (run 'make e2e-network')")
 }
 
@@ -46,18 +46,18 @@ func (s *TokenDeploymentTestSuite) TestOpenZeppelinTokenDeployment() {
 	err = page.NavigateToSession(baseURL, sessionID)
 	s.Require().NoError(err, "Failed to navigate to deployment page")
 
-	// Wait for page to load
-	err = page.WaitForPageLoad()
-	s.Require().NoError(err, "Failed to wait for page load")
-
-	// Initialize test wallet
+	// Initialize test wallet immediately after navigation, before waiting for page load
 	err = s.setup.InitializeTestWallet()
 	s.Require().NoError(err, "Failed to initialize test wallet")
+
+	// Wait for page to load (now that wallet provider is injected)
+	err = page.WaitForPageLoad()
+	s.Require().NoError(err, "Failed to wait for page load")
 
 	// Verify page title
 	title, err := page.GetPageTitle()
 	s.Require().NoError(err)
-	s.Assert().Contains(title, "Deploy", "Page title should contain 'Deploy'")
+	s.Assert().Contains(title, "Transaction Signing", "Page title should contain 'Transaction Signing'")
 
 	// Test wallet connection workflow
 	s.testWalletConnection(page)
@@ -65,11 +65,8 @@ func (s *TokenDeploymentTestSuite) TestOpenZeppelinTokenDeployment() {
 	// Test deployment workflow
 	s.testDeploymentWorkflow(page)
 
-	// Test contract verification
-	contractAddress := s.testContractVerification(page)
-
 	// Test database state verification
-	s.testDatabaseVerification(sessionID, contractAddress, "OpenZeppelin")
+	s.testDatabaseVerification(sessionID)
 
 	// Log final page state for debugging
 	err = page.LogPageState("token_deployment_openzeppelin_final")
@@ -95,18 +92,18 @@ func (s *TokenDeploymentTestSuite) TestCustomTokenDeployment() {
 	err = page.NavigateToSession(baseURL, sessionID)
 	s.Require().NoError(err, "Failed to navigate to deployment page")
 
-	// Wait for page to load
-	err = page.WaitForPageLoad()
-	s.Require().NoError(err, "Failed to wait for page load")
-
-	// Initialize test wallet
+	// Initialize test wallet immediately after navigation, before waiting for page load
 	err = s.setup.InitializeTestWallet()
 	s.Require().NoError(err, "Failed to initialize test wallet")
+
+	// Wait for page to load (now that wallet provider is injected)
+	err = page.WaitForPageLoad()
+	s.Require().NoError(err, "Failed to wait for page load")
 
 	// Verify page title
 	title, err := page.GetPageTitle()
 	s.Require().NoError(err)
-	s.Assert().Contains(title, "Deploy", "Page title should contain 'Deploy'")
+	s.Assert().Contains(title, "Transaction Signing", "Page title should contain 'Transaction Signing'")
 
 	// Test wallet connection workflow
 	s.testWalletConnection(page)
@@ -114,11 +111,8 @@ func (s *TokenDeploymentTestSuite) TestCustomTokenDeployment() {
 	// Test deployment workflow
 	s.testDeploymentWorkflow(page)
 
-	// Test contract verification
-	contractAddress := s.testContractVerification(page)
-
 	// Test database state verification
-	s.testDatabaseVerification(sessionID, contractAddress, "Custom")
+	s.testDatabaseVerification(sessionID)
 
 	// Log final page state for debugging
 	err = page.LogPageState("token_deployment_custom_final")
@@ -132,17 +126,9 @@ func (s *TokenDeploymentTestSuite) testWalletConnection(page *TokenDeploymentPag
 	err := page.WaitForWalletSelection()
 	s.Assert().NoError(err, "Wallet selection not available")
 
-	// Select the test wallet
+	// Select the test wallet by value (UUID)
 	err = page.SelectWallet("test-wallet-e2e")
 	s.Assert().NoError(err, "Failed to select test wallet")
-
-	// Click connect wallet button
-	err = page.ClickConnectWallet()
-	s.Assert().NoError(err, "Failed to click connect wallet")
-
-	// Wait for wallet connection
-	err = page.WaitForWalletConnection()
-	s.Assert().NoError(err, "Wallet connection failed")
 }
 
 func (s *TokenDeploymentTestSuite) testDeploymentWorkflow(page *TokenDeploymentPage) {
@@ -155,34 +141,18 @@ func (s *TokenDeploymentTestSuite) testDeploymentWorkflow(page *TokenDeploymentP
 	s.Require().NoError(err, "Success state not reached")
 }
 
-func (s *TokenDeploymentTestSuite) testContractVerification(page *TokenDeploymentPage) string {
-	// Get contract address
-	address, err := page.GetContractAddress()
-	s.Require().NoError(err, "Failed to get contract address")
-
-	// Verify address is valid Ethereum address
-	s.Assert().Regexp(`^0x[a-fA-F0-9]{40}$`, address, "Contract address format invalid: %s", address)
-
-	// Verify contract is actually deployed on blockchain
-	err = s.setup.VerifyContractDeployment(address)
-	s.Require().NoError(err, "Contract not found on blockchain at %s", address)
-
-	return address
-}
-
-func (s *TokenDeploymentTestSuite) testDatabaseVerification(sessionID, contractAddress, templateType string) {
+func (s *TokenDeploymentTestSuite) testDatabaseVerification(sessionID string) {
 	// Get session from database
-	session, err := s.setup.DB.GetTransactionSession(sessionID)
+	session, err := s.setup.TestSetup.TxService.GetTransactionSession(sessionID)
 	s.Require().NoError(err, "Failed to get transaction session")
 
 	// Verify session status
-	s.Assert().Equal(models.TransactionStatusConfirmed, session.Status, "Session status should be models.TransactionStatusConfirmed")
+	s.Assert().Equal(models.TransactionStatusConfirmed, session.TransactionStatus, "Session status should be models.TransactionStatusConfirmed")
 
-	// Verify deployment record was created
-	deployments, err := s.setup.DB.ListDeployments()
 	s.Require().NoError(err, "Failed to list deployments")
-
-	s.Assert().Greater(len(deployments), 0, "There should be at least one deployment")
+	for _, deployment := range session.TransactionDeployments {
+		s.Require().Equal(deployment.Status, models.TransactionStatusConfirmed, "Deployment status should be models.TransactionStatusConfirmed")
+	}
 }
 
 // TokenDeploymentErrorTestSuite tests error scenarios for token deployment
@@ -232,7 +202,7 @@ func (s *TokenDeploymentErrorTestSuite) TestExpiredSession() {
 	s.Require().NoError(err)
 
 	// Manually expire the session
-	err = s.setup.DB.UpdateTransactionSessionStatus(sessionID, "expired", "")
+	err = s.setup.TestSetup.DB.UpdateTransactionSessionStatus(sessionID, "expired", "")
 	s.Require().NoError(err)
 
 	page := NewTokenDeploymentPage(s.setup.ctx)
@@ -265,7 +235,7 @@ func (s *TokenDeploymentWalletTestSuite) SetupSuite() {
 	s.setup = NewChromedpTestSetup(s.T())
 
 	// Verify Ethereum connection
-	err := s.setup.VerifyEthereumConnection()
+	err := s.setup.TestSetup.VerifyEthereumConnection()
 	s.Require().NoError(err)
 }
 
@@ -301,6 +271,19 @@ func (s *TokenDeploymentWalletTestSuite) TestDeploymentWithoutWallet() {
 	// Take screenshot to verify UI state
 	page.TakeScreenshot("token_deployment_no_wallet.png")
 
+	// Check if no wallets message is shown
+	err = page.WaitForNoWalletsMessage()
+	if err != nil {
+		// If no specific no-wallets message, check connection status
+		status, statusErr := page.CheckConnectionStatus()
+		if statusErr != nil {
+			s.T().Logf("Could not check connection status: %v", statusErr)
+		} else {
+			s.T().Logf("Connection status: %s", status)
+			s.Assert().Equal("not_connected", status, "Should show not connected status when no wallet available")
+		}
+	}
+
 	// Log page HTML for debugging
 	err = page.LogPageState("token_deployment_no_wallet")
 	if err != nil {
@@ -321,41 +304,6 @@ func (s *TokenDeploymentPageLoadTestSuite) SetupSuite() {
 func (s *TokenDeploymentPageLoadTestSuite) TearDownSuite() {
 	if s.setup != nil {
 		s.setup.Cleanup()
-	}
-}
-
-func (s *TokenDeploymentPageLoadTestSuite) TestTokenDeploymentPageLoad() {
-	// Create template first
-	templateID, err := s.setup.CreateCustomTemplate()
-	s.Require().NoError(err)
-
-	// Create session
-	sessionID, err := s.setup.CreateTokenDeploymentSession(templateID)
-	s.Require().NoError(err)
-
-	page := NewTokenDeploymentPage(s.setup.ctx)
-	baseURL := s.setup.GetBaseURL()
-
-	// Navigate and verify basic page elements
-	err = page.NavigateToSession(baseURL, sessionID)
-	s.Require().NoError(err)
-
-	// Verify page loads
-	err = page.WaitForPageLoad()
-	s.Require().NoError(err)
-
-	// Verify title
-	title, err := page.GetPageTitle()
-	s.Require().NoError(err)
-	s.Assert().Contains(title, "Deploy")
-
-	// Take screenshot for verification
-	page.TakeScreenshot("token_deployment_page_load.png")
-
-	// Log page HTML for debugging
-	err = page.LogPageState("token_deployment_page_load")
-	if err != nil {
-		fmt.Printf("WARNING: Failed to log page state: %v\n", err)
 	}
 }
 

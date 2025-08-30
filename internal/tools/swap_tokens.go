@@ -133,7 +133,7 @@ func NewSwapTokensTool(db *database.Database, serverPort int) (mcp.Tool, server.
 			"user_address":       userAddress,
 			"uniswap_version":    uniswapSettings.Version,
 			"chain_type":         activeChain.ChainType,
-			"chain_id":           activeChain.ChainID,
+			"chain_id":           activeChain.NetworkID,
 			"rpc":                activeChain.RPC,
 		}
 
@@ -151,7 +151,7 @@ func NewSwapTokensTool(db *database.Database, serverPort int) (mcp.Tool, server.
 		sessionID, err := db.CreateTransactionSession(
 			"swap",
 			activeChain.ChainType,
-			activeChain.ChainID,
+			activeChain.NetworkID,
 			string(transactionDataJSON),
 		)
 		if err != nil {

@@ -251,7 +251,7 @@ func TestUpdateTemplateHandler_UpdateChainType(t *testing.T) {
 			template := &models.Template{
 				Name:         "Test Template",
 				Description:  "Test description",
-				ChainType:    tt.originalChain,
+				ChainType:    models.TransactionChainType(tt.originalChain),
 				TemplateCode: originalTemplate,
 			}
 			err := db.CreateTemplate(template)
@@ -290,7 +290,7 @@ func TestUpdateTemplateHandler_UpdateChainType(t *testing.T) {
 				// Verify database update
 				updatedTemplate, err := db.GetTemplateByID(1)
 				assert.NoError(t, err)
-				assert.Equal(t, tt.newChainType, updatedTemplate.ChainType)
+				assert.Equal(t, models.TransactionChainType(tt.newChainType), updatedTemplate.ChainType)
 
 				if tt.newTemplateCode != "" {
 					assert.Equal(t, tt.newTemplateCode, updatedTemplate.TemplateCode)
@@ -363,7 +363,7 @@ pub struct Initialize {}`,
 			template := &models.Template{
 				Name:         "Test Template",
 				Description:  "Test description",
-				ChainType:    tt.chainType,
+				ChainType:    models.TransactionChainType(tt.chainType),
 				TemplateCode: originalTemplate,
 			}
 			err := db.CreateTemplate(template)

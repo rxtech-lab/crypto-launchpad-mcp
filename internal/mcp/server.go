@@ -8,6 +8,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/tools"
 )
 
@@ -16,15 +17,15 @@ type MCPServer struct {
 	db     *database.Database
 }
 
-func NewMCPServer(db *database.Database, serverPort int) *MCPServer {
+func NewMCPServer(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService) *MCPServer {
 	mcpServer := &MCPServer{
 		db: db,
 	}
-	mcpServer.InitializeTools(db, serverPort)
+	mcpServer.InitializeTools(db, serverPort, evmService, txService, uniswapService, liquidityService)
 	return mcpServer
 }
 
-func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
+func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService) {
 	srv := server.NewMCPServer(
 		"Crypto Launchpad MCP Server",
 		"1.0.0",
@@ -81,8 +82,8 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	srv.AddTool(deleteTemplateTool, deleteTemplateHandler)
 
 	// Deployment Tools
-	launchTool, launchHandler := tools.NewLaunchTool(db, serverPort)
-	srv.AddTool(launchTool, launchHandler)
+	launchTool := tools.NewLaunchTool(db, serverPort, evmService, txService)
+	srv.AddTool(launchTool.GetTool(), launchTool.GetHandler())
 
 	listDeploymentsTool, listDeploymentsHandler := tools.NewListDeploymentsTool(db)
 	srv.AddTool(listDeploymentsTool, listDeploymentsHandler)
@@ -95,11 +96,11 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	srv.AddTool(getUniswapAddressesTool, getUniswapAddressesHandler)
 
 	// Liquidity Management Tools
-	createLiquidityPoolTool, createLiquidityPoolHandler := tools.NewCreateLiquidityPoolTool(db, serverPort)
-	srv.AddTool(createLiquidityPoolTool, createLiquidityPoolHandler)
+	liqudityPoolTool := tools.NewCreateLiquidityPoolTool(db, serverPort, evmService, txService, liquidityService, uniswapService)
+	srv.AddTool(liqudityPoolTool.GetTool(), liqudityPoolTool.GetHandler())
 
-	addLiquidityTool, addLiquidityHandler := tools.NewAddLiquidityTool(db, serverPort)
-	srv.AddTool(addLiquidityTool, addLiquidityHandler)
+	addLiquidityTool := tools.NewAddLiquidityTool(db, serverPort, evmService, txService, liquidityService, uniswapService)
+	srv.AddTool(addLiquidityTool.GetTool(), addLiquidityTool.GetHandler())
 
 	removeLiquidityTool, removeLiquidityHandler := tools.NewRemoveLiquidityTool(db, serverPort)
 	srv.AddTool(removeLiquidityTool, removeLiquidityHandler)
@@ -119,11 +120,11 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int) {
 	srv.AddTool(monitorPoolTool, monitorPoolHandler)
 
 	// Uniswap Deployment Tools
-	deployUniswapTool, deployUniswapHandler := tools.NewDeployUniswapTool(db, serverPort)
-	srv.AddTool(deployUniswapTool, deployUniswapHandler)
+	deployUniswapTool := tools.NewDeployUniswapTool(db, serverPort, evmService, txService, uniswapService)
+	srv.AddTool(deployUniswapTool.GetTool(), deployUniswapTool.GetHandler())
 
-	removeUniswapDeploymentTool, removeUniswapDeploymentHandler := tools.NewRemoveUniswapDeploymentTool(db)
-	srv.AddTool(removeUniswapDeploymentTool, removeUniswapDeploymentHandler)
+	removeUniswapDeploymentTool := tools.NewRemoveUniswapDeploymentTool(db, uniswapService)
+	srv.AddTool(removeUniswapDeploymentTool.GetTool(), removeUniswapDeploymentTool.GetHandler())
 
 	// Balance Query Tools
 	queryBalanceTool, queryBalanceHandler := tools.NewQueryBalanceTool(db, serverPort)

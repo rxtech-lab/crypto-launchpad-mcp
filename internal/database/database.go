@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -292,6 +291,53 @@ func (d *Database) GetActiveUniswapSettings() (*models.UniswapSettings, error) {
 	return &settings, nil
 }
 
+// Uniswap Deployment operations
+func (d *Database) CreateUniswapDeployment(deployment *models.UniswapDeployment) error {
+	return d.DB.Create(deployment).Error
+}
+
+func (d *Database) GetUniswapDeploymentByID(id uint) (*models.UniswapDeployment, error) {
+	var deployment models.UniswapDeployment
+	err := d.DB.Preload("Chain").First(&deployment, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &deployment, nil
+}
+
+func (d *Database) UpdateUniswapDeploymentStatus(id uint, status models.TransactionStatus) error {
+	return d.DB.Model(&models.UniswapDeployment{}).Where("id = ?", id).Update("status", status).Error
+}
+
+func (d *Database) ListUniswapDeployments() ([]models.UniswapDeployment, error) {
+	var deployments []models.UniswapDeployment
+	err := d.DB.Preload("Chain").Find(&deployments).Error
+	return deployments, err
+}
+
+func (d *Database) DeleteUniswapDeployment(id uint) error {
+	return d.DB.Delete(&models.UniswapDeployment{}, id).Error
+}
+
+func (d *Database) GetUniswapDeploymentByChain(chainType, chainID string) (*models.UniswapDeployment, error) {
+	var deployment models.UniswapDeployment
+	var chain models.Chain
+
+	// First find the chain
+	err := d.DB.Where("chain_type = ? AND chain_id = ?", chainType, chainID).First(&chain).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// Then find deployment for this chain
+	err = d.DB.Where("chain_id = ?", chain.ID).Preload("Chain").First(&deployment).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &deployment, nil
+}
+
 // Liquidity Pool operations
 func (d *Database) CreateLiquidityPool(pool *models.LiquidityPool) error {
 	return d.DB.Create(pool).Error
@@ -401,162 +447,52 @@ func (d *Database) GetSwapTransactionsByUser(userAddress string) ([]models.SwapT
 	return swaps, err
 }
 
-// Transaction Session operations
-func (d *Database) CreateTransactionSession(sessionType, chainType, chainID, transactionData string) (string, error) {
-	sessionID := uuid.New().String()
-	session := &models.TransactionSession{
-		ID:              sessionID,
-		SessionType:     sessionType,
-		ChainType:       chainType,
-		ChainID:         chainID,
-		TransactionData: transactionData,
-		Status:          "pending",
-		ExpiresAt:       time.Now().Add(30 * time.Minute), // 30 minute expiry
+func (d *Database) CreateTransactionSession(sessionType string, chainType models.TransactionChainType, chainID, data string) (string, error) {
+	// Generate a UUID for the session ID
+	sessionID := fmt.Sprintf("%s-%d", sessionType, time.Now().UnixNano())
+
+	// Parse chainID to uint
+	var chainIDUint uint
+	if _, err := fmt.Sscanf(chainID, "%d", &chainIDUint); err != nil {
+		// If chainID is not a number, try to find the chain by type and chainID string
+		var chain models.Chain
+		if err := d.DB.Where("chain_type = ? AND chain_id = ?", chainType, chainID).First(&chain).Error; err != nil {
+			return "", fmt.Errorf("failed to find chain: %w", err)
+		}
+		chainIDUint = chain.ID
 	}
 
-	err := d.DB.Create(session).Error
-	if err != nil {
+	// Create metadata for session type
+	metadata := []models.TransactionMetadata{
+		{Key: "session_type", Value: sessionType},
+		{Key: "data", Value: data},
+	}
+
+	session := &models.TransactionSession{
+		ID:                   sessionID,
+		Metadata:             metadata,
+		TransactionStatus:    models.TransactionStatusPending,
+		TransactionChainType: chainType,
+		ChainID:              chainIDUint,
+		ExpiresAt:            time.Now().Add(30 * time.Minute),
+	}
+
+	if err := d.DB.Create(session).Error; err != nil {
 		return "", err
 	}
 
-	return sessionID, nil
-}
-
-func (d *Database) GetTransactionSession(sessionID string) (*models.TransactionSession, error) {
-	var session models.TransactionSession
-	err := d.DB.Where("id = ?", sessionID).First(&session).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if session is expired
-	if time.Now().After(session.ExpiresAt) {
-		return nil, fmt.Errorf("session expired")
-	}
-
-	return &session, nil
+	return session.ID, nil
 }
 
 func (d *Database) UpdateTransactionSessionStatus(sessionID string, status models.TransactionStatus, txHash string) error {
 	updates := map[string]interface{}{
-		"status": status,
+		"transaction_status": status,
 	}
 	if txHash != "" {
 		updates["transaction_hash"] = txHash
 	}
 
 	return d.DB.Model(&models.TransactionSession{}).Where("id = ?", sessionID).Updates(updates).Error
-}
-
-// UniswapDeployment operations
-func (d *Database) CreateUniswapDeployment(deployment *models.UniswapDeployment) error {
-	return d.DB.Create(deployment).Error
-}
-
-func (d *Database) GetUniswapDeploymentByChain(chainType, chainID string) (*models.UniswapDeployment, error) {
-	var deployment models.UniswapDeployment
-	err := d.DB.
-		Joins("JOIN chains ON chains.id = uniswap_deployments.chain_id").
-		Where("chains.chain_type = ? AND chains.chain_id = ? AND uniswap_deployments.status = ?", chainType, chainID, models.TransactionStatusConfirmed).
-		First(&deployment).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// Manually load the Chain relationship
-	var chain models.Chain
-	err = d.DB.First(&chain, deployment.ChainID).Error
-	if err != nil {
-		return nil, err
-	}
-	deployment.Chain = chain
-
-	return &deployment, nil
-}
-
-func (d *Database) GetUniswapDeploymentByID(id uint) (*models.UniswapDeployment, error) {
-	var deployment models.UniswapDeployment
-	err := d.DB.First(&deployment, id).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// Manually load the Chain relationship
-	var chain models.Chain
-	err = d.DB.First(&chain, deployment.ChainID).Error
-	if err != nil {
-		return nil, err
-	}
-	deployment.Chain = chain
-
-	return &deployment, nil
-}
-
-func (d *Database) UpdateUniswapDeploymentStatus(id uint, status models.TransactionStatus, addresses map[string]string, txHashes map[string]string) error {
-	updates := map[string]interface{}{
-		"status": status,
-	}
-
-	// Update addresses if provided
-	if factoryAddr, ok := addresses["factory"]; ok && factoryAddr != "" {
-		updates["factory_address"] = factoryAddr
-	}
-	if routerAddr, ok := addresses["router"]; ok && routerAddr != "" {
-		updates["router_address"] = routerAddr
-	}
-	if wethAddr, ok := addresses["weth"]; ok && wethAddr != "" {
-		updates["weth_address"] = wethAddr
-	}
-	if deployerAddr, ok := addresses["deployer"]; ok && deployerAddr != "" {
-		updates["deployer_address"] = deployerAddr
-	}
-
-	// Update transaction hashes if provided
-	if factoryTx, ok := txHashes["factory"]; ok && factoryTx != "" {
-		updates["factory_tx_hash"] = factoryTx
-	}
-	if routerTx, ok := txHashes["router"]; ok && routerTx != "" {
-		updates["router_tx_hash"] = routerTx
-	}
-	if wethTx, ok := txHashes["weth"]; ok && wethTx != "" {
-		updates["weth_tx_hash"] = wethTx
-	}
-
-	return d.DB.Model(&models.UniswapDeployment{}).Where("id = ?", id).Updates(updates).Error
-}
-
-func (d *Database) ListUniswapDeployments() ([]models.UniswapDeployment, error) {
-	var deployments []models.UniswapDeployment
-	err := d.DB.Find(&deployments).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// Manually load Chain relationships
-	for i := range deployments {
-		var chain models.Chain
-		err = d.DB.First(&chain, deployments[i].ChainID).Error
-		if err != nil {
-			return nil, err
-		}
-		deployments[i].Chain = chain
-	}
-
-	return deployments, nil
-}
-
-func (d *Database) DeleteUniswapDeployments(ids []uint) (int64, error) {
-	if len(ids) == 0 {
-		return 0, nil
-	}
-
-	result := d.DB.Where("id IN ?", ids).Delete(&models.UniswapDeployment{})
-	return result.RowsAffected, result.Error
-}
-
-func (d *Database) ClearUniswapConfiguration(version string) error {
-	// Delete all Uniswap settings for the specified version
-	return d.DB.Where("version = ?", version).Delete(&models.UniswapSettings{}).Error
 }
 
 func (d *Database) Close() error {

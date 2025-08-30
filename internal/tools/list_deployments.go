@@ -68,7 +68,7 @@ func NewListDeploymentsTool(db *database.Database) (mcp.Tool, server.ToolHandler
 			}
 
 			// Apply chain type filter
-			if chainType != "" && deployment.Chain.ChainType != chainType {
+			if chainType != "" && string(deployment.Chain.ChainType) != chainType {
 				continue
 			}
 

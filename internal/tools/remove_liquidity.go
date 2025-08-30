@@ -134,7 +134,7 @@ func NewRemoveLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, se
 			"user_address":     userAddress,
 			"uniswap_version":  uniswapSettings.Version,
 			"chain_type":       activeChain.ChainType,
-			"chain_id":         activeChain.ChainID,
+			"chain_id":         activeChain.NetworkID,
 			"rpc":              activeChain.RPC,
 		}
 
@@ -152,7 +152,7 @@ func NewRemoveLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, se
 		sessionID, err := db.CreateTransactionSession(
 			"remove_liquidity",
 			activeChain.ChainType,
-			activeChain.ChainID,
+			activeChain.NetworkID,
 			string(transactionDataJSON),
 		)
 		if err != nil {

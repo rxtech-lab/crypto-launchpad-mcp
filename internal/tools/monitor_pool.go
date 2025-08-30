@@ -187,7 +187,7 @@ func NewMonitorPoolTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 			"token_deployment":            tokenDeployment,
 			"chain_info": map[string]interface{}{
 				"chain_type": activeChain.ChainType,
-				"chain_id":   activeChain.ChainID,
+				"chain_id":   activeChain.NetworkID,
 				"rpc":        activeChain.RPC,
 			},
 			"notes": []string{

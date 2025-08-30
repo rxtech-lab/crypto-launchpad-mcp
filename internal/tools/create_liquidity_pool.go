@@ -2,17 +2,49 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"strconv"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
+type createLiquidityPoolTool struct {
+	db               *database.Database
+	evmService       services.EvmService
+	txService        services.TransactionService
+	liquidityService services.LiquidityService
+	uniswapService   services.UniswapService
+	serverPort       int
+}
+
+type CreateLiquidityPoolArguments struct {
+	// Required fields
+	TokenAddress       string `json:"token_address" validate:"required"`
+	InitialTokenAmount string `json:"initial_token_amount" validate:"required"`
+	InitialETHAmount   string `json:"initial_eth_amount" validate:"required"`
+
+	// Optional fields
+	Metadata []models.TransactionMetadata `json:"metadata,omitempty"`
+}
+
+func NewCreateLiquidityPoolTool(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, liquidityService services.LiquidityService, uniswapService services.UniswapService) *createLiquidityPoolTool {
+	return &createLiquidityPoolTool{
+		db:               db,
+		evmService:       evmService,
+		txService:        txService,
+		liquidityService: liquidityService,
+		uniswapService:   uniswapService,
+		serverPort:       serverPort,
+	}
+}
+
+func (c *createLiquidityPoolTool) GetTool() mcp.Tool {
 	tool := mcp.NewTool("create_liquidity_pool",
 		mcp.WithDescription("Create new Uniswap liquidity pool with signing interface. Generates a URL where users can connect wallet and sign the pool creation transaction."),
 		mcp.WithString("token_address",
@@ -27,168 +59,125 @@ func NewCreateLiquidityPoolTool(db *database.Database, serverPort int) (mcp.Tool
 			mcp.Required(),
 			mcp.Description("Initial amount of ETH to add to the pool"),
 		),
+		mcp.WithArray("metadata",
+			mcp.Description("JSON array of metadata for the transaction (e.g., [{\"key\": \"Pool Type\", \"value\": \"Liquidity Pool\"}]). Optional."),
+			mcp.Items(map[string]any{
+				"key": map[string]any{
+					"type":        "string",
+					"description": "Key of the metadata",
+				},
+				"value": map[string]any{
+					"type":        "string",
+					"description": "Value of the metadata",
+				},
+			}),
+		),
 	)
+	return tool
+}
 
-	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		tokenAddress, err := request.RequireString("token_address")
-		if err != nil {
-			return nil, fmt.Errorf("token_address parameter is required: %w", err)
+func (c *createLiquidityPoolTool) GetHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args CreateLiquidityPoolArguments
+		if err := request.BindArguments(&args); err != nil {
+			return nil, fmt.Errorf("failed to bind arguments: %w", err)
 		}
 
-		initialTokenAmount, err := request.RequireString("initial_token_amount")
-		if err != nil {
-			return nil, fmt.Errorf("initial_token_amount parameter is required: %w", err)
-		}
-
-		initialETHAmount, err := request.RequireString("initial_eth_amount")
-		if err != nil {
-			return nil, fmt.Errorf("initial_eth_amount parameter is required: %w", err)
+		if err := validator.New().Struct(args); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid arguments: %v", err)), nil
 		}
 
 		// Get active chain configuration
-		activeChain, err := db.GetActiveChain()
+		activeChain, err := c.db.GetActiveChain()
 		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("No active chain selected. Please use select_chain tool first"),
-				},
-			}, nil
+			return mcp.NewToolResultError("No active chain selected. Please use select_chain tool first"), nil
 		}
 
 		// Currently only support Ethereum
-		if activeChain.ChainType != "ethereum" {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("Uniswap pools are only supported on Ethereum"),
-				},
-			}, nil
+		if activeChain.ChainType != models.TransactionChainTypeEthereum {
+			return mcp.NewToolResultError(fmt.Sprintf("Uniswap pools are only supported on Ethereum, got %s", activeChain.ChainType)), nil
 		}
 
-		// Get active Uniswap settings
-		uniswapSettings, err := db.GetActiveUniswapSettings()
-		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("No Uniswap version selected. Please use set_uniswap_version tool first"),
-				},
-			}, nil
-		}
+		return c.createEthereumLiquidityPool(ctx, args, activeChain)
+	}
+}
 
-		// Check if pool already exists
-		existingPool, err := db.GetLiquidityPoolByTokenAddress(tokenAddress)
-		if err == nil && existingPool != nil {
-			// delete the pool if not models.TransactionStatusConfirmed
-			if existingPool.Status != models.TransactionStatusConfirmed {
-				if err := db.DeleteLiquidityPool(existingPool.ID); err != nil {
-					return &mcp.CallToolResult{
-						Content: []mcp.Content{
-							mcp.NewTextContent("Error: "),
-							mcp.NewTextContent(fmt.Sprintf("Failed to delete pending pool: %v", err)),
-						},
-					}, nil
-				}
-			} else {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						mcp.NewTextContent("Error: "),
-						mcp.NewTextContent("Liquidity pool already exists for this token"),
-					},
-				}, nil
-			}
-		}
-
-		// Create liquidity pool record
-		// Creator address will be set when wallet connects on the web interface
-		initialPrice, _, err := utils.CalculateInitialTokenPrice(initialTokenAmount, initialETHAmount, 18)
-		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error calculating initial price: %v", err)),
-				},
-			}, nil
-		}
-
-		pool := &models.LiquidityPool{
-			TokenAddress:   tokenAddress,
-			UniswapVersion: uniswapSettings.Version,
-			Token0:         tokenAddress,
-			Token1:         "0x0000000000000000000000000000000000000000", // ETH placeholder
-			InitialToken0:  initialTokenAmount,
-			InitialToken1:  initialETHAmount,
-			CreatorAddress: "", // Will be populated when wallet connects
-			Status:         "pending",
-		}
-
-		if err := db.CreateLiquidityPool(pool); err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error creating liquidity pool record: %v", err)),
-				},
-			}, nil
-		}
-
-		// Prepare minimal session data (transaction data will be generated on-demand)
-		sessionData := map[string]interface{}{
-			"pool_id": pool.ID,
-		}
-
-		sessionDataJSON, err := json.Marshal(sessionData)
-		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error encoding session data: %v", err)),
-				},
-			}, nil
-		}
-
-		// Create transaction session
-		sessionID, err := db.CreateTransactionSession(
-			"create_pool",
-			activeChain.ChainType,
-			activeChain.ChainID,
-			string(sessionDataJSON),
-		)
-		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error creating transaction session: %v", err)),
-				},
-			}, nil
-		}
-
-		// Generate signing URL
-		signingURL := fmt.Sprintf("http://localhost:%d/pool/create/%s", serverPort, sessionID)
-
-		result := map[string]interface{}{
-			"pool_id":                     pool.ID,
-			"session_id":                  sessionID,
-			"signing_url":                 signingURL,
-			"token_address":               tokenAddress,
-			"initial_token_amount":        initialTokenAmount,
-			"initial_eth_amount":          initialETHAmount,
-			"uniswap_version":             uniswapSettings.Version,
-			"chain_type":                  activeChain.ChainType,
-			"initial_price_per_token_eth": initialPrice,
-			"message":                     "Liquidity pool creation session created. Use the signing URL to connect wallet and create pool.",
-			"instructions":                "1. Open the signing URL in your browser\n2. Connect your wallet using EIP-6963\n3. Review the pool creation details\n4. Sign and send the transaction to create the pool",
-		}
-
-		resultJSON, _ := json.Marshal(result)
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				mcp.NewTextContent("Your pool creation session has been created. Use the signing URL to connect wallet and create pool."),
-				mcp.NewTextContent(fmt.Sprintf("Initial price per token: %v ETH", initialPrice)),
-				mcp.NewTextContent(string(resultJSON)),
-			},
-		}, nil
+func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Context, args CreateLiquidityPoolArguments, activeChain *models.Chain) (*mcp.CallToolResult, error) {
+	// Get active Uniswap settings
+	uniswapSettings, err := c.db.GetActiveUniswapSettings()
+	if err != nil {
+		return mcp.NewToolResultError("No Uniswap version selected. Please use set_uniswap_version tool first"), nil
 	}
 
-	return tool, handler
+	// Get Uniswap deployment to retrieve WETH address
+	uniswapDeployment, err := c.uniswapService.GetUniswapDeploymentByChain(activeChain.ID)
+	if err != nil {
+		return mcp.NewToolResultError("No Uniswap deployment found for this chain. Please deploy Uniswap first using deploy_uniswap tool"), nil
+	}
+
+	// Verify WETH address is available
+	if uniswapDeployment.WETHAddress == "" {
+		return mcp.NewToolResultError("WETH address not found in Uniswap deployment. Please ensure Uniswap deployment is completed"), nil
+	}
+
+	// Check if pool already exists
+	existingPool, err := c.liquidityService.GetLiquidityPoolByTokenAddress(args.TokenAddress)
+	if err == nil && existingPool != nil {
+		// Delete the pool if not confirmed
+		if existingPool.Status != models.TransactionStatusConfirmed {
+			if err := c.db.DeleteLiquidityPool(existingPool.ID); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to delete pending pool: %v", err)), nil
+			}
+		} else {
+			return mcp.NewToolResultError("Liquidity pool already exists for this token"), nil
+		}
+	}
+
+	// Create liquidity pool record
+	// Creator address will be set when wallet connects on the web interface
+	_, _, err = utils.CalculateInitialTokenPrice(args.InitialTokenAmount, args.InitialETHAmount, 18)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Error calculating initial price: %v", err)), nil
+	}
+
+	pool := &models.LiquidityPool{
+		TokenAddress:   args.TokenAddress,
+		UniswapVersion: uniswapSettings.Version,
+		Token0:         args.TokenAddress,
+		Token1:         uniswapDeployment.WETHAddress, // Use WETH from Uniswap deployment
+		InitialToken0:  args.InitialTokenAmount,
+		InitialToken1:  args.InitialETHAmount,
+		CreatorAddress: "", // Will be populated when wallet connects
+		Status:         models.TransactionStatusPending,
+	}
+
+	poolID, err := c.liquidityService.CreateLiquidityPool(pool)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Error creating liquidity pool record: %v", err)), nil
+	}
+
+	// Add pool ID to metadata
+	enhancedMetadata := append(args.Metadata, models.TransactionMetadata{
+		Key:   "pool_id",
+		Value: strconv.FormatUint(uint64(poolID), 10),
+	})
+
+	// Create transaction session with empty deployment (will be populated by handler)
+	sessionID, err := c.txService.CreateTransactionSession(services.CreateTransactionSessionRequest{
+		TransactionDeployments: []models.TransactionDeployment{}, // Empty - will be populated on signing page
+		ChainType:              models.TransactionChainTypeEthereum,
+		ChainID:                activeChain.ID,
+		Metadata:               enhancedMetadata,
+	})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Error creating transaction session: %v", err)), nil
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.NewTextContent(fmt.Sprintf("Transaction session created: %s", sessionID)),
+			mcp.NewTextContent("Please sign the liquidity pool creation transaction in the URL"),
+			mcp.NewTextContent(fmt.Sprintf("http://localhost:%d/tx/%s", c.serverPort, sessionID)),
+		},
+	}, nil
 }

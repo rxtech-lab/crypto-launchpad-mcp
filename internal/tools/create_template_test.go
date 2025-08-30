@@ -40,6 +40,7 @@ func TestCreateTemplateHandler_ParameterValidation(t *testing.T) {
 			name: "missing_name",
 			requestArgs: map[string]interface{}{
 				"description":   "Test description",
+				"contract_name": "TestToken",
 				"chain_type":    "ethereum",
 				"template_code": validEthereumTemplate(),
 			},
@@ -50,6 +51,7 @@ func TestCreateTemplateHandler_ParameterValidation(t *testing.T) {
 			name: "missing_description",
 			requestArgs: map[string]interface{}{
 				"name":          "Test Template",
+				"contract_name": "TestToken",
 				"chain_type":    "ethereum",
 				"template_code": validEthereumTemplate(),
 			},
@@ -61,17 +63,30 @@ func TestCreateTemplateHandler_ParameterValidation(t *testing.T) {
 			requestArgs: map[string]interface{}{
 				"name":          "Test Template",
 				"description":   "Test description",
+				"contract_name": "TestToken",
 				"template_code": validEthereumTemplate(),
 			},
 			expectError: true,
 			errorMsg:    "chain_type parameter is required",
 		},
 		{
+			name: "missing_contract_name",
+			requestArgs: map[string]interface{}{
+				"name":          "Test Template",
+				"description":   "Test description",
+				"chain_type":    "ethereum",
+				"template_code": validEthereumTemplate(),
+			},
+			expectError: true,
+			errorMsg:    "contract_name parameter is required",
+		},
+		{
 			name: "missing_template_code",
 			requestArgs: map[string]interface{}{
-				"name":        "Test Template",
-				"description": "Test description",
-				"chain_type":  "ethereum",
+				"name":          "Test Template",
+				"description":   "Test description",
+				"contract_name": "TestToken",
+				"chain_type":    "ethereum",
 			},
 			expectError: true,
 			errorMsg:    "template_code parameter is required",
@@ -140,9 +155,10 @@ func TestCreateTemplateHandler_ChainTypeValidation(t *testing.T) {
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
 					Arguments: map[string]interface{}{
-						"name":        "Test Template",
-						"description": "Test description",
-						"chain_type":  tt.chainType,
+						"name":          "Test Template",
+						"description":   "Test description",
+						"contract_name": "TestToken",
+						"chain_type":    tt.chainType,
 						"template_code": func() string {
 							if tt.chainType == "solana" {
 								return validSolanaTemplate()
@@ -158,11 +174,10 @@ func TestCreateTemplateHandler_ChainTypeValidation(t *testing.T) {
 			if tt.expectError {
 				assert.NoError(t, err) // Handler returns success with error content
 				assert.NotNil(t, result)
-				assert.Len(t, result.Content, 2)
+				assert.True(t, result.IsError)
+				assert.Len(t, result.Content, 1)
 				textContent0 := result.Content[0].(mcp.TextContent)
-				textContent1 := result.Content[1].(mcp.TextContent)
-				assert.Equal(t, "Error: ", textContent0.Text)
-				assert.Contains(t, textContent1.Text, "Invalid chain_type")
+				assert.Contains(t, textContent0.Text, "Invalid chain_type")
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
@@ -177,12 +192,14 @@ func TestCreateTemplateHandler_EthereumTemplateValidation(t *testing.T) {
 	tests := []struct {
 		name         string
 		templateCode string
+		contractName string
 		expectError  bool
 		errorMsg     string
 	}{
 		{
 			name:         "valid_ethereum_template",
 			templateCode: validEthereumTemplate(),
+			contractName: "SimpleToken",
 			expectError:  false,
 		},
 		{
@@ -197,21 +214,24 @@ contract MyToken is ERC20 {
         _mint(msg.sender, {{.InitialSupply}} * 10**decimals());
     }
 }`,
-			expectError: false,
+			contractName: "MyToken",
+			expectError:  false,
 		},
 		{
 			name:         "invalid_solidity_syntax",
 			templateCode: "invalid solidity code {{}",
+			contractName: "Test",
 			expectError:  true,
-			errorMsg:     "Solidity compilation failed",
+			errorMsg:     "Contract Test not found",
 		},
 		{
 			name: "missing_pragma",
 			templateCode: `contract Test {
     constructor() {}
 }`,
-			expectError: true,
-			errorMsg:    "Solidity compilation failed",
+			contractName: "Test",
+			expectError:  true,
+			errorMsg:     "Contract Test not found",
 		},
 	}
 
@@ -227,6 +247,7 @@ contract MyToken is ERC20 {
 						"name":          "Test Template",
 						"description":   "Test description",
 						"chain_type":    "ethereum",
+						"contract_name": tt.contractName,
 						"template_code": tt.templateCode,
 					},
 				},
@@ -237,11 +258,10 @@ contract MyToken is ERC20 {
 			if tt.expectError {
 				assert.NoError(t, err) // Handler returns success with error content
 				assert.NotNil(t, result)
-				assert.Len(t, result.Content, 2)
+				assert.True(t, result.IsError)
+				assert.Len(t, result.Content, 1)
 				textContent0 := result.Content[0].(mcp.TextContent)
-				textContent1 := result.Content[1].(mcp.TextContent)
-				assert.Equal(t, "Error: ", textContent0.Text)
-				assert.Contains(t, textContent1.Text, tt.errorMsg)
+				assert.Contains(t, textContent0.Text, tt.errorMsg)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
@@ -249,7 +269,7 @@ contract MyToken is ERC20 {
 				templates, err := db.ListTemplates("", "", 10)
 				assert.NoError(t, err)
 				assert.Len(t, templates, 1)
-				assert.Equal(t, "ethereum", templates[0].ChainType)
+				assert.Equal(t, "ethereum", string(templates[0].ChainType))
 			}
 		})
 	}
@@ -321,6 +341,7 @@ func TestCreateTemplateHandler_MetadataValidation(t *testing.T) {
 				"name":          "Test Template",
 				"description":   "Test description",
 				"chain_type":    "ethereum",
+				"contract_name": "SimpleToken",
 				"template_code": validEthereumTemplate(),
 			}
 
@@ -339,14 +360,14 @@ func TestCreateTemplateHandler_MetadataValidation(t *testing.T) {
 			if tt.expectError {
 				assert.NoError(t, err) // Handler returns success with error content
 				assert.NotNil(t, result)
-				assert.Len(t, result.Content, 2)
+				assert.True(t, result.IsError)
+				assert.Len(t, result.Content, 1)
 				textContent0 := result.Content[0].(mcp.TextContent)
-				textContent1 := result.Content[1].(mcp.TextContent)
-				assert.Equal(t, "Error: ", textContent0.Text)
-				assert.Contains(t, textContent1.Text, tt.errorMsg)
+				assert.Contains(t, textContent0.Text, tt.errorMsg)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
+				assert.False(t, result.IsError)
 
 				// Parse result JSON to verify metadata handling
 				assert.Len(t, result.Content, 2)
@@ -386,6 +407,7 @@ func TestCreateTemplateHandler_DatabaseIntegration(t *testing.T) {
 				"name":              "Integration Test Template",
 				"description":       "This is a test template for database integration",
 				"chain_type":        "ethereum",
+				"contract_name":     "SimpleToken",
 				"template_code":     validEthereumTemplate(),
 				"template_metadata": `{"TokenName": "", "TokenSymbol": "", "InitialSupply": ""}`,
 			},
@@ -425,7 +447,7 @@ func TestCreateTemplateHandler_DatabaseIntegration(t *testing.T) {
 	template := templates[0]
 	assert.Equal(t, "Integration Test Template", template.Name)
 	assert.Equal(t, "This is a test template for database integration", template.Description)
-	assert.Equal(t, "ethereum", template.ChainType)
+	assert.Equal(t, models.TransactionChainType("ethereum"), template.ChainType)
 	assert.Equal(t, validEthereumTemplate(), template.TemplateCode)
 	assert.Len(t, template.Metadata, 3)
 	assert.Contains(t, template.Metadata, "TokenName")
@@ -445,6 +467,7 @@ func TestCreateTemplateHandler_MultipleTemplates(t *testing.T) {
 				"name":          "Ethereum Template",
 				"description":   "Ethereum ERC20 Template",
 				"chain_type":    "ethereum",
+				"contract_name": "SimpleToken",
 				"template_code": validEthereumTemplate(),
 			},
 		},
@@ -461,6 +484,7 @@ func TestCreateTemplateHandler_MultipleTemplates(t *testing.T) {
 				"name":          "Solana Template",
 				"description":   "Solana SPL Token Template",
 				"chain_type":    "solana",
+				"contract_name": "spl_token",
 				"template_code": validSolanaTemplate(),
 			},
 		},
@@ -488,8 +512,8 @@ func TestCreateTemplateHandler_MultipleTemplates(t *testing.T) {
 
 	assert.NotNil(t, ethTemplate)
 	assert.NotNil(t, solTemplate)
-	assert.Equal(t, "ethereum", ethTemplate.ChainType)
-	assert.Equal(t, "solana", solTemplate.ChainType)
+	assert.Equal(t, models.TransactionChainType("ethereum"), ethTemplate.ChainType)
+	assert.Equal(t, models.TransactionChainType("solana"), solTemplate.ChainType)
 }
 
 // Helper functions for test templates

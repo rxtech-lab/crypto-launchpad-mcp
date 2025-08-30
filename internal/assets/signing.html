@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="session-id" content="{{.SessionID}}" />
+    <meta name="rpc-network" content="{{.RPCNetwork | json}}" />
+    {{if .SessionData}}
+    <meta name="transaction-session" content="{{.SessionData | json}}" />
+    {{end}}
+    <title>Transaction Signing</title>
+    <link rel="stylesheet" crossorigin href="/static/tx/app.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" crossorigin src="/static/tx/app.js"></script>
+  </body>
+</html>

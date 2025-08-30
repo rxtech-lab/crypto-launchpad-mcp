@@ -135,7 +135,7 @@ func NewGetPoolInfoTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 			},
 			"chain_info": map[string]interface{}{
 				"chain_type": activeChain.ChainType,
-				"chain_id":   activeChain.ChainID,
+				"chain_id":   activeChain.NetworkID,
 				"rpc":        activeChain.RPC,
 			},
 			"note": "This is cached data from the database. For real-time on-chain data, use blockchain RPC calls or subgraph queries.",

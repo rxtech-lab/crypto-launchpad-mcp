@@ -78,7 +78,7 @@ func (s *APIServer) handleTestSignTransaction(c *fiber.Ctx) error {
 	defer client.Close()
 
 	// Create auth from private key
-	chainIDInt, ok := new(big.Int).SetString(activeChain.ChainID, 10)
+	chainIDInt, ok := new(big.Int).SetString(activeChain.NetworkID, 10)
 	if !ok {
 		return c.Status(500).JSON(TestSignTransactionResponse{
 			Success: false,

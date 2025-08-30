@@ -109,33 +109,18 @@ func NewSetChainTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 		if chainID == "" && chainType == "ethereum" {
 			fetchedChainID, err := fetchChainIDFromRPC(rpc)
 			if err != nil {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						mcp.NewTextContent("Warning: "),
-						mcp.NewTextContent(fmt.Sprintf("Could not auto-detect chain ID from RPC: %v. Please provide chain_id parameter.", err)),
-					},
-				}, nil
+				return mcp.NewToolResultError(fmt.Sprintf("Could not auto-detect chain ID from RPC: %v. Please provide chain_id parameter.", err)), nil
 			}
 			chainID = fetchedChainID
 		}
 
 		// For Solana, chain_id is still required
 		if chainID == "" && chainType == "solana" {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("chain_id parameter is required for Solana chains"),
-				},
-			}, nil
+			return mcp.NewToolResultError("chain_id parameter is required for Solana chains"), nil
 		}
 
 		if chainID == "" {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("chain_id parameter is required or could not be auto-detected"),
-				},
-			}, nil
+			return mcp.NewToolResultError("chain_id parameter is required or could not be auto-detected"), nil
 		}
 
 		name := request.GetString("name", "")
@@ -171,28 +156,18 @@ func NewSetChainTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 
 		// Validate chain type
 		if chainType != "ethereum" && chainType != "solana" {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("Invalid chain_type. Supported values: ethereum, solana"),
-				},
-			}, nil
+			return mcp.NewToolResultError("Invalid chain_type. Supported values: ethereum, solana"), nil
 		}
 
 		// Check if chain configuration already exists
 		chains, err := db.ListChains()
 		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error listing chains: %v", err)),
-				},
-			}, nil
+			return mcp.NewToolResultError(fmt.Sprintf("Error listing chains: %v", err)), nil
 		}
 
 		var existingChain *models.Chain
 		for _, chain := range chains {
-			if chain.ChainType == chainType {
+			if string(chain.ChainType) == chainType {
 				existingChain = &chain
 				break
 			}
@@ -201,29 +176,19 @@ func NewSetChainTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
 		if existingChain != nil {
 			// Update existing chain configuration
 			if err := db.UpdateChainConfig(chainType, rpc, chainID); err != nil {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						mcp.NewTextContent("Error: "),
-						mcp.NewTextContent(fmt.Sprintf("Error updating chain configuration: %v", err)),
-					},
-				}, nil
+				return mcp.NewToolResultError(fmt.Sprintf("Error updating chain configuration: %v", err)), nil
 			}
 		} else {
 			// Create new chain configuration
 			newChain := &models.Chain{
-				ChainType: chainType,
+				ChainType: models.TransactionChainType(chainType),
 				RPC:       rpc,
-				ChainID:   chainID,
+				NetworkID: chainID,
 				Name:      name,
 				IsActive:  false,
 			}
 			if err := db.CreateChain(newChain); err != nil {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						mcp.NewTextContent("Error: "),
-						mcp.NewTextContent(fmt.Sprintf("Error creating chain configuration: %v", err)),
-					},
-				}, nil
+				return mcp.NewToolResultError(fmt.Sprintf("Error creating chain configuration: %v", err)), nil
 			}
 		}
 

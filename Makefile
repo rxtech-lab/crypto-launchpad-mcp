@@ -1,4 +1,4 @@
-.PHONY: build test run clean deps help install-local package binaries generate
+.PHONY: build build-frontend test run clean clean-frontend deps help install-local package binaries generate
 
 BINARY_NAME=launchpad-mcp
 BUILD_DIR=./bin
@@ -16,6 +16,7 @@ all: deps build test
 deps:
 	go mod download
 	go mod tidy
+	cd frontend/signing && bun install
 
 # Generate embedded contract files
 generate:
@@ -24,13 +25,26 @@ generate:
 inspect:
 	npx -y @modelcontextprotocol/inspector go run cmd/main.go
 
-# Build the project
-build:
+# Build frontend assets first, then the Go binary
+build: build-frontend
 	@echo "Building $(BINARY_NAME) version $(VERSION)..."
 	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/main.go
 
+# Build frontend assets
+build-frontend:
+	@echo "Building frontend assets..."
+	@if [ -d "frontend/signing" ]; then \
+		cd frontend/signing && bun install && bun run build && \
+		echo "Copying compiled assets to internal/assets..." && \
+		cp dist/app.js ../../internal/assets/signing_app.js && \
+		cp dist/app.css ../../internal/assets/signing_app.css && \
+		echo "Frontend assets built and copied successfully!"; \
+	else \
+		echo "Frontend directory not found, skipping frontend build"; \
+	fi
+
 # Build for multiple architectures
-binaries:
+binaries: build-frontend
 	@echo "Building binaries for multiple architectures..."
 	./scripts/binaries.sh
 
@@ -61,11 +75,19 @@ package: build
 	./scripts/package-notarize.sh
 
 # Clean build artifacts
-clean:
+clean: clean-frontend
 	@echo "Cleaning build artifacts..."
 	rm -rf $(BUILD_DIR)/
 	sudo rm -rf /usr/local/bin/$(BINARY_NAME) 2>/dev/null || true
 	go clean
+
+# Clean frontend build artifacts
+clean-frontend:
+	@echo "Cleaning frontend build artifacts..."
+	@if [ -d "frontend/signing/dist" ]; then \
+		rm -rf frontend/signing/dist; \
+		echo "Frontend dist directory cleaned"; \
+	fi
 
 
 e2e-network:
@@ -100,7 +122,8 @@ sec:
 # Show help
 help:
 	@echo "Available commands:"
-	@echo "  build       - Build the project"
+	@echo "  build       - Build the project (includes frontend)"
+	@echo "  build-frontend - Build frontend assets only"
 	@echo "  binaries    - Build for multiple architectures"
 	@echo "  test        - Run tests"
 	@echo "  run         - Run the MCP server directly"
@@ -109,7 +132,8 @@ help:
 	@echo "  package     - Package and notarize for distribution"
 	@echo "  generate    - Generate embedded contract files"
 	@echo "  deps        - Download and tidy dependencies"
-	@echo "  clean       - Clean build artifacts"
+	@echo "  clean       - Clean build artifacts (includes frontend)"
+	@echo "  clean-frontend - Clean frontend build artifacts only"
 	@echo "  fmt         - Format code"
 	@echo "  lint        - Lint code"
 	@echo "  sec         - Run security scan"

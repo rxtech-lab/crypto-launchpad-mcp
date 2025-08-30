@@ -27,6 +27,9 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		mcp.WithString("chain_type",
 			mcp.Description("New chain type (ethereum or solana)"),
 		),
+		mcp.WithString("contract_name",
+			mcp.Description("New contract name"),
+		),
 		mcp.WithString("template_code",
 			mcp.Description("New template code with Go template syntax ({{.VariableName}})"),
 		),
@@ -53,6 +56,7 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 
 		description := request.GetString("description", "")
 		chainType := request.GetString("chain_type", "")
+		contractName := request.GetString("contract_name", "")
 		templateCode := request.GetString("template_code", "")
 		templateMetadata := request.GetString("template_metadata", "")
 
@@ -119,8 +123,14 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 					},
 				}, nil
 			}
-			template.ChainType = chainType
+			template.ChainType = models.TransactionChainType(chainType)
 			updates = append(updates, "chain_type")
+		}
+
+		// Update contract name if provided
+		if contractName != "" {
+			template.ContractName = contractName
+			updates = append(updates, "contract_name")
 		}
 
 		// Update metadata if provided
@@ -134,7 +144,7 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			// Use the current or new chain type for validation
 			validationChainType := template.ChainType
 			if chainType != "" {
-				validationChainType = chainType
+				validationChainType = models.TransactionChainType(chainType)
 			}
 
 			// Use existing template code if not provided

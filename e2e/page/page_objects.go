@@ -29,21 +29,20 @@ func (p *UniswapDeploymentPage) NavigateToSession(baseURL, sessionID string) err
 func (p *UniswapDeploymentPage) WaitForPageLoad() error {
 	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
 	defer cancel()
-	// Wait for the main content div to be visible
+	// Wait for the metadata container to be visible (indicates page loaded)
 	err := chromedp.Run(ctx,
-		chromedp.WaitVisible("#content", chromedp.ByID),
+		chromedp.WaitVisible(`[data-testid="metadata-container"]`, chromedp.ByQuery),
 	)
 	if err != nil {
 		return fmt.Errorf("page did not load: %w", err)
 	}
 
-	// Wait for JavaScript to load session data and replace the loading state
-	// The deploy-uniswap.js script will replace the content with deployment details
+	// Wait for transaction list to be visible
 	err = chromedp.Run(ctx,
-		chromedp.WaitVisible("h2", chromedp.ByQuery), // Wait for any h2 element (deployment details header)
+		chromedp.WaitVisible(`[data-testid="transaction-list-container"]`, chromedp.ByQuery),
 	)
 	if err != nil {
-		return fmt.Errorf("deployment details did not load: %w", err)
+		return fmt.Errorf("transaction list did not load: %w", err)
 	}
 
 	return nil
@@ -54,36 +53,38 @@ func (p *UniswapDeploymentPage) WaitForWalletSelection() error {
 	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
 	defer cancel()
 	return chromedp.Run(ctx,
-		chromedp.WaitVisible("#wallet-select", chromedp.ByID),
+		chromedp.WaitVisible(`[data-testid="wallet-selector-dropdown"]`, chromedp.ByQuery),
 	)
 }
 
-// SelectWallet selects a wallet from the dropdown
-func (p *UniswapDeploymentPage) SelectWallet(walletUUID string) error {
+// SelectWallet selects a wallet from the dropdown by option value (provider UUID)
+func (p *UniswapDeploymentPage) SelectWallet(walletValue string) error {
 	// Wait for wallet select to be available
 	err := p.WaitForWalletSelection()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to wait for wallet selection: %w", err)
 	}
 
-	// Use JavaScript to set the value and trigger change event
-	js := fmt.Sprintf(`
-		const select = document.getElementById('wallet-select');
-		select.value = '%s';
-		select.dispatchEvent(new Event('change', { bubbles: true }));
-	`, walletUUID)
+	// 10 seconds timeout
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
 
-	return chromedp.Run(p.ctx,
-		chromedp.Evaluate(js, nil),
+	// Select the wallet option by setting the select element's value
+	err = chromedp.Run(ctx,
+		chromedp.SetValue(`[data-testid="wallet-selector-dropdown"]`, walletValue, chromedp.ByQuery),
 	)
+	if err != nil {
+		return fmt.Errorf("failed to select wallet with value '%s': %w", walletValue, err)
+	}
+
+	return nil
 }
 
-// ClickConnectWallet clicks the connect wallet button
+// ClickConnectWallet clicks the connect wallet button (wallet connection now automatic after selection)
 func (p *UniswapDeploymentPage) ClickConnectWallet() error {
-	return chromedp.Run(p.ctx,
-		chromedp.WaitVisible("#connect-button", chromedp.ByID),
-		chromedp.Click("#connect-button", chromedp.ByID),
-	)
+	// In the new frontend, wallet connection happens automatically after selection
+	// Just wait for the wallet to be connected
+	return p.WaitForWalletConnection()
 }
 
 // WaitForWalletConnection waits for the wallet to be connected
@@ -92,7 +93,7 @@ func (p *UniswapDeploymentPage) WaitForWalletConnection() error {
 	defer cancel()
 	// Wait for connection status to show success
 	err := chromedp.Run(ctx,
-		chromedp.WaitVisible(".bg-green-50", chromedp.ByQuery),
+		chromedp.WaitVisible(`[data-testid="wallet-connected-status"]`, chromedp.ByQuery),
 	)
 	if err != nil {
 		return fmt.Errorf("wallet connection failed: %w", err)
@@ -100,7 +101,7 @@ func (p *UniswapDeploymentPage) WaitForWalletConnection() error {
 
 	// Verify the sign button is visible
 	err = chromedp.Run(ctx,
-		chromedp.WaitVisible("#sign-button", chromedp.ByID),
+		chromedp.WaitVisible(`[data-testid="transaction-sign-button"]`, chromedp.ByQuery),
 	)
 	if err != nil {
 		return fmt.Errorf("sign button not visible after connection: %w", err)
@@ -114,54 +115,129 @@ func (p *UniswapDeploymentPage) ClickDeployButton() error {
 	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
 	defer cancel()
 	return chromedp.Run(ctx,
-		chromedp.WaitVisible("#sign-button", chromedp.ByID),
-		chromedp.Click("#sign-button", chromedp.ByID),
+		chromedp.WaitVisible(`[data-testid="transaction-sign-button"]`, chromedp.ByQuery),
+		chromedp.Click(`[data-testid="transaction-sign-button"]`, chromedp.ByQuery),
 	)
 }
 
 func (p *UniswapDeploymentPage) WaitForSuccessState() error {
 	// wait for success-state
 	return chromedp.Run(p.ctx,
-		chromedp.WaitVisible("#success-state", chromedp.ByID),
+		chromedp.WaitVisible(`[data-testid="transaction-success-message"]`, chromedp.ByQuery),
 	)
 }
 
 // GetContractAddress gets a contract address from the success state
-func (p *UniswapDeploymentPage) GetContractAddress(contractType string) (string, error) {
-	selector := fmt.Sprintf("#%s-address", contractType)
+func (p *UniswapDeploymentPage) GetContractAddress(contractIndex int) (string, error) {
+	selector := fmt.Sprintf(`[data-testid="deployed-contract-address-%d"]`, contractIndex)
 
 	var text string
 	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
 	defer cancel()
 	err := chromedp.Run(ctx,
-		chromedp.WaitVisible(selector, chromedp.ByID),
-		chromedp.Text(selector, &text, chromedp.ByID),
+		chromedp.WaitVisible(selector, chromedp.ByQuery),
+		chromedp.Text(selector, &text, chromedp.ByQuery),
 	)
 	if err != nil {
-		return "", fmt.Errorf("contract address not found for %s: %w", contractType, err)
+		return "", fmt.Errorf("contract address not found for index %d: %w", contractIndex, err)
 	}
 
-	if text == "Loading..." {
-		return "", fmt.Errorf("contract address still loading for %s", contractType)
+	if text == "Loading..." || text == "" {
+		return "", fmt.Errorf("contract address still loading for index %d", contractIndex)
 	}
 
 	return text, nil
 }
 
-// GetAllContractAddresses gets all three contract addresses
-func (p *UniswapDeploymentPage) GetAllContractAddresses() (map[string]string, error) {
-	addresses := make(map[string]string)
-	contracts := []string{"weth", "factory", "router"}
+// WaitForErrorState waits for an error to be displayed
+func (p *UniswapDeploymentPage) WaitForErrorState() error {
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
+	return chromedp.Run(ctx,
+		chromedp.WaitVisible(`[data-testid="error-display-container"]`, chromedp.ByQuery),
+	)
+}
 
-	for _, contract := range contracts {
-		addr, err := p.GetContractAddress(contract)
-		if err != nil {
-			return nil, err
-		}
-		addresses[contract] = addr
+// GetErrorMessage gets the error message text
+func (p *UniswapDeploymentPage) GetErrorMessage() (string, error) {
+	var text string
+	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
+	defer cancel()
+	err := chromedp.Run(ctx,
+		chromedp.WaitVisible(`[data-testid="error-message"]`, chromedp.ByQuery),
+		chromedp.Text(`[data-testid="error-message"]`, &text, chromedp.ByQuery),
+	)
+	return text, err
+}
+
+// ClickRetryButton clicks the retry button if visible
+func (p *UniswapDeploymentPage) ClickRetryButton() error {
+	return chromedp.Run(p.ctx,
+		chromedp.WaitVisible(`[data-testid="error-retry-button"]`, chromedp.ByQuery),
+		chromedp.Click(`[data-testid="error-retry-button"]`, chromedp.ByQuery),
+	)
+}
+
+// WaitForNoWalletsMessage waits for the no wallets detected message
+func (p *UniswapDeploymentPage) WaitForNoWalletsMessage() error {
+	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
+	defer cancel()
+	return chromedp.Run(ctx,
+		chromedp.WaitVisible(`[data-testid="wallet-no-wallets-message"]`, chromedp.ByQuery),
+	)
+}
+
+// CheckConnectionStatus checks if wallet is connected or shows warning
+func (p *UniswapDeploymentPage) CheckConnectionStatus() (string, error) {
+	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
+	defer cancel()
+
+	// Check if wallet is connected
+	var connectedVisible bool
+	err := chromedp.Run(ctx,
+		chromedp.Evaluate(`document.querySelector('[data-testid="wallet-connected-info"]') !== null`, &connectedVisible),
+	)
+	if err != nil {
+		return "error", err
 	}
 
-	return addresses, nil
+	if connectedVisible {
+		return "connected", nil
+	}
+
+	// Check if showing not connected warning
+	var warningVisible bool
+	err = chromedp.Run(ctx,
+		chromedp.Evaluate(`document.querySelector('[data-testid="wallet-not-connected-warning"]') !== null`, &warningVisible),
+	)
+	if err != nil {
+		return "error", err
+	}
+
+	if warningVisible {
+		return "not_connected", nil
+	}
+
+	return "unknown", nil
+}
+
+// GetTransactionStatus gets the status of a specific transaction
+func (p *UniswapDeploymentPage) GetTransactionStatus(transactionIndex int) (string, error) {
+	// Check if transaction has success status
+	successSelector := fmt.Sprintf(`[data-testid="transaction-status-icon-%d"]`, transactionIndex)
+
+	var text string
+	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
+	defer cancel()
+	err := chromedp.Run(ctx,
+		chromedp.WaitVisible(successSelector, chromedp.ByQuery),
+		chromedp.Text(successSelector, &text, chromedp.ByQuery),
+	)
+	if err != nil {
+		return "unknown", err
+	}
+
+	return text, nil
 }
 
 // TakeScreenshot takes a screenshot of the current page state
