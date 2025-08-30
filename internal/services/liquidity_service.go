@@ -15,14 +15,22 @@ type LiquidityService interface {
 	UpdateLiquidityPoolStatus(poolID uint, status models.TransactionStatus, pairAddress, txHash string) error
 	UpdateLiquidityPoolPairAddress(poolID uint, pairAddress string) error
 	ListLiquidityPools(skip, limit int) ([]models.LiquidityPool, error)
+	ListLiquidityPoolsByUser(userID string, skip, limit int) ([]models.LiquidityPool, error)
 
 	// Liquidity Position operations
 	CreateLiquidityPosition(position *models.LiquidityPosition) (uint, error)
 	GetLiquidityPosition(positionID uint) (*models.LiquidityPosition, error)
 	GetLiquidityPositionsByPool(poolID uint) ([]models.LiquidityPosition, error)
 	GetLiquidityPositionsByUser(userAddress string) ([]models.LiquidityPosition, error)
+	GetLiquidityPositionsByUserID(userID string) ([]models.LiquidityPosition, error)
 	UpdateLiquidityPositionStatus(positionID uint, status models.TransactionStatus, txHash string) error
 	UpdateLiquidityPositionAmounts(positionID uint, liquidityAmount, token0Amount, token1Amount string) error
+
+	// Swap operations
+	CreateSwapTransaction(swap *models.SwapTransaction) (uint, error)
+	GetSwapTransaction(swapID uint) (*models.SwapTransaction, error)
+	ListSwapTransactionsByUser(userID string, skip, limit int) ([]models.SwapTransaction, error)
+	UpdateSwapTransactionStatus(swapID uint, status models.TransactionStatus, txHash string) error
 }
 
 type liquidityService struct {
@@ -92,6 +100,15 @@ func (l *liquidityService) UpdateLiquidityPoolPairAddress(poolID uint, pairAddre
 func (l *liquidityService) ListLiquidityPools(skip, limit int) ([]models.LiquidityPool, error) {
 	var pools []models.LiquidityPool
 	err := l.db.Offset(skip).Limit(limit).Find(&pools).Error
+	if err != nil {
+		return nil, err
+	}
+	return pools, nil
+}
+
+func (l *liquidityService) ListLiquidityPoolsByUser(userID string, skip, limit int) ([]models.LiquidityPool, error) {
+	var pools []models.LiquidityPool
+	err := l.db.Where("user_id = ?", userID).Offset(skip).Limit(limit).Find(&pools).Error
 	if err != nil {
 		return nil, err
 	}
@@ -172,5 +189,60 @@ func (l *liquidityService) UpdateLiquidityPositionAmounts(positionID uint, liqui
 
 	return l.db.Model(&models.LiquidityPosition{}).
 		Where("id = ?", positionID).
+		Updates(updates).Error
+}
+
+func (l *liquidityService) GetLiquidityPositionsByUserID(userID string) ([]models.LiquidityPosition, error) {
+	var positions []models.LiquidityPosition
+	err := l.db.Where("user_id = ?", userID).Preload("Pool").Find(&positions).Error
+	if err != nil {
+		return nil, err
+	}
+	return positions, nil
+}
+
+// Swap operations
+
+func (l *liquidityService) CreateSwapTransaction(swap *models.SwapTransaction) (uint, error) {
+	if swap.Status == "" {
+		swap.Status = models.TransactionStatusPending
+	}
+
+	err := l.db.Create(swap).Error
+	if err != nil {
+		return 0, err
+	}
+	return swap.ID, nil
+}
+
+func (l *liquidityService) GetSwapTransaction(swapID uint) (*models.SwapTransaction, error) {
+	var swap models.SwapTransaction
+	err := l.db.First(&swap, swapID).Error
+	if err != nil {
+		return nil, err
+	}
+	return &swap, nil
+}
+
+func (l *liquidityService) ListSwapTransactionsByUser(userID string, skip, limit int) ([]models.SwapTransaction, error) {
+	var swaps []models.SwapTransaction
+	err := l.db.Where("user_id = ?", userID).Offset(skip).Limit(limit).Find(&swaps).Error
+	if err != nil {
+		return nil, err
+	}
+	return swaps, nil
+}
+
+func (l *liquidityService) UpdateSwapTransactionStatus(swapID uint, status models.TransactionStatus, txHash string) error {
+	updates := map[string]interface{}{
+		"status": status,
+	}
+
+	if txHash != "" {
+		updates["transaction_hash"] = txHash
+	}
+
+	return l.db.Model(&models.SwapTransaction{}).
+		Where("id = ?", swapID).
 		Updates(updates).Error
 }

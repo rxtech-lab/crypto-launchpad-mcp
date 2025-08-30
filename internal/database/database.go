@@ -448,6 +448,11 @@ func (d *Database) GetSwapTransactionsByUser(userAddress string) ([]models.SwapT
 }
 
 func (d *Database) CreateTransactionSession(sessionType string, chainType models.TransactionChainType, chainID, data string) (string, error) {
+	return d.CreateTransactionSessionWithUser(sessionType, chainType, chainID, data, nil)
+}
+
+// CreateTransactionSessionWithUser creates a transaction session with optional user ID
+func (d *Database) CreateTransactionSessionWithUser(sessionType string, chainType models.TransactionChainType, chainID, data string, userID *string) (string, error) {
 	// Generate a UUID for the session ID
 	sessionID := fmt.Sprintf("%s-%d", sessionType, time.Now().UnixNano())
 
@@ -470,6 +475,7 @@ func (d *Database) CreateTransactionSession(sessionType string, chainType models
 
 	session := &models.TransactionSession{
 		ID:                   sessionID,
+		UserID:               userID,
 		Metadata:             metadata,
 		TransactionStatus:    models.TransactionStatusPending,
 		TransactionChainType: chainType,

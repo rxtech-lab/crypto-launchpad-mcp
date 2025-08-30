@@ -65,6 +65,7 @@ type Template struct {
 // Deployment represents deployed token contracts
 type Deployment struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
+	UserID          *string   `gorm:"index;type:varchar(255)" json:"user_id,omitempty"`
 	TemplateID      uint      `gorm:"not null" json:"template_id"`
 	ChainID         uint      `gorm:"not null" json:"chain_id"`
 	ContractAddress string    `json:"contract_address"`
@@ -99,6 +100,7 @@ type UniswapSettings struct {
 // LiquidityPool represents created pool information
 type LiquidityPool struct {
 	ID              uint              `gorm:"primaryKey" json:"id"`
+	UserID          *string           `gorm:"index;type:varchar(255)" json:"user_id,omitempty"`
 	TokenAddress    string            `gorm:"not null" json:"token_address"`
 	PairAddress     string            `gorm:"not null" json:"pair_address"`
 	UniswapVersion  string            `gorm:"not null" json:"uniswap_version"`
@@ -116,6 +118,7 @@ type LiquidityPool struct {
 // LiquidityPosition represents user liquidity positions
 type LiquidityPosition struct {
 	ID              uint              `gorm:"primaryKey" json:"id"`
+	UserID          *string           `gorm:"index;type:varchar(255)" json:"user_id,omitempty"`
 	PoolID          uint              `gorm:"not null" json:"pool_id"`
 	UserAddress     string            `gorm:"not null" json:"user_address"`
 	LiquidityAmount string            `gorm:"not null" json:"liquidity_amount"`
@@ -133,6 +136,7 @@ type LiquidityPosition struct {
 // SwapTransaction represents historical swap data
 type SwapTransaction struct {
 	ID                uint              `gorm:"primaryKey" json:"id"`
+	UserID            *string           `gorm:"index;type:varchar(255)" json:"user_id,omitempty"`
 	UserAddress       string            `gorm:"not null" json:"user_address"`
 	FromToken         string            `gorm:"not null" json:"from_token"`
 	ToToken           string            `gorm:"not null" json:"to_token"`

@@ -11,8 +11,10 @@ import (
 
 type TransactionService interface {
 	CreateTransactionSession(req CreateTransactionSessionRequest) (string, error)
+	CreateTransactionSessionWithUser(req CreateTransactionSessionRequest, userID *string) (string, error)
 	GetTransactionSession(sessionID string) (*models.TransactionSession, error)
 	UpdateTransactionSession(sessionID string, session *models.TransactionSession) error
+	ListTransactionSessionsByUser(userID string) ([]models.TransactionSession, error)
 }
 
 type transactionService struct {
@@ -24,6 +26,7 @@ type CreateTransactionSessionRequest struct {
 	TransactionDeployments []models.TransactionDeployment `json:"transaction_deployments"`
 	ChainType              models.TransactionChainType    `json:"chain_type"`
 	ChainID                uint                           `json:"chain_id"`
+	UserID                 *string                        `json:"user_id,omitempty"`
 }
 
 func NewTransactionService(db *gorm.DB) TransactionService {
@@ -31,10 +34,21 @@ func NewTransactionService(db *gorm.DB) TransactionService {
 }
 
 func (s *transactionService) CreateTransactionSession(req CreateTransactionSessionRequest) (string, error) {
+	return s.CreateTransactionSessionWithUser(req, nil)
+}
+
+func (s *transactionService) CreateTransactionSessionWithUser(req CreateTransactionSessionRequest, userID *string) (string, error) {
 	sessionID := uuid.New().String()
+
+	// Use provided userID or from request
+	finalUserID := userID
+	if finalUserID == nil && req.UserID != nil {
+		finalUserID = req.UserID
+	}
 
 	session := &models.TransactionSession{
 		ID:                     sessionID,
+		UserID:                 finalUserID,
 		Metadata:               req.Metadata,
 		TransactionStatus:      models.TransactionStatusPending,
 		TransactionChainType:   models.TransactionChainType(req.ChainType),
@@ -88,4 +102,11 @@ func (t *transactionService) UpdateTransactionSession(sessionID string, session 
 	}
 
 	return nil
+}
+
+// ListTransactionSessionsByUser returns all transaction sessions for a specific user
+func (t *transactionService) ListTransactionSessionsByUser(userID string) ([]models.TransactionSession, error) {
+	var sessions []models.TransactionSession
+	err := t.db.Preload("Chain").Where("user_id = ?", userID).Find(&sessions).Error
+	return sessions, err
 }
