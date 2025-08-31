@@ -23,7 +23,7 @@ generate:
 	@echo "Generating embedded contract files..."
 	go generate ./...
 inspect:
-	npx -y @modelcontextprotocol/inspector go run cmd/main.go
+	npx -y @modelcontextprotocol/inspector go run cmd/stdio/main.go
 
 # Build frontend assets first, then the Go binary
 build: build-frontend
@@ -54,7 +54,7 @@ test:
 
 # Run the MCP server directly (no build)
 run:
-	go run ./cmd/main.go
+	go run ./cmd/stdio/main.go
 
 # Run the built binary
 run-bin: build
