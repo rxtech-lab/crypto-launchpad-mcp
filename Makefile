@@ -28,7 +28,7 @@ inspect:
 # Build frontend assets first, then the Go binary
 build: build-frontend
 	@echo "Building $(BINARY_NAME) version $(VERSION)..."
-	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/main.go
+	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/stdio/main.go
 
 # Build frontend assets
 build-frontend:

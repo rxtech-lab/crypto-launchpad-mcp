@@ -34,7 +34,7 @@ for arch in "${ARCHS[@]}"; do
   
   for binary in "${BINARIES[@]}"; do
     output_name="$binary"
-    input_path="./cmd/main.go"
+    input_path="./cmd/stdio/main.go"
     
     # Add .exe extension for Windows
     if [ "$GOOS" = "windows" ]; then
