@@ -23,8 +23,8 @@ type dbService struct {
 	db *gorm.DB
 }
 
-// NewDBService creates a new DBService with SQLite connection
-func NewDBService(dbPath string) (DBService, error) {
+// NewSqliteDBService creates a new DBService with SQLite connection
+func NewSqliteDBService(dbPath string) (DBService, error) {
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {

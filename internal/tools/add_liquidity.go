@@ -198,7 +198,7 @@ func (a *addLiquidityTool) prepareMetadata(
 	positionID uint,
 	uniswapVersion string,
 ) []models.TransactionMetadata {
-	// Start with user-provided metadata
+	// StartStdioServer with user-provided metadata
 	metadata := append([]models.TransactionMetadata{}, userMetadata...)
 
 	// Add position and pool information

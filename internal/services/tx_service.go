@@ -15,7 +15,7 @@ type TransactionService interface {
 	GetTransactionSession(sessionID string) (*models.TransactionSession, error)
 	UpdateTransactionSession(sessionID string, session *models.TransactionSession) error
 	ListTransactionSessionsByUser(userID string) ([]models.TransactionSession, error)
-	
+
 	// Legacy methods for backward compatibility with database.go
 	CreateTransactionSessionLegacy(sessionType string, chainType models.TransactionChainType, chainID, data string) (string, error)
 	CreateTransactionSessionWithUserLegacy(sessionType string, chainType models.TransactionChainType, chainID, data string, userID *string) (string, error)

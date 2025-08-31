@@ -33,15 +33,15 @@ const (
 
 // TestSetup provides the core test infrastructure
 type TestSetup struct {
-	t                *testing.T
-	DBService        services.DBService
-	ChainService     services.ChainService
-	TemplateService  services.TemplateService
+	t                 *testing.T
+	DBService         services.DBService
+	ChainService      services.ChainService
+	TemplateService   services.TemplateService
 	DeploymentService *services.DeploymentService
-	UniswapService   services.UniswapService
-	EthClient        *ethclient.Client
-	TxService        services.TransactionService
-	ServerPort       int
+	UniswapService    services.UniswapService
+	EthClient         *ethclient.Client
+	TxService         services.TransactionService
+	ServerPort        int
 }
 
 // ChromedpTestSetup extends the base TestSetup with chromedp capabilities
@@ -56,7 +56,7 @@ type ChromedpTestSetup struct {
 // NewTestSetup creates the base test infrastructure
 func NewTestSetup(t *testing.T) *TestSetup {
 	// Create in-memory database service
-	dbService, err := services.NewDBService(":memory:")
+	dbService, err := services.NewSqliteDBService(":memory:")
 	require.NoError(t, err)
 
 	// Create other services
@@ -79,15 +79,15 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	listener.Close()
 
 	return &TestSetup{
-		t:                t,
-		DBService:        dbService,
-		ChainService:     chainService,
-		TemplateService:  templateService,
+		t:                 t,
+		DBService:         dbService,
+		ChainService:      chainService,
+		TemplateService:   templateService,
 		DeploymentService: deploymentService,
-		UniswapService:   uniswapService,
-		EthClient:        ethClient,
-		TxService:        txService,
-		ServerPort:       port,
+		UniswapService:    uniswapService,
+		EthClient:         ethClient,
+		TxService:         txService,
+		ServerPort:        port,
 	}
 }
 
@@ -97,7 +97,7 @@ func NewChromedpTestSetup(t *testing.T) *ChromedpTestSetup {
 		TestSetup: NewTestSetup(t),
 	}
 
-	// Start HTTP server for E2E tests
+	// StartStdioServer HTTP server for E2E tests
 	err := setup.startAPIServer()
 	require.NoError(t, err)
 

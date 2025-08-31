@@ -80,7 +80,7 @@ func (s *APIServer) Start() (int, error) {
 	// Close the listener so Fiber can use it
 	listener.Close()
 
-	// Start the server on the found port
+	// StartStdioServer the server on the found port
 	go func() {
 		if err := s.app.Listen(fmt.Sprintf(":%d", port)); err != nil {
 			log.Printf("Error starting API server: %v\n", err)

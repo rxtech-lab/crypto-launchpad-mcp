@@ -65,14 +65,14 @@ func main() {
 
 	// Initialize database
 	dbPath := homePath + "/launchpad.db"
-	dbService, err := services.NewDBService(dbPath)
+	dbService, err := services.NewSqliteDBService(dbPath)
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
 	defer dbService.Close()
 
 	// Initialize services
-	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService := server.InitializeServices(dbService.GetDB())
+	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService, deploymentService := server.InitializeServices(dbService.GetDB())
 	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService)
 	// Register hooks
 	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
@@ -80,7 +80,7 @@ func main() {
 	// Initialize and start API server (HTTP server for transaction signing)
 	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
 
-	// Start API server and get the assigned port
+	// StartStdioServer API server and get the assigned port
 	port, err := apiServer.Start()
 	if err != nil {
 		log.Fatal("Failed to start API server:", err)
@@ -89,14 +89,14 @@ func main() {
 	log.Printf("API server started on port %d\n", port)
 
 	// Initialize MCP server with the API server port
-	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService)
+	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
 
 	// Set MCP server reference in API server for cross-communication
 	apiServer.SetMCPServer(mcpServer)
 
-	// Start MCP server in a goroutine
+	// StartStdioServer MCP server in a goroutine
 	go func() {
-		if err := mcpServer.Start(); err != nil {
+		if err := mcpServer.StartStdioServer(); err != nil {
 			log.SetOutput(os.Stderr)
 			log.SetFlags(0)
 			log.Fatal("Failed to start MCP server:", err)
