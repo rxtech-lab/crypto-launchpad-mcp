@@ -14,15 +14,16 @@ import (
 )
 
 type APIServer struct {
-	app         *fiber.App
-	dbService   services.DBService
-	txService   services.TransactionService
-	hookService services.HookService
-	mcpServer   *mcp.MCPServer
-	port        int
+	app          *fiber.App
+	dbService    services.DBService
+	txService    services.TransactionService
+	hookService  services.HookService
+	chainService services.ChainService
+	mcpServer    *mcp.MCPServer
+	port         int
 }
 
-func NewAPIServer(dbService services.DBService, txService services.TransactionService, hookService services.HookService) *APIServer {
+func NewAPIServer(dbService services.DBService, txService services.TransactionService, hookService services.HookService, chainService services.ChainService) *APIServer {
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -36,10 +37,11 @@ func NewAPIServer(dbService services.DBService, txService services.TransactionSe
 	}))
 
 	server := &APIServer{
-		app:         app,
-		dbService:   dbService,
-		txService:   txService,
-		hookService: hookService,
+		app:          app,
+		dbService:    dbService,
+		txService:    txService,
+		hookService:  hookService,
+		chainService: chainService,
 	}
 	server.setupRoutes()
 	return server

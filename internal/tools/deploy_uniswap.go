@@ -86,7 +86,7 @@ func (d *deployUniswapTool) GetHandler() server.ToolHandlerFunc {
 		}
 
 		// Get active chain configuration
-		activeChain, err := d.db.GetActiveChain()
+		activeChain, err := d.chainService.GetActiveChain()
 		if err != nil {
 			return mcp.NewToolResultError("No active chain selected. Please use select_chain tool first"), nil
 		}

@@ -8,7 +8,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
-	"github.com/rxtech-lab/launchpad-mcp/internal/tools"
 )
 
 type MCPServer struct {
@@ -264,41 +263,7 @@ func (s *MCPServer) Start() error {
 	return server.ServeStdio(s.server)
 }
 
-// GetDatabase returns the database instance used by the MCP server
-func (s *MCPServer) GetDatabase() *database.Database {
-	return s.db
-}
-
-// CallMCPMethod provides a way to execute MCP tool functionality from the API server
-// This is a helper method that demonstrates how to access MCP functionality
-func (s *MCPServer) CallMCPMethod(method string, params map[string]interface{}) (interface{}, error) {
-	switch method {
-	case "list_templates":
-		// Example: get templates by chain type
-		chainType, ok := params["chain_type"].(string)
-		if !ok {
-			chainType = ""
-		}
-		keyword, _ := params["keyword"].(string)
-		limit, ok := params["limit"].(int)
-		if !ok {
-			limit = 0 // 0 means no limit
-		}
-		return s.db.ListTemplates(chainType, keyword, limit)
-
-	case "list_deployments":
-		// Example: get all deployments
-		return s.db.ListDeployments()
-
-	case "get_active_chain":
-		// Example: get active chain configuration
-		return s.db.GetActiveChain()
-
-	case "list_chains":
-		// Example: get all chain configurations
-		return s.db.ListChains()
-
-	default:
-		return nil, fmt.Errorf("unsupported MCP method: %s", method)
-	}
+// GetDBService returns the database service used by the MCP server
+func (s *MCPServer) GetDBService() services.DBService {
+	return s.dbService
 }

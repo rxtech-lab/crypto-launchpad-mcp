@@ -4,14 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-func NewQueryBalanceTool(db interface{}, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
+func NewQueryBalanceTool(chainService services.ChainService, txService services.TransactionService, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("query_balance",
 		mcp.WithDescription("Query wallet balance for native tokens and ERC-20 tokens. Can return results directly or display in browser interface."),
 		mcp.WithString("wallet_address",
@@ -33,7 +35,7 @@ func NewQueryBalanceTool(db interface{}, serverPort int) (mcp.Tool, server.ToolH
 		tokenAddress := request.GetString("token_address", "")
 
 		// Get active chain configuration
-		activeChain, err := db.GetActiveChain()
+		activeChain, err := chainService.GetActiveChain()
 		if err != nil {
 			return mcp.NewToolResultError("No active chain selected. Please use select_chain tool first"), nil
 		}
@@ -45,7 +47,7 @@ func NewQueryBalanceTool(db interface{}, serverPort int) (mcp.Tool, server.ToolH
 
 		if showBrowser {
 			// Web mode - create session and return URL
-			return handleBrowserMode(db, serverPort, activeChain, walletAddress, tokenAddress)
+			return handleBrowserMode(txService, serverPort, activeChain, walletAddress, tokenAddress)
 		} else {
 			// Direct mode - require wallet address and return balance immediately
 			if walletAddress == "" {
@@ -59,7 +61,7 @@ func NewQueryBalanceTool(db interface{}, serverPort int) (mcp.Tool, server.ToolH
 }
 
 // handleBrowserMode creates a session for web-based balance display
-func handleBrowserMode(db interface{}, serverPort int, activeChain *models.Chain, walletAddress, tokenAddress string) (*mcp.CallToolResult, error) {
+func handleBrowserMode(txService services.TransactionService, serverPort int, activeChain *models.Chain, walletAddress, tokenAddress string) (*mcp.CallToolResult, error) {
 	// Prepare session data
 	sessionData := map[string]interface{}{
 		"query_type":     "balance",
@@ -76,12 +78,16 @@ func handleBrowserMode(db interface{}, serverPort int, activeChain *models.Chain
 	}
 
 	// Create transaction session
-	sessionID, err := db.CreateTransactionSession(
-		"balance_query",
-		activeChain.ChainType,
-		activeChain.NetworkID,
-		string(sessionDataJSON),
-	)
+	chainIDUint, _ := strconv.ParseUint(activeChain.NetworkID, 10, 64)
+	req := services.CreateTransactionSessionRequest{
+		Metadata: []models.TransactionMetadata{
+			{Key: "session_type", Value: "balance_query"},
+			{Key: "session_data", Value: string(sessionDataJSON)},
+		},
+		ChainType: activeChain.ChainType,
+		ChainID:   uint(chainIDUint),
+	}
+	sessionID, err := txService.CreateTransactionSession(req)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Error creating session: %v", err)), nil
 	}

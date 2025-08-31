@@ -8,9 +8,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewListTemplateTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
+func NewListTemplateTool(templateService services.TemplateService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("list_template",
 		mcp.WithDescription("List predefined smart contract templates with optional filtering by chain type and keyword search. Uses SQLite search for template names and descriptions."),
 		mcp.WithString("chain_type",
@@ -41,7 +42,7 @@ func NewListTemplateTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 		}
 
 		// List templates with filters
-		templates, err := db.ListTemplates(chainType, keyword, limit)
+		templates, err := templateService.ListTemplates(chainType, keyword, limit)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error listing templates: %v", err)), nil
 		}

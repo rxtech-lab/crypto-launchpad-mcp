@@ -13,6 +13,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
 // fetchChainIDFromRPC fetches the chain ID from an Ethereum RPC endpoint
@@ -72,7 +73,7 @@ func fetchChainIDFromRPC(rpcURL string) (string, error) {
 	return result.Result, nil
 }
 
-func NewSetChainTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
+func NewSetChainTool(chainService services.ChainService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("set_chain",
 		mcp.WithDescription("Configure target blockchain with RPC endpoint and chain ID. Creates or updates chain configuration in database."),
 		mcp.WithString("chain_type",
@@ -159,7 +160,7 @@ func NewSetChainTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 		}
 
 		// Check if chain configuration already exists
-		chains, err := db.ListChains()
+		chains, err := chainService.ListChains()
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error listing chains: %v", err)), nil
 		}
@@ -174,7 +175,7 @@ func NewSetChainTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 
 		if existingChain != nil {
 			// Update existing chain configuration
-			if err := db.UpdateChainConfig(chainType, rpc, chainID); err != nil {
+			if err := chainService.UpdateChainConfig(chainType, rpc, chainID); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Error updating chain configuration: %v", err)), nil
 			}
 		} else {
@@ -186,7 +187,7 @@ func NewSetChainTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 				Name:      name,
 				IsActive:  false,
 			}
-			if err := db.CreateChain(newChain); err != nil {
+			if err := chainService.CreateChain(newChain); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Error creating chain configuration: %v", err)), nil
 			}
 		}

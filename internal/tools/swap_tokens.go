@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewSwapTokensTool(db interface{}, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
+func NewSwapTokensTool(chainService services.ChainService, liquidityService services.LiquidityService, uniswapSettingsService services.UniswapSettingsService, txService services.TransactionService, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("swap_tokens",
 		mcp.WithDescription("Execute token swaps via Uniswap with signing interface. Generates a URL where users can connect wallet and sign the swap transaction."),
 		mcp.WithString("from_token",
@@ -62,7 +64,7 @@ func NewSwapTokensTool(db interface{}, serverPort int) (mcp.Tool, server.ToolHan
 		}
 
 		// Get active chain configuration
-		activeChain, err := db.GetActiveChain()
+		activeChain, err := chainService.GetActiveChain()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -93,7 +95,7 @@ func NewSwapTokensTool(db interface{}, serverPort int) (mcp.Tool, server.ToolHan
 		}
 
 		// Get active Uniswap settings
-		uniswapSettings, err := db.GetActiveUniswapSettings()
+		uniswapSettings, err := uniswapSettingsService.GetActiveUniswapSettings()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -113,7 +115,7 @@ func NewSwapTokensTool(db interface{}, serverPort int) (mcp.Tool, server.ToolHan
 			Status:            "pending",
 		}
 
-		if err := db.CreateSwapTransaction(swap); err != nil {
+		if _, err := liquidityService.CreateSwapTransaction(swap); err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent("Error: "),
@@ -147,12 +149,16 @@ func NewSwapTokensTool(db interface{}, serverPort int) (mcp.Tool, server.ToolHan
 		}
 
 		// Create transaction session
-		sessionID, err := db.CreateTransactionSession(
-			"swap",
-			activeChain.ChainType,
-			activeChain.NetworkID,
-			string(transactionDataJSON),
-		)
+		chainIDUint, _ := strconv.ParseUint(activeChain.NetworkID, 10, 64)
+		req := services.CreateTransactionSessionRequest{
+			Metadata: []models.TransactionMetadata{
+				{Key: "session_type", Value: "swap"},
+				{Key: "session_data", Value: string(transactionDataJSON)},
+			},
+			ChainType: activeChain.ChainType,
+			ChainID:   uint(chainIDUint),
+		}
+		sessionID, err := txService.CreateTransactionSession(req)
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{

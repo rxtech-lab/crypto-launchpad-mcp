@@ -78,7 +78,7 @@ func main() {
 	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
 
 	// Initialize and start API server (HTTP server for transaction signing)
-	apiServer := api.NewAPIServer(dbService, txService, hookService)
+	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
 
 	// Start API server and get the assigned port
 	port, err := apiServer.Start()

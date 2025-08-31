@@ -7,9 +7,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewSetUniswapVersionTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
+func NewSetUniswapVersionTool(uniswapSettingsService services.UniswapSettingsService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("set_uniswap_version",
 		mcp.WithDescription("Set Uniswap version and contract addresses for liquidity operations. Stores configuration in database as active setting."),
 		mcp.WithString("version",
@@ -95,7 +96,7 @@ func NewSetUniswapVersionTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc)
 		}
 
 		// Set the Uniswap configuration
-		if err := db.SetUniswapConfiguration(version, routerAddress, factoryAddress, wethAddress, quoterAddress, positionManager, swapRouter02); err != nil {
+		if err := uniswapSettingsService.SetUniswapConfiguration(version, routerAddress, factoryAddress, wethAddress, quoterAddress, positionManager, swapRouter02); err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent("Error: "),
@@ -105,7 +106,7 @@ func NewSetUniswapVersionTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc)
 		}
 
 		// Get the active settings to confirm
-		settings, err := db.GetActiveUniswapSettings()
+		settings, err := uniswapSettingsService.GetActiveUniswapSettings()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
