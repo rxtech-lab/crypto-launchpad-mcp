@@ -4,13 +4,17 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/rxtech-lab/launchpad-mcp/internal/api/middleware"
 	"github.com/rxtech-lab/launchpad-mcp/internal/assets"
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 type APIServer struct {
@@ -24,6 +28,18 @@ type APIServer struct {
 }
 
 func NewAPIServer(dbService services.DBService, txService services.TransactionService, hookService services.HookService, chainService services.ChainService) *APIServer {
+	// Get JWKS URI from environment variable
+	jwksUri := os.Getenv("OAUTH_JWKS_URI")
+	resourceID := os.Getenv("OAUTH_RESOURCE_ID")
+
+	var authenticator *utils.JwtAuthenticator
+	if jwksUri != "" {
+		authenticator = utils.NewJwtAuthenticator(jwksUri)
+		log.Printf("JWT authenticator initialized with JWKS URI: %s", jwksUri)
+	} else {
+		log.Println("Warning: OAUTH_JWKS_URI not set, JWT authentication disabled")
+	}
+
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -34,6 +50,19 @@ func NewAPIServer(dbService services.DBService, txService services.TransactionSe
 		Format:     "[${time}] ${status} - ${latency} ${method} ${path}\n",
 		TimeFormat: "15:04:05",
 		TimeZone:   "Local",
+	}))
+
+	// Add authentication middleware to all routes
+	app.Use(middleware.AuthMiddleware(middleware.AuthConfig{
+		SkipWellKnown: true,
+		TokenValidator: func(token string, audience []string) error {
+			// TODO: Implement actual token validation (e.g., with Scalekit)
+			if token == "" {
+				return fiber.NewError(fiber.StatusUnauthorized, "Invalid token")
+			}
+
+			return nil
+		},
 	}))
 
 	server := &APIServer{
@@ -49,7 +78,7 @@ func NewAPIServer(dbService services.DBService, txService services.TransactionSe
 
 func (s *APIServer) setupRoutes() {
 	// oauth routes
-	s.app.Get("/.well-known/oauth-protected-resource", s.handleOAuthProtectedResource)
+	s.app.Get("/.well-known/oauth-protected-resource/mcp", s.handleOAuthProtectedResource)
 	// Universal transaction signing routes
 	s.app.Get("/tx/:session_id", s.handleTransactionPage)
 	s.app.Post("/api/tx/:session_id/transaction/:index", s.handleTransactionAPI)
@@ -65,8 +94,21 @@ func (s *APIServer) setupRoutes() {
 	})
 }
 
+func (s *APIServer) EnableStreamableHttp() {
+	if s.mcpServer == nil {
+		log.Fatal("MCP server not set. Cannot enable Streamable HTTP.")
+		return
+	}
+	// Start the streamable HTTP server
+	streamableServer := s.mcpServer.StartStreamableHTTPServer()
+
+	s.app.All("/mcp", adaptor.HTTPHandler(streamableServer))
+	s.app.All("/mcp/*", adaptor.HTTPHandler(streamableServer))
+}
+
 // Start starts the server on a random available port
-func (s *APIServer) Start() (int, error) {
+// if port is nil, otherwise starts on the specified port
+func (s *APIServer) Start(port *int) (int, error) {
 	// Find an available port
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -74,20 +116,27 @@ func (s *APIServer) Start() (int, error) {
 	}
 
 	// Get the assigned port
-	port := listener.Addr().(*net.TCPAddr).Port
-	s.port = port
+	assignedPort := listener.Addr().(*net.TCPAddr).Port
+	s.port = assignedPort
+
+	if port != nil {
+		s.port = *port
+	}
 
 	// Close the listener so Fiber can use it
-	listener.Close()
+	err = listener.Close()
+	if err != nil {
+		return 0, err
+	}
 
-	// StartStdioServer the server on the found port
+	// Start the server on the found port
 	go func() {
-		if err := s.app.Listen(fmt.Sprintf(":%d", port)); err != nil {
+		if err := s.app.Listen(fmt.Sprintf(":%d", s.port)); err != nil {
 			log.Printf("Error starting API server: %v\n", err)
 		}
 	}()
 
-	return port, nil
+	return s.port, nil
 }
 
 func (s *APIServer) Shutdown() error {
@@ -98,12 +147,10 @@ func (s *APIServer) GetPort() int {
 	return s.port
 }
 
-// SetMCPServer sets the MCP server instance for accessing MCP methods
 func (s *APIServer) SetMCPServer(mcpServer *mcp.MCPServer) {
 	s.mcpServer = mcpServer
 }
 
-// GetMCPServer returns the MCP server instance
 func (s *APIServer) GetMCPServer() *mcp.MCPServer {
 	return s.mcpServer
 }

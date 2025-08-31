@@ -2,16 +2,21 @@ package api
 
 import (
 	"encoding/json"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 func (s *APIServer) handleOAuthProtectedResource(c *fiber.Ctx) error {
+	authenticationUrl := os.Getenv("OAUTH_AUTHENTICATION_SERVER")
+	authenticationResourceUrl := os.Getenv("OAUTH_RESOURCE_URL")
+	authenticationDocumentationUrl := os.Getenv("OAUTH_RESOURCE_DOCUMENTATION_URL")
+
 	oauthContent := map[string]any{
-		"authorization_servers":    []string{"https://mcp-ae4lqgxzaaaqw.scalekit.dev/resources/res_88196233813820681"},
+		"authorization_servers":    []string{authenticationUrl},
 		"bearer_methods_supported": []string{"header"},
-		"resource":                 "https://launchpad.mcprouter.app",
-		"resource_documentation":   "https://launchpad.mcprouter.app/docs",
+		"resource":                 authenticationResourceUrl,
+		"resource_documentation":   authenticationDocumentationUrl,
 		"scopes_supported":         []string{},
 	}
 

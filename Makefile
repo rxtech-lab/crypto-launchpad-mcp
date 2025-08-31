@@ -29,6 +29,7 @@ inspect:
 build: build-frontend
 	@echo "Building $(BINARY_NAME) version $(VERSION)..."
 	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/stdio/main.go
+	go build ./...
 
 # Build frontend assets
 build-frontend:

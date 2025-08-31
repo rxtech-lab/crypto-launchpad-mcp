@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -44,6 +45,34 @@ func NewSqliteDBService(dbPath string) (DBService, error) {
 	)
 
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+		Logger: gormLogger,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	service := &dbService{db: db}
+	if err := service.migrate(); err != nil {
+		return nil, fmt.Errorf("failed to migrate database: %w", err)
+	}
+
+	return service, nil
+}
+
+func NewPostgresDBService(dsn string) (DBService, error) {
+	// Configure GORM logger - only log errors and slow queries
+	gormLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+		logger.Config{
+			SlowThreshold:             time.Second,  // Slow SQL threshold
+			LogLevel:                  logger.Error, // Only log errors and slow queries
+			IgnoreRecordNotFoundError: true,         // Ignore ErrRecordNotFound error for logger
+			ParameterizedQueries:      false,        // Include params in SQL log
+			Colorful:                  false,        // Disable color
+		},
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: gormLogger,
 	})
 	if err != nil {

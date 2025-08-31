@@ -81,7 +81,7 @@ func main() {
 	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
 
 	// StartStdioServer API server and get the assigned port
-	port, err := apiServer.Start()
+	port, err := apiServer.Start(nil)
 	if err != nil {
 		log.Fatal("Failed to start API server:", err)
 	}

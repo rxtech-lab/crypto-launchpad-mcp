@@ -277,6 +277,11 @@ func (s *MCPServer) StartStdioServer() error {
 	return server.ServeStdio(s.server)
 }
 
+// StartStreamableHTTPServer starts the MCP server with streamable HTTP interface on the specified port
+func (s *MCPServer) StartStreamableHTTPServer() *server.StreamableHTTPServer {
+	return server.NewStreamableHTTPServer(s.server)
+}
+
 // GetDBService returns the database service used by the MCP server
 func (s *MCPServer) GetDBService() services.DBService {
 	return s.dbService

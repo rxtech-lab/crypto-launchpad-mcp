@@ -133,7 +133,7 @@ func (s *ChromedpTestSetup) startAPIServer() error {
 
 	// Initialize API server
 	apiServer := api.NewAPIServer(s.TestSetup.DBService, s.TestSetup.TxService, hookService, s.TestSetup.ChainService)
-	port, err := apiServer.Start()
+	port, err := apiServer.Start(nil)
 	if err != nil {
 		return fmt.Errorf("failed to start API server: %w", err)
 	}
