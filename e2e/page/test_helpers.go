@@ -33,11 +33,15 @@ const (
 
 // TestSetup provides the core test infrastructure
 type TestSetup struct {
-	t          *testing.T
-	DB         *database.Database
-	EthClient  *ethclient.Client
-	TxService  services.TransactionService
-	ServerPort int
+	t                *testing.T
+	DBService        services.DBService
+	ChainService     services.ChainService
+	TemplateService  services.TemplateService
+	DeploymentService *services.DeploymentService
+	UniswapService   services.UniswapService
+	EthClient        *ethclient.Client
+	TxService        services.TransactionService
+	ServerPort       int
 }
 
 // ChromedpTestSetup extends the base TestSetup with chromedp capabilities
@@ -51,16 +55,22 @@ type ChromedpTestSetup struct {
 
 // NewTestSetup creates the base test infrastructure
 func NewTestSetup(t *testing.T) *TestSetup {
-	// Create in-memory database
-	db, err := database.NewDatabase(":memory:")
+	// Create in-memory database service
+	dbService, err := services.NewDBService(":memory:")
 	require.NoError(t, err)
+
+	// Create other services
+	chainService := services.NewChainService(dbService.GetDB())
+	templateService := services.NewTemplateService(dbService.GetDB())
+	deploymentService := services.NewDeploymentService(dbService.GetDB())
+	uniswapService := services.NewUniswapService(dbService.GetDB())
 
 	// Connect to Ethereum testnet
 	ethClient, err := ethclient.Dial(TESTNET_RPC)
 	require.NoError(t, err)
 
 	// Create transaction service
-	txService := services.NewTransactionService(db.DB)
+	txService := services.NewTransactionService(dbService.GetDB())
 
 	// Get a random port for test server
 	listener, err := net.Listen("tcp", ":0")
@@ -69,11 +79,15 @@ func NewTestSetup(t *testing.T) *TestSetup {
 	listener.Close()
 
 	return &TestSetup{
-		t:          t,
-		DB:         db,
-		EthClient:  ethClient,
-		TxService:  txService,
-		ServerPort: port,
+		t:                t,
+		DBService:        dbService,
+		ChainService:     chainService,
+		TemplateService:  templateService,
+		DeploymentService: deploymentService,
+		UniswapService:   uniswapService,
+		EthClient:        ethClient,
+		TxService:        txService,
+		ServerPort:       port,
 	}
 }
 
@@ -118,7 +132,7 @@ func (s *ChromedpTestSetup) startAPIServer() error {
 	hookService := services.NewHookService()
 
 	// Initialize API server
-	apiServer := api.NewAPIServer(s.TestSetup.DB, s.TestSetup.TxService, hookService)
+	apiServer := api.NewAPIServer(s.TestSetup.DBService, s.TestSetup.TxService, hookService, s.TestSetup.ChainService)
 	port, err := apiServer.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start API server: %w", err)
@@ -337,7 +351,7 @@ func (s *ChromedpTestSetup) InitializeTestWallet() error {
 // getOrCreateTestChain gets or creates a test chain for e2e testing
 func (s *ChromedpTestSetup) getOrCreateTestChain() (*models.Chain, error) {
 	// Try to get existing active chain
-	activeChain, err := s.TestSetup.DB.GetActiveChain()
+	activeChain, err := s.TestSetup.ChainService.GetActiveChain()
 	if err == nil && activeChain != nil {
 		return activeChain, nil
 	}
@@ -351,7 +365,7 @@ func (s *ChromedpTestSetup) getOrCreateTestChain() (*models.Chain, error) {
 		IsActive:  true,
 	}
 
-	err = s.TestSetup.DB.CreateChain(testChain)
+	err = s.TestSetup.ChainService.CreateChain(testChain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create test chain: %w", err)
 	}
@@ -374,7 +388,7 @@ func (s *ChromedpTestSetup) CreateUniswapDeploymentSession() (string, error) {
 		Status:  models.TransactionStatusPending,
 	}
 
-	err = s.TestSetup.DB.DB.Create(deployment).Error
+	err = s.TestSetup.DBService.GetDB().Create(deployment).Error
 	if err != nil {
 		return "", fmt.Errorf("failed to create uniswap deployment: %w", err)
 	}
@@ -397,9 +411,9 @@ func (s *ChromedpTestSetup) CreateUniswapDeploymentSession() (string, error) {
 	}
 
 	// Create transaction session in database
-	sessionID, err := s.TestSetup.DB.CreateTransactionSession(
+	sessionID, err := s.TestSetup.TxService.CreateTransactionSessionLegacy(
 		"deploy_uniswap",
-		"ethereum",
+		models.TransactionChainTypeEthereum,
 		"31337",
 		string(sessionDataJSON),
 	)
@@ -428,7 +442,7 @@ contract TestToken is ERC20 {
 }`,
 	}
 
-	err := s.TestSetup.DB.CreateTemplate(template)
+	err := s.TestSetup.TemplateService.CreateTemplate(template)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create OpenZeppelin template: %w", err)
 	}
@@ -490,7 +504,7 @@ contract CustomToken {
 }`,
 	}
 
-	err := s.TestSetup.DB.CreateTemplate(template)
+	err := s.TestSetup.TemplateService.CreateTemplate(template)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create custom template: %w", err)
 	}
@@ -501,7 +515,7 @@ contract CustomToken {
 // CreateTokenDeploymentSession creates a token deployment session for testing using the proper TransactionService
 func (s *ChromedpTestSetup) CreateTokenDeploymentSession(templateID uint) (string, error) {
 	// Get the template to include in session data
-	template, err := s.TestSetup.DB.GetTemplateByID(templateID)
+	template, err := s.TestSetup.TemplateService.GetTemplateByID(templateID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get template: %w", err)
 	}
@@ -521,7 +535,7 @@ func (s *ChromedpTestSetup) CreateTokenDeploymentSession(templateID uint) (strin
 		Status:      "pending",
 	}
 
-	err = s.TestSetup.DB.CreateDeployment(deployment)
+	err = s.TestSetup.DeploymentService.CreateDeployment(deployment)
 	if err != nil {
 		return "", fmt.Errorf("failed to create deployment record: %w", err)
 	}
@@ -664,8 +678,8 @@ func (s *TestSetup) Cleanup() {
 	if s.EthClient != nil {
 		s.EthClient.Close()
 	}
-	if s.DB != nil {
-		s.DB.Close()
+	if s.DBService != nil {
+		s.DBService.Close()
 	}
 }
 
