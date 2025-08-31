@@ -8,10 +8,9 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 )
 
-func NewListDeploymentsTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewListDeploymentsTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("list_deployments",
 		mcp.WithDescription("List all token deployments with pagination support and filtering options including status, contract addresses, and transaction hashes."),
 		mcp.WithString("status",

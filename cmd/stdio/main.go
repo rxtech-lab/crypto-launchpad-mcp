@@ -9,9 +9,9 @@ import (
 	"syscall"
 
 	"github.com/rxtech-lab/launchpad-mcp/internal/api"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
 	"github.com/rxtech-lab/launchpad-mcp/internal/server"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
 // Build information (set via ldflags)
@@ -65,20 +65,20 @@ func main() {
 
 	// Initialize database
 	dbPath := homePath + "/launchpad.db"
-	db, err := database.NewDatabase(dbPath)
+	dbService, err := services.NewDBService(dbPath)
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
-	defer db.Close()
+	defer dbService.Close()
 
 	// Initialize services
-	evmService, txService, uniswapService, liquidityService, hookService := server.InitializeServices(db.DB)
-	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(db.DB, hookService)
+	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService := server.InitializeServices(dbService.GetDB())
+	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService)
 	// Register hooks
 	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
 
 	// Initialize and start API server (HTTP server for transaction signing)
-	apiServer := api.NewAPIServer(db, txService, hookService)
+	apiServer := api.NewAPIServer(dbService, txService, hookService)
 
 	// Start API server and get the assigned port
 	port, err := apiServer.Start()
@@ -89,7 +89,7 @@ func main() {
 	log.Printf("API server started on port %d\n", port)
 
 	// Initialize MCP server with the API server port
-	mcpServer := mcp.NewMCPServer(db, port, evmService, txService, uniswapService, liquidityService)
+	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService)
 
 	// Set MCP server reference in API server for cross-communication
 	apiServer.SetMCPServer(mcpServer)

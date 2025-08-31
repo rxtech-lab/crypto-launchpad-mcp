@@ -7,10 +7,9 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 )
 
-func NewSetUniswapVersionTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewSetUniswapVersionTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("set_uniswap_version",
 		mcp.WithDescription("Set Uniswap version and contract addresses for liquidity operations. Stores configuration in database as active setting."),
 		mcp.WithString("version",

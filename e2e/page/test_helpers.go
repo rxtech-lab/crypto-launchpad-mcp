@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rxtech-lab/launchpad-mcp/internal/api"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/stretchr/testify/require"

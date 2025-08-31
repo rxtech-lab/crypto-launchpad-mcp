@@ -12,7 +12,6 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 )
 
@@ -73,7 +72,7 @@ func fetchChainIDFromRPC(rpcURL string) (string, error) {
 	return result.Result, nil
 }
 
-func NewSetChainTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewSetChainTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("set_chain",
 		mcp.WithDescription("Configure target blockchain with RPC endpoint and chain ID. Creates or updates chain configuration in database."),
 		mcp.WithString("chain_type",

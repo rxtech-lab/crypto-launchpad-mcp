@@ -62,6 +62,21 @@ func (s *DeploymentService) UpdateDeploymentStatus(id uint, status models.Transa
 	return s.db.Model(&models.Deployment{}).Where("id = ?", id).Updates(updates).Error
 }
 
+// UpdateDeploymentStatusWithTxHash updates the status of a deployment with transaction hash
+func (s *DeploymentService) UpdateDeploymentStatusWithTxHash(id uint, status models.TransactionStatus, contractAddress, txHash string) error {
+	updates := map[string]interface{}{
+		"status": status,
+	}
+	if contractAddress != "" {
+		updates["contract_address"] = contractAddress
+	}
+	if txHash != "" {
+		updates["transaction_hash"] = txHash
+	}
+
+	return s.db.Model(&models.Deployment{}).Where("id = ?", id).Updates(updates).Error
+}
+
 // DeleteDeployment deletes a deployment by its ID
 func (s *DeploymentService) DeleteDeployment(id uint) error {
 	return s.db.Delete(&models.Deployment{}, id).Error

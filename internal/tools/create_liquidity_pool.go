@@ -8,14 +8,13 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 type createLiquidityPoolTool struct {
-	db               *database.Database
+	chainService     services.ChainService
 	evmService       services.EvmService
 	txService        services.TransactionService
 	liquidityService services.LiquidityService
@@ -33,9 +32,9 @@ type CreateLiquidityPoolArguments struct {
 	Metadata []models.TransactionMetadata `json:"metadata,omitempty"`
 }
 
-func NewCreateLiquidityPoolTool(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, liquidityService services.LiquidityService, uniswapService services.UniswapService) *createLiquidityPoolTool {
+func NewCreateLiquidityPoolTool(chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService, liquidityService services.LiquidityService, uniswapService services.UniswapService) *createLiquidityPoolTool {
 	return &createLiquidityPoolTool{
-		db:               db,
+		chainService:     chainService,
 		evmService:       evmService,
 		txService:        txService,
 		liquidityService: liquidityService,

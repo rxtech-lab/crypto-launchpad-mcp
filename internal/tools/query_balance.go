@@ -7,12 +7,11 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-func NewQueryBalanceTool(db *database.Database, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
+func NewQueryBalanceTool(db interface{}, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("query_balance",
 		mcp.WithDescription("Query wallet balance for native tokens and ERC-20 tokens. Can return results directly or display in browser interface."),
 		mcp.WithString("wallet_address",
@@ -60,7 +59,7 @@ func NewQueryBalanceTool(db *database.Database, serverPort int) (mcp.Tool, serve
 }
 
 // handleBrowserMode creates a session for web-based balance display
-func handleBrowserMode(db *database.Database, serverPort int, activeChain *models.Chain, walletAddress, tokenAddress string) (*mcp.CallToolResult, error) {
+func handleBrowserMode(db interface{}, serverPort int, activeChain *models.Chain, walletAddress, tokenAddress string) (*mcp.CallToolResult, error) {
 	// Prepare session data
 	sessionData := map[string]interface{}{
 		"query_type":     "balance",

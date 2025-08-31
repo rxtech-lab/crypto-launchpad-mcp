@@ -7,7 +7,6 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/stretchr/testify/suite"
@@ -15,7 +14,7 @@ import (
 
 type AddLiquidityToolTestSuite struct {
 	suite.Suite
-	db                *database.Database
+	db                interface{}
 	tool              *addLiquidityTool
 	liquidityService  services.LiquidityService
 	uniswapService    services.UniswapService

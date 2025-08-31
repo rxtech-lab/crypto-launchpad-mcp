@@ -7,11 +7,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 )
 
-func NewSwapTokensTool(db *database.Database, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
+func NewSwapTokensTool(db interface{}, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("swap_tokens",
 		mcp.WithDescription("Execute token swaps via Uniswap with signing interface. Generates a URL where users can connect wallet and sign the swap transaction."),
 		mcp.WithString("from_token",

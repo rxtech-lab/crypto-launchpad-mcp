@@ -9,21 +9,20 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/rxtech-lab/launchpad-mcp/internal/assets"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
 type APIServer struct {
 	app         *fiber.App
-	db          *database.Database
+	dbService   services.DBService
 	txService   services.TransactionService
 	hookService services.HookService
 	mcpServer   *mcp.MCPServer
 	port        int
 }
 
-func NewAPIServer(db *database.Database, txService services.TransactionService, hookService services.HookService) *APIServer {
+func NewAPIServer(dbService services.DBService, txService services.TransactionService, hookService services.HookService) *APIServer {
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -38,7 +37,7 @@ func NewAPIServer(db *database.Database, txService services.TransactionService, 
 
 	server := &APIServer{
 		app:         app,
-		db:          db,
+		dbService:   dbService,
 		txService:   txService,
 		hookService: hookService,
 	}

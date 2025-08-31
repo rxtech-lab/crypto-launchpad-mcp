@@ -7,11 +7,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 )
 
-func NewRemoveLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
+func NewRemoveLiquidityTool(db interface{}, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("remove_liquidity",
 		mcp.WithDescription("Remove liquidity from Uniswap pool with signing interface. Generates a URL where users can connect wallet and sign the liquidity removal transaction."),
 		mcp.WithString("token_address",

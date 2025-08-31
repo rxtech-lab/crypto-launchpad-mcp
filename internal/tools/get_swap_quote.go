@@ -8,11 +8,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 )
 
-func NewGetSwapQuoteTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewGetSwapQuoteTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("get_swap_quote",
 		mcp.WithDescription("Get swap estimates and price impact for token swaps. This is a read-only operation that provides estimated output amounts and price impact calculations."),
 		mcp.WithString("from_token",

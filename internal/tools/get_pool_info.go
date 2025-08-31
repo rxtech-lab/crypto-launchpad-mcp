@@ -7,10 +7,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewGetPoolInfoTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewGetPoolInfoTool(chainService services.ChainService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("get_pool_info",
 		mcp.WithDescription("Retrieve pool metrics including reserves, liquidity, price, and volume. This is a read-only operation that doesn't require wallet connection."),
 		mcp.WithString("token_address",
@@ -26,7 +26,7 @@ func NewGetPoolInfoTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		}
 
 		// Get active chain configuration
-		activeChain, err := db.GetActiveChain()
+		activeChain, err := chainService.GetActiveChain()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{

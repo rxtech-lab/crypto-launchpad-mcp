@@ -8,14 +8,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func InitializeServices(db *gorm.DB) (services.EvmService, services.TransactionService, services.UniswapService, services.LiquidityService, services.HookService) {
+func InitializeServices(db *gorm.DB) (services.EvmService, services.TransactionService, services.UniswapService, services.LiquidityService, services.HookService, services.ChainService, services.TemplateService, services.UniswapSettingsService) {
 	evmService := services.NewEvmService()
 	txService := services.NewTransactionService(db)
 	uniswapService := services.NewUniswapService(db)
 	liquidityService := services.NewLiquidityService(db)
 	hookService := services.NewHookService()
+	chainService := services.NewChainService(db)
+	templateService := services.NewTemplateService(db)
+	uniswapSettingsService := services.NewUniswapSettingsService(db)
 
-	return evmService, txService, uniswapService, liquidityService, hookService
+	return evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService
 }
 
 func InitializeHooks(db *gorm.DB, hookService services.HookService) (services.Hook, services.Hook) {

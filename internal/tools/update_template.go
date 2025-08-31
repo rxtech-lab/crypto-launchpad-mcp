@@ -9,12 +9,11 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewUpdateTemplateTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("update_template",
 		mcp.WithDescription("Update existing smart contract template with new description, chain type, template code, or metadata. Performs syntax validation on updated code."),
 		mcp.WithString("template_id",

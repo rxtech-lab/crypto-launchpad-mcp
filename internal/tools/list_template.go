@@ -8,10 +8,9 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 )
 
-func NewListTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewListTemplateTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("list_template",
 		mcp.WithDescription("List predefined smart contract templates with optional filtering by chain type and keyword search. Uses SQLite search for template names and descriptions."),
 		mcp.WithString("chain_type",

@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
@@ -25,7 +24,7 @@ const (
 
 type LaunchToolTestSuite struct {
 	suite.Suite
-	db         *database.Database
+	db         interface{}
 	ethClient  *ethclient.Client
 	launchTool *launchTool
 	chain      *models.Chain

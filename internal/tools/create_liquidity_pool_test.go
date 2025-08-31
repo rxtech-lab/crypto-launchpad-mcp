@@ -19,7 +19,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/contracts"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
@@ -44,7 +43,7 @@ type DeployedContract struct {
 
 type CreateLiquidityPoolTestSuite struct {
 	suite.Suite
-	db                *database.Database
+	db                interface{}
 	ethClient         *ethclient.Client
 	tool              *createLiquidityPoolTool
 	chain             *models.Chain

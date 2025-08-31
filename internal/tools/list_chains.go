@@ -7,10 +7,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewListChainsTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewListChainsTool(chainService services.ChainService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("list_chains",
 		mcp.WithDescription("List all available blockchain chains with their configurations"),
 		mcp.WithString("chain_type",
@@ -21,7 +21,7 @@ func NewListChainsTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc)
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		chainType := request.GetString("chain_type", "")
 
-		chains, err := db.ListChains()
+		chains, err := chainService.ListChains()
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error listing chains: %v", err)), nil
 		}

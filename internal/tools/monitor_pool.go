@@ -7,10 +7,9 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 )
 
-func NewMonitorPoolTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewMonitorPoolTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("monitor_pool",
 		mcp.WithDescription("Real-time pool monitoring and event tracking. Returns current pool status, recent transactions, and activity metrics. This is a read-only operation."),
 		mcp.WithString("token_address",

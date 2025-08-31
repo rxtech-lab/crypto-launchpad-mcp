@@ -8,10 +8,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewSelectChainTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewSelectChainTool(chainService services.ChainService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("select_chain",
 		mcp.WithDescription("Select blockchain for token operations. Can select by uuid (recommended). Sets the selection as active in database."),
 		mcp.WithString("chain_type",
@@ -32,11 +32,11 @@ func NewSelectChainTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		}
 		uuid, err := strconv.ParseUint(chainIDStr, 10, 32)
 		// Set the active chain by uuid
-		if err := db.SetActiveChainByID(uint(uuid)); err != nil {
+		if err := chainService.SetActiveChainByID(uint(uuid)); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error setting active chain: %v", err)), nil
 		}
 		// Get the active chain to return current state
-		activeChain, err := db.GetActiveChain()
+		activeChain, err := chainService.GetActiveChain()
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error getting active chain: %v", err)), nil
 		}

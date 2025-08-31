@@ -7,10 +7,9 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 )
 
-func NewGetUniswapAddressesTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewGetUniswapAddressesTool(db interface{}) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("get_uniswap_addresses",
 		mcp.WithDescription("Get current Uniswap configuration including version and contract addresses. Returns the active Uniswap settings from database."),
 	)

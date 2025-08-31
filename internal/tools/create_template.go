@@ -7,12 +7,12 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewCreateTemplateTool(templateService services.TemplateService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("create_template",
 		mcp.WithDescription("Create new smart contract template with syntax validation. Template code should use Go template syntax ({{.VariableName}}) for dynamic parameters. OpenZeppelin contracts are available to use."),
 		mcp.WithString("name",
@@ -122,7 +122,7 @@ func NewCreateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 			Metadata:     metadata,
 		}
 
-		if err := db.CreateTemplate(template); err != nil {
+		if err := templateService.CreateTemplate(template); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error creating template: %v", err)), nil
 		}
 

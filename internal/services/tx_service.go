@@ -15,6 +15,11 @@ type TransactionService interface {
 	GetTransactionSession(sessionID string) (*models.TransactionSession, error)
 	UpdateTransactionSession(sessionID string, session *models.TransactionSession) error
 	ListTransactionSessionsByUser(userID string) ([]models.TransactionSession, error)
+	
+	// Legacy methods for backward compatibility with database.go
+	CreateTransactionSessionLegacy(sessionType string, chainType models.TransactionChainType, chainID, data string) (string, error)
+	CreateTransactionSessionWithUserLegacy(sessionType string, chainType models.TransactionChainType, chainID, data string, userID *string) (string, error)
+	UpdateTransactionSessionStatus(sessionID string, status models.TransactionStatus, txHash string) error
 }
 
 type transactionService struct {
@@ -74,9 +79,9 @@ func (s *transactionService) CreateTransactionSessionWithUser(req CreateTransact
 }
 
 // GetTransactionSession returns the transaction session by sessionID
-func (t *transactionService) GetTransactionSession(sessionID string) (*models.TransactionSession, error) {
+func (s *transactionService) GetTransactionSession(sessionID string) (*models.TransactionSession, error) {
 	var session models.TransactionSession
-	err := t.db.Where("id = ?", sessionID).Preload("Chain").First(&session).Error
+	err := s.db.Where("id = ?", sessionID).Preload("Chain").First(&session).Error
 	if err != nil {
 		return nil, err
 	}
@@ -90,13 +95,13 @@ func (t *transactionService) GetTransactionSession(sessionID string) (*models.Tr
 }
 
 // UpdateTransactionSession updates the transaction session by sessionID
-func (t *transactionService) UpdateTransactionSession(sessionID string, session *models.TransactionSession) error {
+func (s *transactionService) UpdateTransactionSession(sessionID string, session *models.TransactionSession) error {
 	// Ensure the session ID matches
 	session.ID = sessionID
 	session.UpdatedAt = time.Now()
 
 	// Update the session in the database by ID
-	err := t.db.Model(&models.TransactionSession{}).Where("id = ?", sessionID).Updates(session).Error
+	err := s.db.Model(&models.TransactionSession{}).Where("id = ?", sessionID).Updates(session).Error
 	if err != nil {
 		return err
 	}
@@ -105,8 +110,64 @@ func (t *transactionService) UpdateTransactionSession(sessionID string, session 
 }
 
 // ListTransactionSessionsByUser returns all transaction sessions for a specific user
-func (t *transactionService) ListTransactionSessionsByUser(userID string) ([]models.TransactionSession, error) {
+func (s *transactionService) ListTransactionSessionsByUser(userID string) ([]models.TransactionSession, error) {
 	var sessions []models.TransactionSession
-	err := t.db.Preload("Chain").Where("user_id = ?", userID).Find(&sessions).Error
+	err := s.db.Preload("Chain").Where("user_id = ?", userID).Find(&sessions).Error
 	return sessions, err
+}
+
+// CreateTransactionSessionLegacy creates a transaction session with backward compatibility signature
+func (s *transactionService) CreateTransactionSessionLegacy(sessionType string, chainType models.TransactionChainType, chainID, data string) (string, error) {
+	return s.CreateTransactionSessionWithUserLegacy(sessionType, chainType, chainID, data, nil)
+}
+
+// CreateTransactionSessionWithUserLegacy creates a transaction session with optional user ID (legacy signature)
+func (s *transactionService) CreateTransactionSessionWithUserLegacy(sessionType string, chainType models.TransactionChainType, chainID, data string, userID *string) (string, error) {
+	// Generate a UUID for the session ID
+	sessionID := fmt.Sprintf("%s-%d", sessionType, time.Now().UnixNano())
+
+	// Parse chainID to uint
+	var chainIDUint uint
+	if _, err := fmt.Sscanf(chainID, "%d", &chainIDUint); err != nil {
+		// If chainID is not a number, try to find the chain by type and chainID string
+		var chain models.Chain
+		if err := s.db.Where("chain_type = ? AND chain_id = ?", chainType, chainID).First(&chain).Error; err != nil {
+			return "", fmt.Errorf("failed to find chain: %w", err)
+		}
+		chainIDUint = chain.ID
+	}
+
+	// Create metadata for session type
+	metadata := []models.TransactionMetadata{
+		{Key: "session_type", Value: sessionType},
+		{Key: "data", Value: data},
+	}
+
+	session := &models.TransactionSession{
+		ID:                   sessionID,
+		UserID:               userID,
+		Metadata:             metadata,
+		TransactionStatus:    models.TransactionStatusPending,
+		TransactionChainType: chainType,
+		ChainID:              chainIDUint,
+		ExpiresAt:            time.Now().Add(30 * time.Minute),
+	}
+
+	if err := s.db.Create(session).Error; err != nil {
+		return "", err
+	}
+
+	return session.ID, nil
+}
+
+// UpdateTransactionSessionStatus updates the status of a transaction session
+func (s *transactionService) UpdateTransactionSessionStatus(sessionID string, status models.TransactionStatus, txHash string) error {
+	updates := map[string]interface{}{
+		"transaction_status": status,
+	}
+	if txHash != "" {
+		updates["transaction_hash"] = txHash
+	}
+
+	return s.db.Model(&models.TransactionSession{}).Where("id = ?", sessionID).Updates(updates).Error
 }

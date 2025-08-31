@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"

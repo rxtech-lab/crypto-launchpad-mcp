@@ -10,13 +10,12 @@ import (
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDatabase(t *testing.T) *database.Database {
+func setupTestDatabase(t *testing.T) interface{} {
 	tempDir := t.TempDir()
 	dbPath := filepath.Join(tempDir, "test.db")
 	db, err := database.NewDatabase(dbPath)

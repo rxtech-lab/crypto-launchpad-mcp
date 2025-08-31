@@ -9,14 +9,13 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 type deployUniswapTool struct {
-	db             *database.Database
+	chainService   services.ChainService
 	evmService     services.EvmService
 	txService      services.TransactionService
 	uniswapService services.UniswapService
@@ -32,9 +31,9 @@ type DeployUniswapArguments struct {
 	Metadata     []models.TransactionMetadata `json:"metadata,omitempty"`
 }
 
-func NewDeployUniswapTool(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService) *deployUniswapTool {
+func NewDeployUniswapTool(chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService) *deployUniswapTool {
 	return &deployUniswapTool{
-		db:             db,
+		chainService:   chainService,
 		evmService:     evmService,
 		txService:      txService,
 		uniswapService: uniswapService,

@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/stretchr/testify/suite"
 )
