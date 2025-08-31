@@ -10,9 +10,8 @@ import (
 
 	"github.com/rxtech-lab/launchpad-mcp/internal/api"
 	"github.com/rxtech-lab/launchpad-mcp/internal/database"
-	"github.com/rxtech-lab/launchpad-mcp/internal/hooks"
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
-	"github.com/rxtech-lab/launchpad-mcp/internal/services"
+	"github.com/rxtech-lab/launchpad-mcp/internal/server"
 )
 
 // Build information (set via ldflags)
@@ -73,22 +72,10 @@ func main() {
 	defer db.Close()
 
 	// Initialize services
-	evmService := services.NewEvmService()
-	txService := services.NewTransactionService(db.DB)
-	uniswapService := services.NewUniswapService(db.DB)
-	hookService := services.NewHookService()
-	liquidityService := services.NewLiquidityService(db.DB)
-
+	evmService, txService, uniswapService, liquidityService, hookService := server.InitializeServices(db.DB)
+	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(db.DB, hookService)
 	// Register hooks
-	tokenDeploymentHook := hooks.NewTokenDeploymentHook(db.DB)
-	uniswapDeploymentHook := hooks.NewUniswapDeploymentHook(db.DB)
-
-	if err := hookService.AddHook(tokenDeploymentHook); err != nil {
-		log.Fatal("Failed to register token deployment hook:", err)
-	}
-	if err := hookService.AddHook(uniswapDeploymentHook); err != nil {
-		log.Fatal("Failed to register uniswap deployment hook:", err)
-	}
+	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
 
 	// Initialize and start API server (HTTP server for transaction signing)
 	apiServer := api.NewAPIServer(db, txService, hookService)

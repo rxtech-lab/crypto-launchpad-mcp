@@ -47,23 +47,14 @@ func NewAPIServer(db *database.Database, txService services.TransactionService, 
 }
 
 func (s *APIServer) setupRoutes() {
-
+	// oauth routes
+	s.app.Get("/.well-known/oauth-protected-resource", s.handleOAuthProtectedResource)
 	// Universal transaction signing routes
 	s.app.Get("/tx/:session_id", s.handleTransactionPage)
 	s.app.Post("/api/tx/:session_id/transaction/:index", s.handleTransactionAPI)
-
 	// Static assets for signing app
 	s.app.Get("/static/tx/app.js", s.handleSigningAppJS)
 	s.app.Get("/static/tx/app.css", s.handleSigningAppCSS)
-
-	// Legacy balance query routes (redirect to new tx routes)
-	s.app.Get("/balance/:session_id", func(c *fiber.Ctx) error {
-		return c.Redirect("/tx/" + c.Params("session_id"))
-	})
-	s.app.Get("/api/balance/:session_id", func(c *fiber.Ctx) error {
-		return c.Redirect("/api/tx/" + c.Params("session_id"))
-	})
-
 	// Test API for E2E testing
 	s.app.Post("/api/test/sign-transaction", s.handleTestSignTransaction)
 
