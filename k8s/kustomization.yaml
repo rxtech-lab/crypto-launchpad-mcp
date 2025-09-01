@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: launchpad-mcp
+  namespace: launchpad
+
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - secrets.yaml
+
+commonLabels:
+  app: launchpad-mcp
+  managed-by: kustomize
+
+commonAnnotations:
+  app.kubernetes.io/name: launchpad-mcp
+  app.kubernetes.io/version: latest
+  app.kubernetes.io/managed-by: kustomize
+
+namespace: launchpad
+
+images:
+  - name: ghcr.io/rxtech-lab/launchpad-mcp
+    newTag: latest

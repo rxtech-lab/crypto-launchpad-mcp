@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: launchpad-mcp
+  namespace: launchpad
+  labels:
+    app: launchpad-mcp
+    version: v1
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: launchpad-mcp
+  template:
+    metadata:
+      labels:
+        app: launchpad-mcp
+        version: v1
+    spec:
+      containers:
+      - name: launchpad-mcp
+        image: ghcr.io/rxtech-lab/launchpad-mcp:latest
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8080"
+        - name: GIN_MODE
+          value: "release"
+        - name: POSTGRES_URL
+          valueFrom:
+            secretKeyRef:
+              name: launchpad-mcp-secrets
+              key: postgres-url
+        - name: SCALEKIT_ENV_URL
+          valueFrom:
+            secretKeyRef:
+              name: launchpad-mcp-secrets
+              key: scalekit-env-url
+              optional: true
+        - name: OAUTH_AUTHENTICATION_SERVER
+          valueFrom:
+            secretKeyRef:
+              name: launchpad-mcp-secrets
+              key: oauth-authentication-server
+              optional: true
+        - name: OAUTH_RESOURCE_URL
+          valueFrom:
+            secretKeyRef:
+              name: launchpad-mcp-secrets
+              key: oauth-resource-url
+              optional: true
+        - name: OAUTH_RESOURCE_DOCUMENTATION_URL
+          valueFrom:
+            secretKeyRef:
+              name: launchpad-mcp-secrets
+              key: oauth-resource-documentation-url
+              optional: true
+        - name: SCALEKIT_RESOURCE_METADATA_URL
+          valueFrom:
+            secretKeyRef:
+              name: launchpad-mcp-secrets
+              key: scalekit-resource-metadata-url
+              optional: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+      securityContext:
+        fsGroup: 1001
+      restartPolicy: Always

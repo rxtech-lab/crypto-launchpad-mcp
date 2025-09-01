@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: launchpad
+  labels:
+    name: launchpad
+    app.kubernetes.io/name: launchpad-mcp
+    app.kubernetes.io/managed-by: kustomize
