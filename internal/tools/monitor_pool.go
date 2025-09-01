@@ -7,10 +7,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewMonitorPoolTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewMonitorPoolTool(chainService services.ChainService, liquidityService services.LiquidityService, deploymentService *services.DeploymentService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("monitor_pool",
 		mcp.WithDescription("Real-time pool monitoring and event tracking. Returns current pool status, recent transactions, and activity metrics. This is a read-only operation."),
 		mcp.WithString("token_address",
@@ -31,7 +31,7 @@ func NewMonitorPoolTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		timeRange := request.GetString("time_range", "24h")
 
 		// Get active chain configuration
-		activeChain, err := db.GetActiveChain()
+		activeChain, err := chainService.GetActiveChain()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -52,7 +52,7 @@ func NewMonitorPoolTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		}
 
 		// Get pool information
-		pool, err := db.GetLiquidityPoolByTokenAddress(tokenAddress)
+		pool, err := liquidityService.GetLiquidityPoolByTokenAddress(tokenAddress)
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -63,7 +63,7 @@ func NewMonitorPoolTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		}
 
 		// Get all liquidity positions for this pool
-		allPositions, err := db.GetLiquidityPositionsByUser("")
+		allPositions, err := liquidityService.GetLiquidityPositionsByUser("")
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -101,7 +101,7 @@ func NewMonitorPoolTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		}
 
 		// Get all swap transactions related to this token
-		allSwaps, err := db.GetSwapTransactionsByUser("")
+		allSwaps, err := liquidityService.ListSwapTransactionsByUser("", 0, 1000)
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -136,7 +136,7 @@ func NewMonitorPoolTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		}
 
 		// Get all deployments to check if this token was deployed through the system
-		deployments, err := db.ListDeployments()
+		deployments, err := deploymentService.ListDeployments()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{

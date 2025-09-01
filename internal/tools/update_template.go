@@ -9,12 +9,12 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewUpdateTemplateTool(templateService services.TemplateService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("update_template",
 		mcp.WithDescription("Update existing smart contract template with new description, chain type, template code, or metadata. Performs syntax validation on updated code."),
 		mcp.WithString("template_id",
@@ -94,7 +94,7 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		}
 
 		// Get existing template
-		template, err := db.GetTemplateByID(uint(templateID))
+		template, err := templateService.GetTemplateByID(uint(templateID))
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -189,7 +189,7 @@ func NewUpdateTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		}
 
 		// Save updated template
-		if err := db.UpdateTemplate(template); err != nil {
+		if err := templateService.UpdateTemplate(template); err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent("Error: "),

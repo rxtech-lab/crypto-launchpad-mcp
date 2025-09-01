@@ -9,9 +9,8 @@ import (
 	"syscall"
 
 	"github.com/rxtech-lab/launchpad-mcp/internal/api"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
-	"github.com/rxtech-lab/launchpad-mcp/internal/hooks"
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
+	"github.com/rxtech-lab/launchpad-mcp/internal/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
@@ -66,35 +65,23 @@ func main() {
 
 	// Initialize database
 	dbPath := homePath + "/launchpad.db"
-	db, err := database.NewDatabase(dbPath)
+	dbService, err := services.NewSqliteDBService(dbPath)
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
-	defer db.Close()
+	defer dbService.Close()
 
 	// Initialize services
-	evmService := services.NewEvmService()
-	txService := services.NewTransactionService(db.DB)
-	uniswapService := services.NewUniswapService(db.DB)
-	hookService := services.NewHookService()
-	liquidityService := services.NewLiquidityService(db.DB)
-
+	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService, deploymentService := server.InitializeServices(dbService.GetDB())
+	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService)
 	// Register hooks
-	tokenDeploymentHook := hooks.NewTokenDeploymentHook(db.DB)
-	uniswapDeploymentHook := hooks.NewUniswapDeploymentHook(db.DB)
-
-	if err := hookService.AddHook(tokenDeploymentHook); err != nil {
-		log.Fatal("Failed to register token deployment hook:", err)
-	}
-	if err := hookService.AddHook(uniswapDeploymentHook); err != nil {
-		log.Fatal("Failed to register uniswap deployment hook:", err)
-	}
+	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
 
 	// Initialize and start API server (HTTP server for transaction signing)
-	apiServer := api.NewAPIServer(db, txService, hookService)
+	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
 
-	// Start API server and get the assigned port
-	port, err := apiServer.Start()
+	// StartStdioServer API server and get the assigned port
+	port, err := apiServer.Start(nil)
 	if err != nil {
 		log.Fatal("Failed to start API server:", err)
 	}
@@ -102,14 +89,14 @@ func main() {
 	log.Printf("API server started on port %d\n", port)
 
 	// Initialize MCP server with the API server port
-	mcpServer := mcp.NewMCPServer(db, port, evmService, txService, uniswapService, liquidityService)
+	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
 
 	// Set MCP server reference in API server for cross-communication
 	apiServer.SetMCPServer(mcpServer)
 
-	// Start MCP server in a goroutine
+	// StartStdioServer MCP server in a goroutine
 	go func() {
-		if err := mcpServer.Start(); err != nil {
+		if err := mcpServer.StartStdioServer(); err != nil {
 			log.SetOutput(os.Stderr)
 			log.SetFlags(0)
 			log.Fatal("Failed to start MCP server:", err)

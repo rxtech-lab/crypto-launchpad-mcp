@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
@@ -33,29 +32,33 @@ const (
 
 type TxHandlerTestSuite struct {
 	suite.Suite
-	db         *database.Database
-	apiServer  *APIServer
-	serverPort int
-	ethClient  *ethclient.Client
-	chain      *models.Chain
-	template   *models.Template
+	db                services.DBService
+	apiServer         *APIServer
+	serverPort        int
+	ethClient         *ethclient.Client
+	chain             *models.Chain
+	template          *models.Template
+	deploymentService *services.DeploymentService
+	chainService      services.ChainService
+	templateService   services.TemplateService
 }
 
 func (suite *TxHandlerTestSuite) SetupSuite() {
 	// Initialize in-memory database
-	db, err := database.NewDatabase(":memory:")
+	db, err := services.NewSqliteDBService(":memory:")
 	suite.Require().NoError(err)
 	suite.db = db
 
-	// Initialize transaction service
-	txService := services.NewTransactionService(db.DB)
-
-	// Initialize hook service
+	// Initialize services
+	txService := services.NewTransactionService(db.GetDB())
 	hookService := services.NewHookService()
+	suite.chainService = services.NewChainService(db.GetDB())
+	suite.templateService = services.NewTemplateService(db.GetDB())
+	suite.deploymentService = services.NewDeploymentService(db.GetDB())
 
 	// Initialize API server
-	apiServer := NewAPIServer(db, txService, hookService)
-	port, err := apiServer.Start()
+	apiServer := NewAPIServer(db, txService, hookService, suite.chainService)
+	port, err := apiServer.Start(nil) // Let it find an available port
 	suite.Require().NoError(err)
 	suite.apiServer = apiServer
 	suite.serverPort = port
@@ -101,7 +104,7 @@ func (suite *TxHandlerTestSuite) setupTestChain() {
 		IsActive:  true,
 	}
 
-	err := suite.db.CreateChain(chain)
+	err := suite.chainService.CreateChain(chain)
 	suite.Require().NoError(err)
 	suite.chain = chain
 }
@@ -132,17 +135,17 @@ contract SimpleToken {
 		TemplateCode: contractCode,
 	}
 
-	err := suite.db.CreateTemplate(template)
+	err := suite.templateService.CreateTemplate(template)
 	suite.Require().NoError(err)
 	suite.template = template
 }
 
 func (suite *TxHandlerTestSuite) cleanupTestData() {
 	// Clean up transaction sessions
-	suite.db.DB.Where("1 = 1").Delete(&models.TransactionSession{})
+	suite.db.GetDB().Where("1 = 1").Delete(&models.TransactionSession{})
 
 	// Clean up deployments
-	suite.db.DB.Where("1 = 1").Delete(&models.Deployment{})
+	suite.db.GetDB().Where("1 = 1").Delete(&models.Deployment{})
 }
 
 func (suite *TxHandlerTestSuite) verifyEthereumConnection() error {
@@ -176,7 +179,7 @@ func (suite *TxHandlerTestSuite) createTestSession() string {
 		},
 	}
 
-	err := suite.db.CreateDeployment(deployment)
+	err := suite.deploymentService.CreateDeployment(deployment)
 	suite.Require().NoError(err)
 
 	// Create transaction session using the service
@@ -199,7 +202,7 @@ func (suite *TxHandlerTestSuite) createTestSession() string {
 		ChainID:   suite.chain.ID,
 	}
 
-	txService := services.NewTransactionService(suite.db.DB)
+	txService := services.NewTransactionService(suite.db.GetDB())
 	sessionID, err := txService.CreateTransactionSession(req)
 	suite.Require().NoError(err)
 
@@ -299,6 +302,9 @@ func (suite *TxHandlerTestSuite) makeRequest(method, path string, body interface
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	// Add dummy authentication token for testing
+	req.Header.Set("Authorization", "Bearer test-token")
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	return client.Do(req)
 }
@@ -382,7 +388,7 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_Success() {
 	suite.Equal(contractAddress.Hex(), *responseData.ContractAddress)
 
 	// Verify database was updated
-	txService := services.NewTransactionService(suite.db.DB)
+	txService := services.NewTransactionService(suite.db.GetDB())
 	session, err := txService.GetTransactionSession(sessionID)
 	suite.Require().NoError(err)
 	suite.Equal(models.TransactionStatusConfirmed, session.TransactionStatus)
@@ -418,7 +424,7 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_InvalidTransactionHash
 	suite.Contains(errorResponse["error"], "Failed to verify transaction")
 
 	// Verify session status was updated to failed
-	txService := services.NewTransactionService(suite.db.DB)
+	txService := services.NewTransactionService(suite.db.GetDB())
 	session, err := txService.GetTransactionSession(sessionID)
 	suite.Require().NoError(err)
 	suite.Equal(models.TransactionStatusFailed, session.TransactionStatus)
@@ -455,6 +461,7 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_InvalidRequestBody() {
 	req, err := http.NewRequest("POST", fmt.Sprintf("http://localhost:%d/api/tx/%s/transaction/0", suite.serverPort, sessionID), strings.NewReader(invalidJson))
 	suite.Require().NoError(err)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-token")
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
@@ -513,7 +520,7 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_PartialConfirmation() 
 		},
 	}
 
-	err = suite.db.CreateDeployment(deployment)
+	err = suite.deploymentService.CreateDeployment(deployment)
 	suite.Require().NoError(err)
 
 	// Create session with multiple transaction deployments
@@ -543,7 +550,7 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_PartialConfirmation() 
 		ChainID:   suite.chain.ID,
 	}
 
-	txService := services.NewTransactionService(suite.db.DB)
+	txService := services.NewTransactionService(suite.db.GetDB())
 	sessionID, err := txService.CreateTransactionSession(req)
 	suite.Require().NoError(err)
 

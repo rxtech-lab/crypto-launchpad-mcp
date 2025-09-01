@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewRemoveLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
+func NewRemoveLiquidityTool(chainService services.ChainService, liquidityService services.LiquidityService, uniswapSettingsService services.UniswapSettingsService, txService services.TransactionService, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("remove_liquidity",
 		mcp.WithDescription("Remove liquidity from Uniswap pool with signing interface. Generates a URL where users can connect wallet and sign the liquidity removal transaction."),
 		mcp.WithString("token_address",
@@ -63,7 +64,7 @@ func NewRemoveLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, se
 		}
 
 		// Get active chain configuration
-		activeChain, err := db.GetActiveChain()
+		activeChain, err := chainService.GetActiveChain()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -84,7 +85,7 @@ func NewRemoveLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, se
 		}
 
 		// Check if pool exists
-		pool, err := db.GetLiquidityPoolByTokenAddress(tokenAddress)
+		pool, err := liquidityService.GetLiquidityPoolByTokenAddress(tokenAddress)
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -95,7 +96,7 @@ func NewRemoveLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, se
 		}
 
 		// Get active Uniswap settings
-		uniswapSettings, err := db.GetActiveUniswapSettings()
+		uniswapSettings, err := uniswapSettingsService.GetActiveUniswapSettings()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -114,7 +115,7 @@ func NewRemoveLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, se
 			Status:          "pending",
 		}
 
-		if err := db.CreateLiquidityPosition(position); err != nil {
+		if _, err := liquidityService.CreateLiquidityPosition(position); err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent("Error: "),
@@ -149,12 +150,16 @@ func NewRemoveLiquidityTool(db *database.Database, serverPort int) (mcp.Tool, se
 		}
 
 		// Create transaction session
-		sessionID, err := db.CreateTransactionSession(
-			"remove_liquidity",
-			activeChain.ChainType,
-			activeChain.NetworkID,
-			string(transactionDataJSON),
-		)
+		chainIDUint, _ := strconv.ParseUint(activeChain.NetworkID, 10, 64)
+		req := services.CreateTransactionSessionRequest{
+			Metadata: []models.TransactionMetadata{
+				{Key: "session_type", Value: "remove_liquidity"},
+				{Key: "session_data", Value: string(transactionDataJSON)},
+			},
+			ChainType: activeChain.ChainType,
+			ChainID:   uint(chainIDUint),
+		}
+		sessionID, err := txService.CreateTransactionSession(req)
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{

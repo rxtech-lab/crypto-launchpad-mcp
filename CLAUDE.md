@@ -1,78 +1,21 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Crypto Launchpad MCP server built in Go for cryptocurrency token deployments and Uniswap operations.
 
-## Project Overview
+## Architecture
 
-This is a Crypto Launchpad MCP (Model Context Protocol) server built in Go that allows AI agents to manage cryptocurrency token deployments and Uniswap liquidity operations. The project combines an MCP server for AI tool integration with a REST API for blockchain transaction signing interfaces.
+- **MCP Server**: `github.com/mark3labs/mcp-go` for AI tool integration
+- **REST API**: Fiber framework with random port for transaction signing
+- **Database**: GORM + SQLite (`~/launchpad.db`)
+- **Frontend**: HTMX + Tailwind CSS with EIP-6963 wallet discovery
 
-## Core Architecture
+## Tools (18 total)
 
-- **MCP Server**: Built using `github.com/mark3labs/mcp-go` for creating MCP tools
-- **REST API**: Fiber framework with random port assignment for transaction signing interfaces
-- **Database**: GORM with SQLite for local data storage
-- **Frontend**: HTMX + Tailwind CSS for reactive signing interfaces
-- **Blockchain Integration**: EIP-6963 wallet discovery for Ethereum and Solana support
-
-## Key Components
-
-### Data Models
-
-- Chain configurations (blockchain RPC endpoints and chain IDs)
-- Smart contract templates by chain type (Ethereum/Solana)
-- Deployment records with transaction tracking
-- Uniswap settings and pool management
-- Uniswap deployment tracking (factory, router, WETH contracts)
-- Liquidity positions and swap transaction history
-- Transaction sessions for signing interface management (deploy, deploy_uniswap, balance_query, pool operations)
-
-### MCP Tools (18 total)
-
-#### Chain Management (2 tools)
-
-- `select_chain` - Select active blockchain (ethereum/solana)
-- `set_chain` - Configure blockchain RPC and chain ID
-
-#### Template Management (4 tools)
-
-- `list_template` - List smart contract templates with search
-- `create_template` - Create new contract template with validation
-- `update_template` - Update existing template
-- `delete_template` - Delete templates by ID(s) with bulk deletion support
-
-#### Deployment (2 tools)
-
-- `launch` - Generate deployment URL with signing interface
-- `list_deployments` - List all token deployments with filtering options
-
-#### Uniswap Integration (11 tools)
-
-- `deploy_uniswap` - Deploy Uniswap infrastructure contracts (factory, router, WETH)
-- `remove_uniswap_deployment` - Remove Uniswap deployments by ID(s) with bulk deletion support
-- `set_uniswap_version` - Configure Uniswap version (v2/v3/v4)
-- `get_uniswap_addresses` - Get current Uniswap configuration
-- `create_liquidity_pool` - Create new liquidity pool with signing interface
-- `add_liquidity` - Add liquidity to existing pool with signing interface
-- `remove_liquidity` - Remove liquidity from pool with signing interface
-- `swap_tokens` - Execute token swaps with signing interface
-- `get_pool_info` - Retrieve pool metrics (read-only)
-- `get_swap_quote` - Get swap estimates and price impact (read-only)
-- `monitor_pool` - Real-time pool monitoring and event tracking (read-only)
-
-#### Balance Query Tools (1 tool)
-
-- `query_balance` - Query wallet balance for native tokens and ERC-20 tokens with browser/direct modes
-
-### Transaction Signing Workflow
-
-1. AI tool creates transaction session in database
-2. Tool generates unique URL with session ID
-3. User opens URL in browser
-4. Frontend loads with EIP-6963 wallet discovery
-5. User connects wallet and reviews transaction details
-6. User signs and sends transaction
-7. Frontend updates session status via API
-8. Database records are updated with transaction hash
+**Chain**: `select_chain`, `set_chain`  
+**Templates**: `list_template`, `create_template`, `update_template`, `delete_template`  
+**Deployment**: `launch`, `list_deployments`  
+**Uniswap**: `deploy_uniswap`, `remove_uniswap_deployment`, `set_uniswap_version`, `get_uniswap_addresses`, `create_liquidity_pool`, `add_liquidity`, `remove_liquidity`, `swap_tokens`, `get_pool_info`, `get_swap_quote`, `monitor_pool`  
+**Balance**: `query_balance`
 
 ## Development Commands
 
@@ -348,6 +291,130 @@ async loadSessionData(sessionId, apiUrl, embeddedData = null) {
 - **Template Validation**: Smart contract templates checked for basic security issues
 - **Session Expiry**: Transaction sessions expire after 30 minutes
 - **No Private Keys**: System never handles private keys - all signing done client-side
+
+## Authentication Integration
+
+The project supports OAuth/JWT authentication for both HTTP API endpoints and MCP tool invocations, providing audit trails and role-based access control.
+
+### Authentication Architecture
+
+- **HTTP API Authentication**: Fiber middleware validates JWT tokens and stores authenticated user in Fiber context
+- **MCP Tool Authentication**: Custom streamable HTTP handler extracts JWT tokens and passes authenticated user through Go `context.Context`
+- **Dual Context Support**: Separate context keys for HTTP (`authenticatedUser`) and MCP (`mcp_authenticated_user`) contexts
+
+### Environment Configuration
+
+Authentication is configured via environment variables:
+
+```bash
+# JWT/OAuth Configuration
+SCALEKIT_ENV_URL="https://your-auth-provider.com/.well-known/jwks.json"  # JWKS URI for token validation
+OAUTH_AUTHENTICATION_SERVER="https://your-auth-provider.com"             # OAuth server URL
+OAUTH_RESOURCE_URL="https://your-api.com"                                # Resource server URL
+OAUTH_RESOURCE_DOCUMENTATION_URL="https://docs.your-api.com"             # API documentation URL
+SCALEKIT_RESOURCE_METADATA_URL="https://your-auth-provider.com/metadata" # OAuth resource metadata
+```
+
+### Authentication Flow
+
+#### HTTP API Authentication
+1. Client sends request with `Authorization: Bearer <jwt-token>` header
+2. Auth middleware (`internal/api/middleware/auth.go`) validates token using JwtAuthenticator
+3. Authenticated user stored in Fiber context via `c.Locals(AuthenticatedUserContextKey, user)`
+4. Handlers access user with: `user := c.Locals(AuthenticatedUserContextKey).(*utils.AuthenticatedUser)`
+
+#### MCP Tool Authentication
+1. HTTP request to `/mcp/*` endpoints includes `Authorization: Bearer <jwt-token>` header
+2. Custom handler (`createAuthenticatedMCPHandler`) extracts and validates JWT token
+3. Authenticated user added to Go context via `utils.WithAuthenticatedUser(ctx, user)`
+4. MCP tools access user with: `user, ok := utils.GetAuthenticatedUser(ctx)`
+
+### Context Helper Functions
+
+The `internal/utils/context.go` file provides utilities for working with authenticated users in MCP tools:
+
+```go
+// Store user in context (used by streamable HTTP handler)
+func WithAuthenticatedUser(ctx context.Context, user *AuthenticatedUser) context.Context
+
+// Retrieve user from context (used by MCP tools)
+func GetAuthenticatedUser(ctx context.Context) (*AuthenticatedUser, bool)
+
+// Utility functions for common operations
+func IsAuthenticated(ctx context.Context) bool
+func GetUserID(ctx context.Context) string
+func GetUserRoles(ctx context.Context) []string
+func HasRole(ctx context.Context, role string) bool
+func GetUserScopes(ctx context.Context) []string
+func HasScope(ctx context.Context, scope string) bool
+```
+
+### Authenticated User Structure
+
+```go
+type AuthenticatedUser struct {
+    Aud      []string `json:"aud"`      // Token audience
+    ClientId string   `json:"client_id"` // OAuth client ID
+    Exp      int      `json:"exp"`      // Token expiration
+    Iat      int      `json:"iat"`      // Token issued at
+    Iss      string   `json:"iss"`      // Token issuer
+    Jti      string   `json:"jti"`      // JWT ID
+    Nbf      int      `json:"nbf"`      // Token not before
+    Oid      string   `json:"oid"`      // Object ID
+    Resid    string   `json:"resid"`    // Resource ID
+    Roles    []string `json:"roles"`    // User roles
+    Scopes   []string `json:"scopes"`   // OAuth scopes
+    Sid      string   `json:"sid"`      // Session ID
+    Sub      string   `json:"sub"`      // Subject (user ID)
+}
+```
+
+### MCP Tool Integration Example
+
+```go
+// Example from internal/tools/create_template.go
+handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+    // Check if user is authenticated (optional for this tool, but log for audit)
+    var createdBy string
+    if user, ok := utils.GetAuthenticatedUser(ctx); ok {
+        createdBy = user.Sub
+        // Log the authenticated action for audit purposes
+        fmt.Printf("Template creation requested by user: %s (roles: %v)\n", user.Sub, user.Roles)
+    } else {
+        createdBy = "unauthenticated"
+        fmt.Println("Template creation requested by unauthenticated user")
+    }
+
+    // ... rest of tool implementation
+
+    // Include user information in response for audit trail
+    result := map[string]interface{}{
+        "id":         template.ID,
+        "created_by": createdBy,  // Authenticated user ID or "unauthenticated"
+        // ... other fields
+    }
+}
+```
+
+### Well-Known OAuth Endpoints
+
+The API server exposes OAuth discovery endpoints:
+
+- `/.well-known/oauth-protected-resource/mcp` - OAuth resource metadata for MCP endpoints
+
+### Testing Authentication
+
+Authentication is fully tested with comprehensive test suites:
+
+- **`internal/api/middleware/auth_test.go`** - Tests HTTP middleware authentication and context storage
+- **`internal/utils/context_test.go`** - Tests MCP context helper functions and propagation
+- **Integration tests** verify end-to-end authentication flow through both HTTP and MCP interfaces
+
+### Backwards Compatibility
+
+- **Unauthenticated Access**: Tools continue to work without authentication (user context simply won't be available)
+- **Optional Authentication**: Tools can check for authentication but don't require it
+- **Graceful Degradation**: Missing JWKS configuration results in warnings but doesn't break functionality
 
 ## Important Notes
 
@@ -986,3 +1053,7 @@ When testing HTML responses in E2E tests:
    - Always verify database state changes after operations
    - Check transaction hashes are properly stored
    - Verify status updates are applied correctly
+
+   
+
+**In the tests**, never uses err = s.dbService.GetDB().Where("transaction_hash = ?", deployment.TransactionHash).First(&updatedDeployment).Error to create or check data existence. Don't use gorm to create or check data existence in tests. Always use the database service methods like s.uniswapService.GetUniswapDeploymentByID(deployment.ID) to ensure all business logic and validations are applied consistently.

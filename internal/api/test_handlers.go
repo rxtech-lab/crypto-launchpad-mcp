@@ -59,7 +59,7 @@ func (s *APIServer) handleTestSignTransaction(c *fiber.Ctx) error {
 	}
 
 	// Get the active chain configuration
-	activeChain, err := s.db.GetActiveChain()
+	activeChain, err := s.chainService.GetActiveChain()
 	if err != nil {
 		return c.Status(500).JSON(TestSignTransactionResponse{
 			Success: false,

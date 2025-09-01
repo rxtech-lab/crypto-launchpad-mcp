@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/stretchr/testify/suite"
@@ -14,30 +13,32 @@ import (
 
 type RemoveUniswapDeploymentTestSuite struct {
 	suite.Suite
-	db             *database.Database
+	dbService      services.DBService
 	uniswapService services.UniswapService
+	chainService   services.ChainService
 	tool           *removeUniswapDeploymentTool
 }
 
 func (suite *RemoveUniswapDeploymentTestSuite) SetupSuite() {
 	// Initialize in-memory database for testing
-	db, err := database.NewDatabase(":memory:")
+	dbService, err := services.NewSqliteDBService(":memory:")
 	suite.Require().NoError(err)
-	suite.db = db
+	suite.dbService = dbService
 
 	// Initialize services
-	suite.uniswapService = services.NewUniswapService(db.DB)
+	suite.uniswapService = services.NewUniswapService(dbService.GetDB())
+	suite.chainService = services.NewChainService(dbService.GetDB())
 
 	// Initialize tool
-	suite.tool = NewRemoveUniswapDeploymentTool(db, suite.uniswapService)
+	suite.tool = NewRemoveUniswapDeploymentTool(suite.uniswapService)
 
 	// Setup test data
 	suite.setupTestData()
 }
 
 func (suite *RemoveUniswapDeploymentTestSuite) TearDownSuite() {
-	if suite.db != nil {
-		suite.db.Close()
+	if suite.dbService != nil {
+		suite.dbService.Close()
 	}
 }
 
@@ -55,13 +56,13 @@ func (suite *RemoveUniswapDeploymentTestSuite) setupTestData() {
 		NetworkID: "31337",
 		IsActive:  true,
 	}
-	err := suite.db.DB.Create(testChain).Error
+	err := suite.chainService.CreateChain(testChain)
 	suite.Require().NoError(err)
 }
 
 func (suite *RemoveUniswapDeploymentTestSuite) cleanupTestData() {
 	// Clean up deployments and sessions
-	suite.db.DB.Where("1 = 1").Delete(&models.UniswapDeployment{})
+	suite.dbService.GetDB().Where("1 = 1").Delete(&models.UniswapDeployment{})
 }
 
 func (suite *RemoveUniswapDeploymentTestSuite) createTestDeployment(chainID uint, version string) uint {
@@ -90,8 +91,7 @@ func (suite *RemoveUniswapDeploymentTestSuite) TestGetTool() {
 
 func (suite *RemoveUniswapDeploymentTestSuite) TestHandlerSuccess_SingleDeployment() {
 	// Get test chain
-	var testChain models.Chain
-	err := suite.db.DB.Where("chain_type = ?", models.TransactionChainTypeEthereum).First(&testChain).Error
+	testChain, err := suite.chainService.GetChainByType(string(models.TransactionChainTypeEthereum))
 	suite.Require().NoError(err)
 
 	// Create test deployment
@@ -126,8 +126,7 @@ func (suite *RemoveUniswapDeploymentTestSuite) TestHandlerSuccess_SingleDeployme
 
 func (suite *RemoveUniswapDeploymentTestSuite) TestHandlerSuccess_BulkDeployments() {
 	// Get test chain
-	var testChain models.Chain
-	err := suite.db.DB.Where("chain_type = ?", models.TransactionChainTypeEthereum).First(&testChain).Error
+	testChain, err := suite.chainService.GetChainByType(string(models.TransactionChainTypeEthereum))
 	suite.Require().NoError(err)
 
 	// Create multiple test deployments
@@ -172,8 +171,7 @@ func (suite *RemoveUniswapDeploymentTestSuite) TestHandlerSuccess_BulkDeployment
 
 func (suite *RemoveUniswapDeploymentTestSuite) TestHandlerSuccess_MixedExistingAndNonExisting() {
 	// Get test chain
-	var testChain models.Chain
-	err := suite.db.DB.Where("chain_type = ?", models.TransactionChainTypeEthereum).First(&testChain).Error
+	testChain, err := suite.chainService.GetChainByType(string(models.TransactionChainTypeEthereum))
 	suite.Require().NoError(err)
 
 	// Create one test deployment
@@ -306,24 +304,15 @@ func (suite *RemoveUniswapDeploymentTestSuite) TestHandlerError_EmptyIdsArray() 
 
 func (suite *RemoveUniswapDeploymentTestSuite) TestDatabaseIntegration() {
 	// Get test chain
-	var testChain models.Chain
-	err := suite.db.DB.Where("chain_type = ?", models.TransactionChainTypeEthereum).First(&testChain).Error
+	testChain, err := suite.chainService.GetChainByType(string(models.TransactionChainTypeEthereum))
 	suite.Require().NoError(err)
 
-	// Create test deployment directly in database
-	deployment := &models.UniswapDeployment{
-		ChainID: testChain.ID,
-		Version: "v2",
-		Status:  models.TransactionStatusPending,
-	}
-	err = suite.db.DB.Create(deployment).Error
+	// Create test deployment using service
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(testChain.ID, "v2")
 	suite.Require().NoError(err)
-
-	deploymentID := deployment.ID
 
 	// Verify it exists
-	var foundDeployment models.UniswapDeployment
-	err = suite.db.DB.First(&foundDeployment, deploymentID).Error
+	foundDeployment, err := suite.uniswapService.GetUniswapDeployment(deploymentID)
 	suite.Require().NoError(err)
 	suite.Equal(deploymentID, foundDeployment.ID)
 
@@ -342,7 +331,7 @@ func (suite *RemoveUniswapDeploymentTestSuite) TestDatabaseIntegration() {
 	suite.NoError(err)
 
 	// Verify it's deleted from database
-	err = suite.db.DB.First(&foundDeployment, deploymentID).Error
+	_, err = suite.uniswapService.GetUniswapDeployment(deploymentID)
 	suite.Error(err)
 	suite.Equal(gorm.ErrRecordNotFound, err)
 }

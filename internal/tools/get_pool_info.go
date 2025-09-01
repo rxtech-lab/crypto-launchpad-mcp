@@ -7,10 +7,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewGetPoolInfoTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewGetPoolInfoTool(chainService services.ChainService, liquidityService services.LiquidityService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("get_pool_info",
 		mcp.WithDescription("Retrieve pool metrics including reserves, liquidity, price, and volume. This is a read-only operation that doesn't require wallet connection."),
 		mcp.WithString("token_address",
@@ -26,7 +26,7 @@ func NewGetPoolInfoTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		}
 
 		// Get active chain configuration
-		activeChain, err := db.GetActiveChain()
+		activeChain, err := chainService.GetActiveChain()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -47,7 +47,7 @@ func NewGetPoolInfoTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		}
 
 		// Get pool information from database
-		pool, err := db.GetLiquidityPoolByTokenAddress(tokenAddress)
+		pool, err := liquidityService.GetLiquidityPoolByTokenAddress(tokenAddress)
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -58,7 +58,7 @@ func NewGetPoolInfoTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		}
 
 		// Get liquidity positions for this pool
-		positions, err := db.GetLiquidityPositionsByUser("") // Get all positions for the pool
+		positions, err := liquidityService.GetLiquidityPositionsByUser("") // Get all positions for the pool
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -80,7 +80,7 @@ func NewGetPoolInfoTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc
 		}
 
 		// Get recent swap transactions
-		swaps, err := db.GetSwapTransactionsByUser("") // Get all swaps
+		swaps, err := liquidityService.ListSwapTransactionsByUser("", 0, 1000) // Get all swaps
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{

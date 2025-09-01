@@ -10,16 +10,16 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
 type launchTool struct {
-	db         *database.Database
-	evmService services.EvmService
-	txService  services.TransactionService
-	serverPort int
+	templateService services.TemplateService
+	chainService    services.ChainService
+	evmService      services.EvmService
+	txService       services.TransactionService
+	serverPort      int
 }
 
 type LaunchArguments struct {
@@ -33,12 +33,13 @@ type LaunchArguments struct {
 	Metadata        []models.TransactionMetadata `json:"metadata,omitempty"`
 }
 
-func NewLaunchTool(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService) *launchTool {
+func NewLaunchTool(templateService services.TemplateService, chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService) *launchTool {
 	return &launchTool{
-		db:         db,
-		evmService: evmService,
-		txService:  txService,
-		serverPort: serverPort,
+		templateService: templateService,
+		chainService:    chainService,
+		evmService:      evmService,
+		txService:       txService,
+		serverPort:      serverPort,
 	}
 }
 
@@ -95,13 +96,13 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 		}
 
 		// Get template
-		template, err := l.db.GetTemplateByID(uint(templateID))
+		template, err := l.templateService.GetTemplateByID(uint(templateID))
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Template not found: %v", err)), nil
 		}
 
 		// Get active chain configuration
-		activeChain, err := l.db.GetActiveChain()
+		activeChain, err := l.chainService.GetActiveChain()
 		if err != nil {
 			return mcp.NewToolResultError("No active chain selected. Please use select_chain tool first"), nil
 		}

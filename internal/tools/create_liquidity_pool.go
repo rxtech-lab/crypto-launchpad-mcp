@@ -8,19 +8,19 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 type createLiquidityPoolTool struct {
-	db               *database.Database
-	evmService       services.EvmService
-	txService        services.TransactionService
-	liquidityService services.LiquidityService
-	uniswapService   services.UniswapService
-	serverPort       int
+	chainService           services.ChainService
+	evmService             services.EvmService
+	txService              services.TransactionService
+	liquidityService       services.LiquidityService
+	uniswapService         services.UniswapService
+	uniswapSettingsService services.UniswapSettingsService
+	serverPort             int
 }
 
 type CreateLiquidityPoolArguments struct {
@@ -33,14 +33,15 @@ type CreateLiquidityPoolArguments struct {
 	Metadata []models.TransactionMetadata `json:"metadata,omitempty"`
 }
 
-func NewCreateLiquidityPoolTool(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, liquidityService services.LiquidityService, uniswapService services.UniswapService) *createLiquidityPoolTool {
+func NewCreateLiquidityPoolTool(chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService, liquidityService services.LiquidityService, uniswapService services.UniswapService, uniswapSettingsService services.UniswapSettingsService) *createLiquidityPoolTool {
 	return &createLiquidityPoolTool{
-		db:               db,
-		evmService:       evmService,
-		txService:        txService,
-		liquidityService: liquidityService,
-		uniswapService:   uniswapService,
-		serverPort:       serverPort,
+		chainService:           chainService,
+		evmService:             evmService,
+		txService:              txService,
+		liquidityService:       liquidityService,
+		uniswapService:         uniswapService,
+		uniswapSettingsService: uniswapSettingsService,
+		serverPort:             serverPort,
 	}
 }
 
@@ -88,7 +89,7 @@ func (c *createLiquidityPoolTool) GetHandler() server.ToolHandlerFunc {
 		}
 
 		// Get active chain configuration
-		activeChain, err := c.db.GetActiveChain()
+		activeChain, err := c.chainService.GetActiveChain()
 		if err != nil {
 			return mcp.NewToolResultError("No active chain selected. Please use select_chain tool first"), nil
 		}
@@ -104,7 +105,7 @@ func (c *createLiquidityPoolTool) GetHandler() server.ToolHandlerFunc {
 
 func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Context, args CreateLiquidityPoolArguments, activeChain *models.Chain) (*mcp.CallToolResult, error) {
 	// Get active Uniswap settings
-	uniswapSettings, err := c.db.GetActiveUniswapSettings()
+	uniswapSettings, err := c.uniswapSettingsService.GetActiveUniswapSettings()
 	if err != nil {
 		return mcp.NewToolResultError("No Uniswap version selected. Please use set_uniswap_version tool first"), nil
 	}
@@ -123,12 +124,8 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 	// Check if pool already exists
 	existingPool, err := c.liquidityService.GetLiquidityPoolByTokenAddress(args.TokenAddress)
 	if err == nil && existingPool != nil {
-		// Delete the pool if not confirmed
-		if existingPool.Status != models.TransactionStatusConfirmed {
-			if err := c.db.DeleteLiquidityPool(existingPool.ID); err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("Failed to delete pending pool: %v", err)), nil
-			}
-		} else {
+		// Check if pool is already confirmed
+		if existingPool.Status == models.TransactionStatusConfirmed {
 			return mcp.NewToolResultError("Liquidity pool already exists for this token"), nil
 		}
 	}

@@ -6,22 +6,19 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDatabase(t *testing.T) *database.Database {
-	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "test.db")
-	db, err := database.NewDatabase(dbPath)
+func setupTestChainService(t *testing.T) services.ChainService {
+	db, err := services.NewSqliteDBService(":memory:")
 	require.NoError(t, err)
-	return db
+	return services.NewChainService(db.GetDB())
 }
 
 func TestFetchChainIDFromRPC(t *testing.T) {
@@ -99,7 +96,7 @@ func TestFetchChainIDFromRPC(t *testing.T) {
 }
 
 func TestNewSetChainTool(t *testing.T) {
-	db := setupTestDatabase(t)
+	db := setupTestChainService(t)
 	tool, handler := NewSetChainTool(db)
 
 	// Test tool metadata
@@ -211,7 +208,7 @@ func TestSetChainHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create fresh database for each test
-			db := setupTestDatabase(t)
+			db := setupTestChainService(t)
 			_, handler := NewSetChainTool(db)
 
 			var mockServer *httptest.Server
@@ -284,7 +281,7 @@ func TestSetChainHandler(t *testing.T) {
 }
 
 func TestSetChainUpdateExisting(t *testing.T) {
-	db := setupTestDatabase(t)
+	db := setupTestChainService(t)
 	_, handler := NewSetChainTool(db)
 	ctx := context.Background()
 
@@ -348,7 +345,7 @@ func TestDefaultChainNames(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%s_%s", tt.chainType, tt.chainID), func(t *testing.T) {
 			// Create fresh database for each test
-			db := setupTestDatabase(t)
+			db := setupTestChainService(t)
 			_, handler := NewSetChainTool(db)
 
 			request := mcp.CallToolRequest{

@@ -202,7 +202,7 @@ func (s *TokenDeploymentErrorTestSuite) TestExpiredSession() {
 	s.Require().NoError(err)
 
 	// Manually expire the session
-	err = s.setup.TestSetup.DB.UpdateTransactionSessionStatus(sessionID, "expired", "")
+	err = s.setup.TestSetup.TxService.UpdateTransactionSessionStatus(sessionID, "expired", "")
 	s.Require().NoError(err)
 
 	page := NewTokenDeploymentPage(s.setup.ctx)

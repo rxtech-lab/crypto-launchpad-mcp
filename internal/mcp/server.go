@@ -7,25 +7,24 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/tools"
 )
 
 type MCPServer struct {
-	server *server.MCPServer
-	db     *database.Database
+	server    *server.MCPServer
+	dbService services.DBService
 }
 
-func NewMCPServer(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService) *MCPServer {
+func NewMCPServer(dbService services.DBService, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService, chainService services.ChainService, templateService services.TemplateService, uniswapSettingsService services.UniswapSettingsService, deploymentService *services.DeploymentService) *MCPServer {
 	mcpServer := &MCPServer{
-		db: db,
+		dbService: dbService,
 	}
-	mcpServer.InitializeTools(db, serverPort, evmService, txService, uniswapService, liquidityService)
+	mcpServer.InitializeTools(dbService, serverPort, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
 	return mcpServer
 }
 
-func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService) {
+func (s *MCPServer) InitializeTools(dbService services.DBService, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService, chainService services.ChainService, templateService services.TemplateService, uniswapSettingsService services.UniswapSettingsService, deploymentService *services.DeploymentService) {
 	srv := server.NewMCPServer(
 		"Crypto Launchpad MCP Server",
 		"1.0.0",
@@ -59,75 +58,74 @@ func (s *MCPServer) InitializeTools(db *database.Database, serverPort int, evmSe
 	})
 
 	// Chain Management Tools
-	listChainsTool, listChainsHandler := tools.NewListChainsTool(db)
-	srv.AddTool(listChainsTool, listChainsHandler)
-
-	selectChainTool, selectChainHandler := tools.NewSelectChainTool(db)
+	selectChainTool, selectChainHandler := tools.NewSelectChainTool(chainService)
 	srv.AddTool(selectChainTool, selectChainHandler)
 
-	setChainTool, setChainHandler := tools.NewSetChainTool(db)
+	setChainTool, setChainHandler := tools.NewSetChainTool(chainService)
 	srv.AddTool(setChainTool, setChainHandler)
 
+	listChainsTool, listChainsHandler := tools.NewListChainsTool(chainService)
+	srv.AddTool(listChainsTool, listChainsHandler)
+
 	// Template Management Tools
-	listTemplateTool, listTemplateHandler := tools.NewListTemplateTool(db)
+	listTemplateTool, listTemplateHandler := tools.NewListTemplateTool(templateService)
 	srv.AddTool(listTemplateTool, listTemplateHandler)
 
-	createTemplateTool, createTemplateHandler := tools.NewCreateTemplateTool(db)
+	createTemplateTool, createTemplateHandler := tools.NewCreateTemplateTool(templateService)
 	srv.AddTool(createTemplateTool, createTemplateHandler)
 
-	updateTemplateTool, updateTemplateHandler := tools.NewUpdateTemplateTool(db)
+	updateTemplateTool, updateTemplateHandler := tools.NewUpdateTemplateTool(templateService)
 	srv.AddTool(updateTemplateTool, updateTemplateHandler)
 
-	deleteTemplateTool, deleteTemplateHandler := tools.NewDeleteTemplateTool(db)
+	deleteTemplateTool, deleteTemplateHandler := tools.NewDeleteTemplateTool(templateService)
 	srv.AddTool(deleteTemplateTool, deleteTemplateHandler)
 
 	// Deployment Tools
-	launchTool := tools.NewLaunchTool(db, serverPort, evmService, txService)
+	launchTool := tools.NewLaunchTool(templateService, chainService, serverPort, evmService, txService)
 	srv.AddTool(launchTool.GetTool(), launchTool.GetHandler())
 
-	listDeploymentsTool, listDeploymentsHandler := tools.NewListDeploymentsTool(db)
+	listDeploymentsTool, listDeploymentsHandler := tools.NewListDeploymentsTool(deploymentService)
 	srv.AddTool(listDeploymentsTool, listDeploymentsHandler)
 
-	// Uniswap Configuration Tools
-	setUniswapVersionTool, setUniswapVersionHandler := tools.NewSetUniswapVersionTool(db)
+	// Uniswap Deployment Tools
+	deployUniswapTool := tools.NewDeployUniswapTool(chainService, serverPort, evmService, txService, uniswapService)
+	srv.AddTool(deployUniswapTool.GetTool(), deployUniswapTool.GetHandler())
+
+	removeUniswapDeploymentTool := tools.NewRemoveUniswapDeploymentTool(uniswapService)
+	srv.AddTool(removeUniswapDeploymentTool.GetTool(), removeUniswapDeploymentTool.GetHandler())
+
+	setUniswapVersionTool, setUniswapVersionHandler := tools.NewSetUniswapVersionTool(uniswapSettingsService)
 	srv.AddTool(setUniswapVersionTool, setUniswapVersionHandler)
 
-	getUniswapAddressesTool, getUniswapAddressesHandler := tools.NewGetUniswapAddressesTool(db)
+	getUniswapAddressesTool, getUniswapAddressesHandler := tools.NewGetUniswapAddressesTool(uniswapSettingsService)
 	srv.AddTool(getUniswapAddressesTool, getUniswapAddressesHandler)
 
 	// Liquidity Management Tools
-	liqudityPoolTool := tools.NewCreateLiquidityPoolTool(db, serverPort, evmService, txService, liquidityService, uniswapService)
-	srv.AddTool(liqudityPoolTool.GetTool(), liqudityPoolTool.GetHandler())
+	createLiquidityPoolTool := tools.NewCreateLiquidityPoolTool(chainService, serverPort, evmService, txService, liquidityService, uniswapService, uniswapSettingsService)
+	srv.AddTool(createLiquidityPoolTool.GetTool(), createLiquidityPoolTool.GetHandler())
 
-	addLiquidityTool := tools.NewAddLiquidityTool(db, serverPort, evmService, txService, liquidityService, uniswapService)
+	addLiquidityTool := tools.NewAddLiquidityTool(chainService, serverPort, evmService, txService, liquidityService, uniswapService, uniswapSettingsService)
 	srv.AddTool(addLiquidityTool.GetTool(), addLiquidityTool.GetHandler())
 
-	removeLiquidityTool, removeLiquidityHandler := tools.NewRemoveLiquidityTool(db, serverPort)
+	removeLiquidityTool, removeLiquidityHandler := tools.NewRemoveLiquidityTool(chainService, liquidityService, uniswapSettingsService, txService, serverPort)
 	srv.AddTool(removeLiquidityTool, removeLiquidityHandler)
 
 	// Trading Tools
-	swapTokensTool, swapTokensHandler := tools.NewSwapTokensTool(db, serverPort)
+	swapTokensTool, swapTokensHandler := tools.NewSwapTokensTool(chainService, liquidityService, uniswapSettingsService, txService, serverPort)
 	srv.AddTool(swapTokensTool, swapTokensHandler)
 
 	// Read-only Information Tools
-	getPoolInfoTool, getPoolInfoHandler := tools.NewGetPoolInfoTool(db)
+	getPoolInfoTool, getPoolInfoHandler := tools.NewGetPoolInfoTool(chainService, liquidityService)
 	srv.AddTool(getPoolInfoTool, getPoolInfoHandler)
 
-	getSwapQuoteTool, getSwapQuoteHandler := tools.NewGetSwapQuoteTool(db)
+	getSwapQuoteTool, getSwapQuoteHandler := tools.NewGetSwapQuoteTool(chainService, liquidityService, uniswapSettingsService)
 	srv.AddTool(getSwapQuoteTool, getSwapQuoteHandler)
 
-	monitorPoolTool, monitorPoolHandler := tools.NewMonitorPoolTool(db)
+	monitorPoolTool, monitorPoolHandler := tools.NewMonitorPoolTool(chainService, liquidityService, deploymentService)
 	srv.AddTool(monitorPoolTool, monitorPoolHandler)
 
-	// Uniswap Deployment Tools
-	deployUniswapTool := tools.NewDeployUniswapTool(db, serverPort, evmService, txService, uniswapService)
-	srv.AddTool(deployUniswapTool.GetTool(), deployUniswapTool.GetHandler())
-
-	removeUniswapDeploymentTool := tools.NewRemoveUniswapDeploymentTool(db, uniswapService)
-	srv.AddTool(removeUniswapDeploymentTool.GetTool(), removeUniswapDeploymentTool.GetHandler())
-
 	// Balance Query Tools
-	queryBalanceTool, queryBalanceHandler := tools.NewQueryBalanceTool(db, serverPort)
+	queryBalanceTool, queryBalanceHandler := tools.NewQueryBalanceTool(chainService, txService, serverPort)
 	srv.AddTool(queryBalanceTool, queryBalanceHandler)
 
 	s.server = srv
@@ -275,45 +273,16 @@ No private keys are handled by the server - all signing is client-side.`
 	}
 }
 
-func (s *MCPServer) Start() error {
+func (s *MCPServer) StartStdioServer() error {
 	return server.ServeStdio(s.server)
 }
 
-// GetDatabase returns the database instance used by the MCP server
-func (s *MCPServer) GetDatabase() *database.Database {
-	return s.db
+// StartStreamableHTTPServer starts the MCP server with streamable HTTP interface on the specified port
+func (s *MCPServer) StartStreamableHTTPServer() *server.StreamableHTTPServer {
+	return server.NewStreamableHTTPServer(s.server)
 }
 
-// CallMCPMethod provides a way to execute MCP tool functionality from the API server
-// This is a helper method that demonstrates how to access MCP functionality
-func (s *MCPServer) CallMCPMethod(method string, params map[string]interface{}) (interface{}, error) {
-	switch method {
-	case "list_templates":
-		// Example: get templates by chain type
-		chainType, ok := params["chain_type"].(string)
-		if !ok {
-			chainType = ""
-		}
-		keyword, _ := params["keyword"].(string)
-		limit, ok := params["limit"].(int)
-		if !ok {
-			limit = 0 // 0 means no limit
-		}
-		return s.db.ListTemplates(chainType, keyword, limit)
-
-	case "list_deployments":
-		// Example: get all deployments
-		return s.db.ListDeployments()
-
-	case "get_active_chain":
-		// Example: get active chain configuration
-		return s.db.GetActiveChain()
-
-	case "list_chains":
-		// Example: get all chain configurations
-		return s.db.ListChains()
-
-	default:
-		return nil, fmt.Errorf("unsupported MCP method: %s", method)
-	}
+// GetDBService returns the database service used by the MCP server
+func (s *MCPServer) GetDBService() services.DBService {
+	return s.dbService
 }

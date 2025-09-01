@@ -9,10 +9,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewDeleteTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewDeleteTemplateTool(templateService services.TemplateService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("delete_template",
 		mcp.WithDescription("Delete one or multiple smart contract templates by their IDs. Accepts a single ID or comma-separated list of IDs for bulk deletion."),
 		mcp.WithString("ids",
@@ -61,7 +61,7 @@ func NewDeleteTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		// Check if templates exist before deletion
 		var existingTemplates []uint
 		for _, id := range ids {
-			template, err := db.GetTemplateByID(id)
+			template, err := templateService.GetTemplateByID(id)
 			if err == nil && template != nil {
 				existingTemplates = append(existingTemplates, id)
 			}
@@ -79,7 +79,7 @@ func NewDeleteTemplateTool(db *database.Database) (mcp.Tool, server.ToolHandlerF
 		}
 
 		// Perform bulk deletion
-		deletedCount, err := db.DeleteTemplates(existingTemplates)
+		deletedCount, err := templateService.DeleteTemplates(existingTemplates)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error deleting templates: %v", err)), nil
 		}

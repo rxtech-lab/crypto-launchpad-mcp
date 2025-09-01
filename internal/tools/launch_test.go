@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
@@ -25,18 +24,26 @@ const (
 
 type LaunchToolTestSuite struct {
 	suite.Suite
-	db         *database.Database
-	ethClient  *ethclient.Client
-	launchTool *launchTool
-	chain      *models.Chain
-	template   *models.Template
+	db              services.DBService
+	ethClient       *ethclient.Client
+	launchTool      *launchTool
+	chain           *models.Chain
+	template        *models.Template
+	templateService services.TemplateService
+	chainService    services.ChainService
 }
 
 func (suite *LaunchToolTestSuite) SetupSuite() {
 	// Initialize in-memory database
-	db, err := database.NewDatabase(":memory:")
+	db, err := services.NewSqliteDBService(":memory:")
 	suite.Require().NoError(err)
 	suite.db = db
+
+	// Initialize services
+	suite.templateService = services.NewTemplateService(db.GetDB())
+	suite.chainService = services.NewChainService(db.GetDB())
+	evmService := services.NewEvmService()
+	txService := services.NewTransactionService(db.GetDB())
 
 	// Initialize Ethereum client
 	ethClient, err := ethclient.Dial(TEST_TESTNET_RPC)
@@ -47,12 +54,8 @@ func (suite *LaunchToolTestSuite) SetupSuite() {
 	err = suite.verifyEthereumConnection()
 	suite.Require().NoError(err)
 
-	// Initialize services
-	evmService := services.NewEvmService()
-	txService := services.NewTransactionService(db.DB)
-
 	// Initialize launch tool
-	suite.launchTool = NewLaunchTool(db, TEST_SERVER_PORT, evmService, txService)
+	suite.launchTool = NewLaunchTool(suite.templateService, suite.chainService, TEST_SERVER_PORT, evmService, txService)
 
 	// Setup test data
 	suite.setupTestChain()
@@ -98,7 +101,7 @@ func (suite *LaunchToolTestSuite) setupTestChain() {
 		IsActive:  true,
 	}
 
-	err := suite.db.CreateChain(chain)
+	err := suite.chainService.CreateChain(chain)
 	suite.Require().NoError(err)
 	suite.chain = chain
 }
@@ -133,17 +136,17 @@ contract CustomToken {
 		TemplateCode: contractCode,
 	}
 
-	err := suite.db.CreateTemplate(template)
+	err := suite.templateService.CreateTemplate(template)
 	suite.Require().NoError(err)
 	suite.template = template
 }
 
 func (suite *LaunchToolTestSuite) cleanupTestData() {
 	// Clean up transaction sessions
-	suite.db.DB.Where("1 = 1").Delete(&models.TransactionSession{})
+	suite.db.GetDB().Where("1 = 1").Delete(&models.TransactionSession{})
 
 	// Clean up deployments
-	suite.db.DB.Where("1 = 1").Delete(&models.Deployment{})
+	suite.db.GetDB().Where("1 = 1").Delete(&models.Deployment{})
 }
 
 func (suite *LaunchToolTestSuite) TestGetTool() {
@@ -261,7 +264,7 @@ func (suite *LaunchToolTestSuite) TestHandlerSuccess() {
 	sessionID := sessionIDContent[len("Transaction session created: "):]
 
 	// Verify session was created in database
-	txService := services.NewTransactionService(suite.db.DB)
+	txService := services.NewTransactionService(suite.db.GetDB())
 	session, err := txService.GetTransactionSession(sessionID)
 	suite.NoError(err)
 	suite.NotNil(session)
@@ -326,7 +329,7 @@ func (suite *LaunchToolTestSuite) TestHandlerTemplateRendering() {
 	}
 	sessionID := sessionIDContent[len("Transaction session created: "):]
 
-	txService := services.NewTransactionService(suite.db.DB)
+	txService := services.NewTransactionService(suite.db.GetDB())
 	session, err := txService.GetTransactionSession(sessionID)
 	suite.NoError(err)
 
@@ -393,7 +396,7 @@ contract TokenWithConstructor {
 		TemplateCode: contractCodeWithConstructor,
 	}
 
-	err := suite.db.CreateTemplate(templateWithConstructor)
+	err := suite.templateService.CreateTemplate(templateWithConstructor)
 	suite.Require().NoError(err)
 
 	request := mcp.CallToolRequest{
@@ -426,7 +429,7 @@ contract TokenWithConstructor {
 	}
 	sessionID := sessionIDContent[len("Transaction session created: "):]
 
-	txService := services.NewTransactionService(suite.db.DB)
+	txService := services.NewTransactionService(suite.db.GetDB())
 	session, err := txService.GetTransactionSession(sessionID)
 	suite.NoError(err)
 
@@ -484,8 +487,19 @@ func (suite *LaunchToolTestSuite) TestHandlerTemplateNotFound() {
 }
 
 func (suite *LaunchToolTestSuite) TestHandlerNoActiveChain() {
-	// Deactivate the chain
-	err := suite.db.DB.Model(&models.Chain{}).Where("id = ?", suite.chain.ID).Update("is_active", false).Error
+	// Deactivate the chain by setting another chain as active (this deactivates all others first)
+	// Since we need to deactivate the current chain, we'll create a dummy chain and set it as active
+	dummyChain := &models.Chain{
+		ChainType: "solana",
+		RPC:       "https://dummy-solana-rpc.com",
+		NetworkID: "999",
+		Name:      "Dummy Chain",
+		IsActive:  false,
+	}
+	err := suite.chainService.CreateChain(dummyChain)
+	suite.Require().NoError(err)
+
+	err = suite.chainService.SetActiveChainByID(dummyChain.ID)
 	suite.Require().NoError(err)
 	suite.chain.IsActive = false
 
@@ -507,11 +521,12 @@ func (suite *LaunchToolTestSuite) TestHandlerNoActiveChain() {
 	suite.NotNil(result)
 	suite.True(result.IsError)
 	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
-		suite.Contains(textContent.Text, "No active chain selected")
+		// Now we get a chain type mismatch error since we activated a Solana chain
+		suite.Contains(textContent.Text, "doesn't match active chain")
 	}
 
 	// Reactivate the chain for other tests
-	err = suite.db.DB.Model(&models.Chain{}).Where("id = ?", suite.chain.ID).Update("is_active", true).Error
+	err = suite.chainService.SetActiveChainByID(suite.chain.ID)
 	suite.Require().NoError(err)
 	suite.chain.IsActive = true
 }
@@ -526,7 +541,7 @@ func (suite *LaunchToolTestSuite) TestHandlerChainTypeMismatch() {
 		TemplateCode: "// Solana contract code",
 	}
 
-	err := suite.db.CreateTemplate(solanaTemplate)
+	err := suite.templateService.CreateTemplate(solanaTemplate)
 	suite.Require().NoError(err)
 
 	request := mcp.CallToolRequest{
@@ -558,14 +573,14 @@ func (suite *LaunchToolTestSuite) TestHandlerSolanaNotImplemented() {
 		RPC:       "https://api.devnet.solana.com",
 		NetworkID: "devnet",
 		Name:      "Solana Devnet",
-		IsActive:  true,
+		IsActive:  false,
 	}
 
-	err := suite.db.CreateChain(solanaChain)
+	err := suite.chainService.CreateChain(solanaChain)
 	suite.Require().NoError(err)
 
-	// Deactivate Ethereum chain
-	err = suite.db.DB.Model(&models.Chain{}).Where("id = ?", suite.chain.ID).Update("is_active", false).Error
+	// Set Solana chain as active (this will deactivate Ethereum chain)
+	err = suite.chainService.SetActiveChainByID(solanaChain.ID)
 	suite.Require().NoError(err)
 	suite.chain.IsActive = false
 
@@ -577,7 +592,7 @@ func (suite *LaunchToolTestSuite) TestHandlerSolanaNotImplemented() {
 		TemplateCode: "// Solana contract code",
 	}
 
-	err = suite.db.CreateTemplate(solanaTemplate)
+	err = suite.templateService.CreateTemplate(solanaTemplate)
 	suite.Require().NoError(err)
 
 	request := mcp.CallToolRequest{
@@ -601,13 +616,10 @@ func (suite *LaunchToolTestSuite) TestHandlerSolanaNotImplemented() {
 		suite.Contains(textContent.Text, "Solana is not implemented yet")
 	}
 
-	// Reactivate Ethereum chain and deactivate Solana chain for other tests
-	err = suite.db.DB.Model(&models.Chain{}).Where("id = ?", suite.chain.ID).Update("is_active", true).Error
+	// Reactivate Ethereum chain for other tests (this will deactivate the Solana chain)
+	err = suite.chainService.SetActiveChainByID(suite.chain.ID)
 	suite.Require().NoError(err)
 	suite.chain.IsActive = true
-
-	err = suite.db.DB.Model(&models.Chain{}).Where("id = ?", solanaChain.ID).Update("is_active", false).Error
-	suite.Require().NoError(err)
 	solanaChain.IsActive = false
 }
 
@@ -697,7 +709,7 @@ contract TestContract {
 	suite.NotEmpty(sessionID)
 
 	// Verify session was created in database
-	txService := services.NewTransactionService(suite.db.DB)
+	txService := services.NewTransactionService(suite.db.GetDB())
 	session, err := txService.GetTransactionSession(sessionID)
 	suite.NoError(err)
 	suite.NotNil(session)

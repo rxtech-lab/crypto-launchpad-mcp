@@ -11,6 +11,7 @@ import (
 type UniswapService interface {
 	GetUniswapDeployment(deploymentID uint) (*models.UniswapDeployment, error)
 	GetUniswapDeploymentByChain(chainID uint) (*models.UniswapDeployment, error)
+	GetUniswapDeploymentByChainString(chainType, chainID string) (*models.UniswapDeployment, error)
 	CreateUniswapDeployment(chainID uint, version string) (uint, error)
 	CreateUniswapDeploymentWithUser(chainID uint, version string, userID *string) (uint, error)
 	UpdateFactoryAddress(deploymentID uint, factoryAddress string) error
@@ -151,4 +152,24 @@ func (u *uniswapService) DeleteUniswapDeployment(deploymentID uint) error {
 
 func (u *uniswapService) DeleteUniswapDeployments(deploymentIDs []uint) error {
 	return u.db.Delete(&models.UniswapDeployment{}, deploymentIDs).Error
+}
+
+// GetUniswapDeploymentByChainString gets a Uniswap deployment by chain type and chain ID strings
+func (u *uniswapService) GetUniswapDeploymentByChainString(chainType, chainID string) (*models.UniswapDeployment, error) {
+	var deployment models.UniswapDeployment
+	var chain models.Chain
+
+	// First find the chain
+	err := u.db.Where("chain_type = ? AND chain_id = ?", chainType, chainID).First(&chain).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// Then find deployment for this chain
+	err = u.db.Where("chain_id = ?", chain.ID).Preload("Chain").First(&deployment).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &deployment, nil
 }

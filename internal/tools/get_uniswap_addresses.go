@@ -7,17 +7,17 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewGetUniswapAddressesTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewGetUniswapAddressesTool(uniswapSettingsService services.UniswapSettingsService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("get_uniswap_addresses",
 		mcp.WithDescription("Get current Uniswap configuration including version and contract addresses. Returns the active Uniswap settings from database."),
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Get the active Uniswap settings
-		settings, err := db.GetActiveUniswapSettings()
+		settings, err := uniswapSettingsService.GetActiveUniswapSettings()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{

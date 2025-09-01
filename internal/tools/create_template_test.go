@@ -7,12 +7,21 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/stretchr/testify/assert"
 )
 
+func setupTestDatabase(t *testing.T) services.TemplateService {
+	db, err := services.NewSqliteDBService(":memory:")
+	if err != nil {
+		t.Fatalf("Failed to setup test database: %v", err)
+	}
+	return services.NewTemplateService(db.GetDB())
+}
+
 func TestNewCreateTemplateTool(t *testing.T) {
-	db := setupTestDatabase(t)
-	tool, handler := NewCreateTemplateTool(db)
+	templateService := setupTestDatabase(t)
+	tool, handler := NewCreateTemplateTool(templateService)
 
 	// Test tool metadata
 	assert.Equal(t, "create_template", tool.Name)
@@ -95,8 +104,8 @@ func TestCreateTemplateHandler_ParameterValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := setupTestDatabase(t)
-			_, handler := NewCreateTemplateTool(db)
+			templateService := setupTestDatabase(t)
+			_, handler := NewCreateTemplateTool(templateService)
 
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
@@ -120,8 +129,8 @@ func TestCreateTemplateHandler_ParameterValidation(t *testing.T) {
 
 func TestCreateTemplateHandler_ChainTypeValidation(t *testing.T) {
 	ctx := context.Background()
-	db := setupTestDatabase(t)
-	_, handler := NewCreateTemplateTool(db)
+	templateService := setupTestDatabase(t)
+	_, handler := NewCreateTemplateTool(templateService)
 
 	tests := []struct {
 		name        string
@@ -238,8 +247,8 @@ contract MyToken is ERC20 {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a fresh database for each test case
-			db := setupTestDatabase(t)
-			_, handler := NewCreateTemplateTool(db)
+			templateService := setupTestDatabase(t)
+			_, handler := NewCreateTemplateTool(templateService)
 
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
@@ -266,10 +275,12 @@ contract MyToken is ERC20 {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
 				// Verify template was created in database
-				templates, err := db.ListTemplates("", "", 10)
+				templates, err := templateService.ListTemplates("test-user", "", "", 10)
 				assert.NoError(t, err)
 				assert.Len(t, templates, 1)
-				assert.Equal(t, "ethereum", string(templates[0].ChainType))
+				if len(templates) > 0 {
+					assert.Equal(t, "ethereum", string(templates[0].ChainType))
+				}
 			}
 		})
 	}
@@ -334,8 +345,8 @@ func TestCreateTemplateHandler_MetadataValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a fresh database for each test case
-			db := setupTestDatabase(t)
-			_, handler := NewCreateTemplateTool(db)
+			templateService := setupTestDatabase(t)
+			_, handler := NewCreateTemplateTool(templateService)
 
 			args := map[string]interface{}{
 				"name":          "Test Template",
@@ -383,7 +394,7 @@ func TestCreateTemplateHandler_MetadataValidation(t *testing.T) {
 				}
 
 				// Verify template was created in database
-				templates, err := db.ListTemplates("", "", 10)
+				templates, err := templateService.ListTemplates("test-user", "", "", 10)
 				assert.NoError(t, err)
 				assert.Len(t, templates, 1)
 
@@ -398,8 +409,8 @@ func TestCreateTemplateHandler_MetadataValidation(t *testing.T) {
 
 func TestCreateTemplateHandler_DatabaseIntegration(t *testing.T) {
 	ctx := context.Background()
-	db := setupTestDatabase(t)
-	_, handler := NewCreateTemplateTool(db)
+	templateService := setupTestDatabase(t)
+	_, handler := NewCreateTemplateTool(templateService)
 
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -440,7 +451,7 @@ func TestCreateTemplateHandler_DatabaseIntegration(t *testing.T) {
 	assert.NotNil(t, resultData["created_at"])
 
 	// Verify template exists in database
-	templates, err := db.ListTemplates("", "", 10)
+	templates, err := templateService.ListTemplates("test-user", "", "", 10)
 	assert.NoError(t, err)
 	assert.Len(t, templates, 1)
 
@@ -457,8 +468,8 @@ func TestCreateTemplateHandler_DatabaseIntegration(t *testing.T) {
 
 func TestCreateTemplateHandler_MultipleTemplates(t *testing.T) {
 	ctx := context.Background()
-	db := setupTestDatabase(t)
-	_, handler := NewCreateTemplateTool(db)
+	templateService := setupTestDatabase(t)
+	_, handler := NewCreateTemplateTool(templateService)
 
 	// Create first template
 	request1 := mcp.CallToolRequest{
@@ -495,7 +506,7 @@ func TestCreateTemplateHandler_MultipleTemplates(t *testing.T) {
 	assert.NotNil(t, result2)
 
 	// Verify both templates exist
-	templates, err := db.ListTemplates("", "", 10)
+	templates, err := templateService.ListTemplates("test-user", "", "", 10)
 	assert.NoError(t, err)
 	assert.Len(t, templates, 2)
 

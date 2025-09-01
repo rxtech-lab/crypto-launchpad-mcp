@@ -7,7 +7,6 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/stretchr/testify/suite"
@@ -15,37 +14,42 @@ import (
 
 type AddLiquidityToolTestSuite struct {
 	suite.Suite
-	db                *database.Database
-	tool              *addLiquidityTool
-	liquidityService  services.LiquidityService
-	uniswapService    services.UniswapService
-	txService         services.TransactionService
-	evmService        services.EvmService
-	chain             *models.Chain
-	pool              *models.LiquidityPool
-	uniswapDeployment *models.UniswapDeployment
+	dbService              services.DBService
+	tool                   *addLiquidityTool
+	liquidityService       services.LiquidityService
+	uniswapService         services.UniswapService
+	txService              services.TransactionService
+	evmService             services.EvmService
+	chainService           services.ChainService
+	uniswapSettingsService services.UniswapSettingsService
+	chain                  *models.Chain
+	pool                   *models.LiquidityPool
+	uniswapDeployment      *models.UniswapDeployment
 }
 
 func (suite *AddLiquidityToolTestSuite) SetupSuite() {
 	// Initialize in-memory database
-	db, err := database.NewDatabase(":memory:")
+	dbService, err := services.NewSqliteDBService(":memory:")
 	suite.Require().NoError(err)
-	suite.db = db
+	suite.dbService = dbService
 
 	// Initialize services
 	suite.evmService = services.NewEvmService()
-	suite.txService = services.NewTransactionService(db.DB)
-	suite.liquidityService = services.NewLiquidityService(db.DB)
-	suite.uniswapService = services.NewUniswapService(db.DB)
+	suite.txService = services.NewTransactionService(dbService.GetDB())
+	suite.liquidityService = services.NewLiquidityService(dbService.GetDB())
+	suite.uniswapService = services.NewUniswapService(dbService.GetDB())
+	suite.chainService = services.NewChainService(dbService.GetDB())
+	suite.uniswapSettingsService = services.NewUniswapSettingsService(dbService.GetDB())
 
 	// Initialize tool
 	suite.tool = NewAddLiquidityTool(
-		db,
+		suite.chainService,
 		9999, // test server port
 		suite.evmService,
 		suite.txService,
 		suite.liquidityService,
 		suite.uniswapService,
+		suite.uniswapSettingsService,
 	)
 
 	// Setup test data
@@ -56,8 +60,8 @@ func (suite *AddLiquidityToolTestSuite) SetupSuite() {
 }
 
 func (suite *AddLiquidityToolTestSuite) TearDownSuite() {
-	if suite.db != nil {
-		suite.db.Close()
+	if suite.dbService != nil {
+		suite.dbService.Close()
 	}
 }
 
@@ -75,18 +79,13 @@ func (suite *AddLiquidityToolTestSuite) setupTestChain() {
 		IsActive:  true,
 	}
 
-	err := suite.db.CreateChain(chain)
+	err := suite.chainService.CreateChain(chain)
 	suite.Require().NoError(err)
 	suite.chain = chain
 }
 
 func (suite *AddLiquidityToolTestSuite) setupUniswapSettings() {
-	settings := &models.UniswapSettings{
-		Version:  "v2",
-		IsActive: true,
-	}
-
-	err := suite.db.DB.Create(settings).Error
+	err := suite.uniswapSettingsService.SetUniswapVersion("v2")
 	suite.Require().NoError(err)
 }
 
@@ -136,10 +135,10 @@ func (suite *AddLiquidityToolTestSuite) setupTestPool() {
 
 func (suite *AddLiquidityToolTestSuite) cleanupTestData() {
 	// Clean up transaction sessions
-	suite.db.DB.Where("1 = 1").Delete(&models.TransactionSession{})
+	suite.dbService.GetDB().Where("1 = 1").Delete(&models.TransactionSession{})
 
 	// Clean up liquidity positions
-	suite.db.DB.Where("1 = 1").Delete(&models.LiquidityPosition{})
+	suite.dbService.GetDB().Where("1 = 1").Delete(&models.LiquidityPosition{})
 }
 
 // Test cases
@@ -427,14 +426,14 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerNonEthereumChain() {
 		RPC:       "https://api.devnet.solana.com",
 		NetworkID: "devnet",
 		Name:      "Solana Devnet",
-		IsActive:  true,
+		IsActive:  false,
 	}
 
-	err := suite.db.CreateChain(solanaChain)
+	err := suite.chainService.CreateChain(solanaChain)
 	suite.Require().NoError(err)
 
-	// Deactivate Ethereum chain
-	err = suite.db.DB.Model(&models.Chain{}).Where("id = ?", suite.chain.ID).Update("is_active", false).Error
+	// Set Solana chain as active (this will deactivate the Ethereum chain)
+	err = suite.chainService.SetActiveChainByID(solanaChain.ID)
 	suite.Require().NoError(err)
 
 	request := mcp.CallToolRequest{
@@ -460,11 +459,8 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerNonEthereumChain() {
 		suite.Contains(textContent.Text, "only supported on Ethereum")
 	}
 
-	// Clean up
-	err = suite.db.DB.Model(&models.Chain{}).Where("id = ?", solanaChain.ID).Update("is_active", false).Error
-	suite.Require().NoError(err)
-
-	err = suite.db.DB.Model(&models.Chain{}).Where("id = ?", suite.chain.ID).Update("is_active", true).Error
+	// Clean up - reactivate Ethereum chain for other tests
+	err = suite.chainService.SetActiveChainByID(suite.chain.ID)
 	suite.Require().NoError(err)
 }
 

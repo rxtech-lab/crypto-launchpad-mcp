@@ -62,6 +62,21 @@ func (s *DeploymentService) UpdateDeploymentStatus(id uint, status models.Transa
 	return s.db.Model(&models.Deployment{}).Where("id = ?", id).Updates(updates).Error
 }
 
+// UpdateDeploymentStatusWithTxHash updates the status of a deployment with transaction hash
+func (s *DeploymentService) UpdateDeploymentStatusWithTxHash(id uint, status models.TransactionStatus, contractAddress, txHash string) error {
+	updates := map[string]interface{}{
+		"status": status,
+	}
+	if contractAddress != "" {
+		updates["contract_address"] = contractAddress
+	}
+	if txHash != "" {
+		updates["transaction_hash"] = txHash
+	}
+
+	return s.db.Model(&models.Deployment{}).Where("id = ?", id).Updates(updates).Error
+}
+
 // DeleteDeployment deletes a deployment by its ID
 func (s *DeploymentService) DeleteDeployment(id uint) error {
 	return s.db.Delete(&models.Deployment{}, id).Error
@@ -89,4 +104,14 @@ func (s *DeploymentService) GetDeploymentsByChain(chainID uint) ([]models.Deploy
 	var deployments []models.Deployment
 	err := s.db.Preload("Template").Preload("Chain").Where("chain_id = ?", chainID).Find(&deployments).Error
 	return deployments, err
+}
+
+// GetDeploymentByTransactionHash returns a deployment by its transaction hash
+func (s *DeploymentService) GetDeploymentByTransactionHash(txHash string) (*models.Deployment, error) {
+	var deployment models.Deployment
+	err := s.db.Preload("Template").Preload("Chain").Where("transaction_hash = ?", txHash).First(&deployment).Error
+	if err != nil {
+		return nil, err
+	}
+	return &deployment, nil
 }

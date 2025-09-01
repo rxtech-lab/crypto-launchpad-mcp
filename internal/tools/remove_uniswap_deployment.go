@@ -8,12 +8,10 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
 type removeUniswapDeploymentTool struct {
-	db             *database.Database
 	uniswapService services.UniswapService
 }
 
@@ -21,9 +19,8 @@ type RemoveUniswapDeploymentArguments struct {
 	Ids []uint `json:"ids" validate:"required,min=1"`
 }
 
-func NewRemoveUniswapDeploymentTool(db *database.Database, uniswapService services.UniswapService) *removeUniswapDeploymentTool {
+func NewRemoveUniswapDeploymentTool(uniswapService services.UniswapService) *removeUniswapDeploymentTool {
 	return &removeUniswapDeploymentTool{
-		db:             db,
 		uniswapService: uniswapService,
 	}
 }

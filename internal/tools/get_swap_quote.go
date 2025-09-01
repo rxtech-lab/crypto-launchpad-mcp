@@ -8,11 +8,11 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/rxtech-lab/launchpad-mcp/internal/database"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewGetSwapQuoteTool(db *database.Database) (mcp.Tool, server.ToolHandlerFunc) {
+func NewGetSwapQuoteTool(chainService services.ChainService, liquidityService services.LiquidityService, uniswapSettingsService services.UniswapSettingsService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("get_swap_quote",
 		mcp.WithDescription("Get swap estimates and price impact for token swaps. This is a read-only operation that provides estimated output amounts and price impact calculations."),
 		mcp.WithString("from_token",
@@ -46,7 +46,7 @@ func NewGetSwapQuoteTool(db *database.Database) (mcp.Tool, server.ToolHandlerFun
 		}
 
 		// Get active chain configuration
-		activeChain, err := db.GetActiveChain()
+		activeChain, err := chainService.GetActiveChain()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -77,7 +77,7 @@ func NewGetSwapQuoteTool(db *database.Database) (mcp.Tool, server.ToolHandlerFun
 		}
 
 		// Get active Uniswap settings
-		uniswapSettings, err := db.GetActiveUniswapSettings()
+		uniswapSettings, err := uniswapSettingsService.GetActiveUniswapSettings()
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -100,7 +100,7 @@ func NewGetSwapQuoteTool(db *database.Database) (mcp.Tool, server.ToolHandlerFun
 		}
 
 		// Get pool information
-		pool, err := db.GetLiquidityPoolByTokenAddress(poolToken)
+		pool, err := liquidityService.GetLiquidityPoolByTokenAddress(poolToken)
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
