@@ -267,12 +267,11 @@ jobs:
           # Extract version from release tag
           VERSION="${{ github.ref_name }}"
 
-          # Update kustomization with new image tag
-          cd k8s
-          kubectl kustomize . | kubectl apply -f -
+          # Update the image tag in deployment.yaml before applying
+          sed -i "s|ghcr.io/rxtech-lab/launchpad-mcp:.*|ghcr.io/rxtech-lab/launchpad-mcp:${VERSION}|g" k8s/deployment.yaml
 
-          # Update the deployment with the specific release tag
-          kubectl set image deployment/launchpad-mcp launchpad-mcp=ghcr.io/rxtech-lab/launchpad-mcp:${VERSION} -n launchpad
+          # Apply deployment with the updated image tag
+          kubectl apply -f k8s/deployment.yaml
 
           # Wait for rollout to complete
           kubectl rollout status deployment/launchpad-mcp -n launchpad --timeout=300s
