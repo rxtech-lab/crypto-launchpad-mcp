@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  launchpad-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+        COMMIT_HASH: ${COMMIT_HASH:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    ports:
+      - "${PORT:-8080}:8080"
+    env_file:
+      - .env
+    volumes:
+      # Mount database directory for persistence
+      - launchpad_data:/home/appuser/.local/share/launchpad
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional PostgreSQL service for production deployments
+  postgres:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-launchpad}
+      POSTGRES_USER: ${POSTGRES_USER:-launchpad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    profiles:
+      - postgres
+
+volumes:
+  launchpad_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  default:
+    name: launchpad-network

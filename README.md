@@ -45,6 +45,57 @@ make build
 make run
 ```
 
+### Docker Deployment
+
+For production deployments, you can use the pre-built Docker images from GitHub Container Registry:
+
+#### Using Docker Run
+
+```bash
+# Pull and run the latest image
+docker run -d \
+  --name launchpad-mcp \
+  -p 8080:8080 \
+  -e POSTGRES_URL="your_postgres_url" \
+  ghcr.io/rxtech-lab/launchpad-mcp:latest
+```
+
+#### Using Docker Compose
+
+1. Copy the environment file:
+```bash
+cp .env.example .env
+```
+
+2. Edit `.env` with your configuration
+
+3. Run with Docker Compose:
+```bash
+# Run with SQLite (default)
+docker compose up -d
+
+# Run with PostgreSQL
+docker compose --profile postgres up -d
+```
+
+#### Building Locally
+
+```bash
+# Build multi-architecture image
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --build-arg VERSION=dev \
+  --build-arg COMMIT_HASH=$(git rev-parse HEAD) \
+  --build-arg BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S') \
+  -t launchpad-mcp .
+```
+
+#### Available Tags
+
+- `latest` - Latest stable release
+- `v1.0.0` - Specific version tags
+- `main-<sha>` - Latest main branch build
+
 ## MCP Tools
 
 The server provides 14 MCP tools for comprehensive crypto launchpad operations:

@@ -63,3 +63,34 @@ jobs:
       - name: Test binary execution
         run: |
           timeout 5s ./bin/launchpad-mcp || [ $? -eq 124 ]
+
+  docker-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build Docker image (test only)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          build-args: |
+            VERSION=latest
+            COMMIT_HASH=${{ github.sha }}
+            BUILD_TIME=${{ github.run_started_at }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
