@@ -10,9 +10,10 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+  - cluster-issuer.yaml
 
 namespace: launchpad
 
 images:
   - name: ghcr.io/rxtech-lab/launchpad-mcp
-    newTag: 2.0.3
+    newTag: latest

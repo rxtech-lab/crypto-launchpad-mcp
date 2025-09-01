@@ -13,17 +13,17 @@ metadata:
 spec:
   ingressClassName: nginx
   tls:
-  - hosts:
-    - launchpad-mcp.example.com  # Replace with your actual domain
-    secretName: launchpad-mcp-tls
+    - hosts:
+        - launchpad.mcprouter.app
+      secretName: launchpad-mcp-tls
   rules:
-  - host: launchpad-mcp.example.com  # Replace with your actual domain
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: launchpad-mcp-service
-            port:
-              number: 8080
+    - host: launchpad.mcprouter.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: launchpad-mcp-service
+                port:
+                  number: 8080
