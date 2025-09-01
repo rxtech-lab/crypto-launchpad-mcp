@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/api/middleware"
 	"github.com/rxtech-lab/launchpad-mcp/internal/assets"
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
@@ -18,28 +21,17 @@ import (
 )
 
 type APIServer struct {
-	app          *fiber.App
-	dbService    services.DBService
-	txService    services.TransactionService
-	hookService  services.HookService
-	chainService services.ChainService
-	mcpServer    *mcp.MCPServer
-	port         int
+	app           *fiber.App
+	dbService     services.DBService
+	txService     services.TransactionService
+	hookService   services.HookService
+	chainService  services.ChainService
+	mcpServer     *mcp.MCPServer
+	authenticator *utils.JwtAuthenticator
+	port          int
 }
 
 func NewAPIServer(dbService services.DBService, txService services.TransactionService, hookService services.HookService, chainService services.ChainService) *APIServer {
-	// Get JWKS URI from environment variable
-	jwksUri := os.Getenv("OAUTH_JWKS_URI")
-	resourceID := os.Getenv("OAUTH_RESOURCE_ID")
-
-	var authenticator *utils.JwtAuthenticator
-	if jwksUri != "" {
-		authenticator = utils.NewJwtAuthenticator(jwksUri)
-		log.Printf("JWT authenticator initialized with JWKS URI: %s", jwksUri)
-	} else {
-		log.Println("Warning: OAUTH_JWKS_URI not set, JWT authentication disabled")
-	}
-
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -51,26 +43,24 @@ func NewAPIServer(dbService services.DBService, txService services.TransactionSe
 		TimeFormat: "15:04:05",
 		TimeZone:   "Local",
 	}))
-
-	// Add authentication middleware to all routes
-	app.Use(middleware.AuthMiddleware(middleware.AuthConfig{
-		SkipWellKnown: true,
-		TokenValidator: func(token string, audience []string) error {
-			// TODO: Implement actual token validation (e.g., with Scalekit)
-			if token == "" {
-				return fiber.NewError(fiber.StatusUnauthorized, "Invalid token")
-			}
-
-			return nil
-		},
-	}))
+	// Get JWKS URI from environment variable
+	jwksUri := os.Getenv("SCALEKIT_ENV_URL")
+	var authenticator *utils.JwtAuthenticator
+	if jwksUri != "" {
+		auth := utils.NewJwtAuthenticator(jwksUri)
+		authenticator = &auth
+		log.Printf("JWT authenticator initialized with JWKS URI: %s", jwksUri)
+	} else {
+		log.Println("Warning: SCALEKIT_ENV_URL not set, JWT authentication disabled")
+	}
 
 	server := &APIServer{
-		app:          app,
-		dbService:    dbService,
-		txService:    txService,
-		hookService:  hookService,
-		chainService: chainService,
+		app:           app,
+		dbService:     dbService,
+		txService:     txService,
+		hookService:   hookService,
+		chainService:  chainService,
+		authenticator: authenticator,
 	}
 	server.setupRoutes()
 	return server
@@ -102,8 +92,26 @@ func (s *APIServer) EnableStreamableHttp() {
 	// Start the streamable HTTP server
 	streamableServer := s.mcpServer.StartStreamableHTTPServer()
 
-	s.app.All("/mcp", adaptor.HTTPHandler(streamableServer))
-	s.app.All("/mcp/*", adaptor.HTTPHandler(streamableServer))
+	// Create a custom handler that extracts authentication and adds to context
+	authenticatedHandler := s.createAuthenticatedMCPHandler(streamableServer, s.authenticator)
+
+	s.app.All("/mcp", authenticatedHandler)
+	s.app.All("/mcp/*", authenticatedHandler)
+
+	// Add authentication middleware to all routes
+	s.app.Use(middleware.AuthMiddleware(middleware.AuthConfig{
+		SkipWellKnown: true,
+		TokenValidator: func(token string, audience []string) (*utils.AuthenticatedUser, error) {
+			if s.authenticator != nil {
+				return s.authenticator.ValidateToken(token)
+			}
+			// Default validation when no authenticator is configured
+			if token == "" {
+				return nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid token")
+			}
+			return &utils.AuthenticatedUser{}, nil
+		},
+	}))
 }
 
 // Start starts the server on a random available port
@@ -165,4 +173,46 @@ func (s *APIServer) handleSigningAppJS(c *fiber.Ctx) error {
 func (s *APIServer) handleSigningAppCSS(c *fiber.Ctx) error {
 	c.Set("Content-Type", "text/css")
 	return c.Send(assets.SigningAppCSS)
+}
+
+// createAuthenticatedMCPHandler creates a Fiber handler that extracts authentication
+// and passes it to the MCP streamable HTTP server via context
+func (s *APIServer) createAuthenticatedMCPHandler(streamableServer *server.StreamableHTTPServer, authenticator *utils.JwtAuthenticator) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Extract Bearer token from Authorization header
+		authHeader := c.Get("Authorization")
+		var authenticatedUser *utils.AuthenticatedUser
+
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+			if token != "" && authenticator != nil {
+				// Validate token using JWT authenticator
+				if user, err := authenticator.ValidateToken(token); err == nil {
+					authenticatedUser = user
+					log.Printf("MCP request authenticated as user: %s", user.Sub)
+				} else {
+					log.Printf("MCP authentication failed: %v", err)
+				}
+			}
+		}
+
+		// Create a custom HTTP handler that injects authentication context
+		httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+
+			// Add authenticated user to context if available
+			if authenticatedUser != nil {
+				ctx = utils.WithAuthenticatedUser(ctx, authenticatedUser)
+			}
+
+			// Update request with authenticated context
+			r = r.WithContext(ctx)
+
+			// Forward to the actual MCP streamable server
+			streamableServer.ServeHTTP(w, r)
+		})
+
+		// Use Fiber's adaptor to convert
+		return adaptor.HTTPHandler(httpHandler)(c)
+	}
 }

@@ -41,6 +41,17 @@ func NewCreateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 	)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Check if user is authenticated (optional for this tool, but log for audit)
+		var createdBy string
+		if user, ok := utils.GetAuthenticatedUser(ctx); ok {
+			createdBy = user.Sub
+			// Log the authenticated action for audit purposes
+			fmt.Printf("Template creation requested by user: %s (roles: %v)\n", user.Sub, user.Roles)
+		} else {
+			createdBy = "unauthenticated"
+			fmt.Println("Template creation requested by unauthenticated user")
+		}
+
 		name, err := request.RequireString("name")
 		if err != nil {
 			return nil, fmt.Errorf("name parameter is required: %w", err)
@@ -133,6 +144,7 @@ func NewCreateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 			"description": template.Description,
 			"chain_type":  template.ChainType,
 			"created_at":  template.CreatedAt,
+			"created_by":  createdBy,
 			"message":     "Template created successfully",
 		}
 

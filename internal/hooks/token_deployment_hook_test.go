@@ -5,37 +5,46 @@ import (
 	"time"
 
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/stretchr/testify/suite"
 )
 
 type TokenDeploymentHookTestSuite struct {
 	suite.Suite
-	db   *database.Database
-	hook *TokenDeploymentHook
+	dbService         services.DBService
+	deploymentService *services.DeploymentService
+	templateService   services.TemplateService
+	chainService      services.ChainService
+	hook              *TokenDeploymentHook
 }
 
 func (s *TokenDeploymentHookTestSuite) SetupSuite() {
 	// Use in-memory database for testing
-	db, err := database.NewDatabase(":memory:")
+	db, err := services.NewSqliteDBService(":memory:")
 	s.Require().NoError(err)
-	s.db = db
+	s.dbService = db
+
+	// Initialize services
+	s.deploymentService = services.NewDeploymentService(db.GetDB())
+	s.templateService = services.NewTemplateService(db.GetDB())
+	s.chainService = services.NewChainService(db.GetDB())
 
 	// Create hook instance
-	s.hook = &TokenDeploymentHook{db: db.DB}
+	s.hook = &TokenDeploymentHook{db: db.GetDB()}
 
 	// Setup test data
 	s.setupTestData()
 }
 
 func (s *TokenDeploymentHookTestSuite) TearDownSuite() {
-	if s.db != nil {
-		s.db.Close()
+	if s.dbService != nil {
+		s.dbService.Close()
 	}
 }
 
 func (s *TokenDeploymentHookTestSuite) SetupTest() {
 	// Clean up test data between tests
-	s.db.DB.Where("1 = 1").Delete(&models.Deployment{})
+	s.dbService.GetDB().Where("1 = 1").Delete(&models.Deployment{})
 }
 
 func (s *TokenDeploymentHookTestSuite) setupTestData() {
@@ -47,7 +56,7 @@ func (s *TokenDeploymentHookTestSuite) setupTestData() {
 		Name:      "Test Chain",
 		IsActive:  true,
 	}
-	err := s.db.CreateChain(chain)
+	err := s.chainService.CreateChain(chain)
 	s.Require().NoError(err)
 
 	// Create test template
@@ -59,7 +68,7 @@ func (s *TokenDeploymentHookTestSuite) setupTestData() {
 		TemplateCode: `pragma solidity ^0.8.0; contract TestToken { constructor(string memory name) {} }`,
 		Metadata:     models.JSON{"name": ""},
 	}
-	err = s.db.CreateTemplate(template)
+	err = s.templateService.CreateTemplate(template)
 	s.Require().NoError(err)
 }
 
@@ -85,7 +94,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_TokenDeploymen
 		CreatedAt:       time.Now(),
 	}
 
-	err := s.db.DB.Create(deployment).Error
+	err := s.deploymentService.CreateDeployment(deployment)
 	s.Require().NoError(err)
 
 	// Create test session
@@ -107,8 +116,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_TokenDeploymen
 	s.NoError(err)
 
 	// Verify deployment record was updated
-	var updatedDeployment models.Deployment
-	err = s.db.DB.Where("transaction_hash = ?", deployment.TransactionHash).First(&updatedDeployment).Error
+	updatedDeployment, err := s.deploymentService.GetDeploymentByTransactionHash(deployment.TransactionHash)
 	s.Require().NoError(err)
 
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
@@ -127,7 +135,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2Token
 		CreatedAt:       time.Now(),
 	}
 
-	err := s.db.DB.Create(deployment).Error
+	err := s.deploymentService.CreateDeployment(deployment)
 	s.Require().NoError(err)
 
 	// Create test session
@@ -149,8 +157,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2Token
 	s.NoError(err)
 
 	// Verify deployment record was updated
-	var updatedDeployment models.Deployment
-	err = s.db.DB.Where("transaction_hash = ?", deployment.TransactionHash).First(&updatedDeployment).Error
+	updatedDeployment, err := s.deploymentService.GetDeploymentByTransactionHash(deployment.TransactionHash)
 	s.Require().NoError(err)
 
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
@@ -193,7 +200,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_EmptyContractA
 		CreatedAt:       time.Now(),
 	}
 
-	err := s.db.DB.Create(deployment).Error
+	err := s.deploymentService.CreateDeployment(deployment)
 	s.Require().NoError(err)
 
 	// Create test session
@@ -214,8 +221,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_EmptyContractA
 	s.NoError(err)
 
 	// Verify deployment record was updated with empty address
-	var updatedDeployment models.Deployment
-	err = s.db.DB.Where("transaction_hash = ?", deployment.TransactionHash).First(&updatedDeployment).Error
+	updatedDeployment, err := s.deploymentService.GetDeploymentByTransactionHash(deployment.TransactionHash)
 	s.Require().NoError(err)
 
 	s.Equal("", updatedDeployment.ContractAddress)
@@ -245,9 +251,9 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 		CreatedAt:       time.Now(),
 	}
 
-	err := s.db.DB.Create(deployment1).Error
+	err := s.deploymentService.CreateDeployment(deployment1)
 	s.Require().NoError(err)
-	err = s.db.DB.Create(deployment2).Error
+	err = s.deploymentService.CreateDeployment(deployment2)
 	s.Require().NoError(err)
 
 	// Create test session
@@ -270,7 +276,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 
 	// Verify both deployment records were updated
 	var updatedDeployments []models.Deployment
-	err = s.db.DB.Where("transaction_hash = ?", txHash).Find(&updatedDeployments).Error
+	err = s.dbService.GetDB().Where("transaction_hash = ?", txHash).Find(&updatedDeployments).Error
 	s.Require().NoError(err)
 	s.Len(updatedDeployments, 2)
 
@@ -282,7 +288,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 
 func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 	// Test constructor function
-	hook := NewTokenDeploymentHook(s.db.DB)
+	hook := NewTokenDeploymentHook(s.dbService.GetDB())
 	s.NotNil(hook)
 
 	// Verify it implements the Hook interface
@@ -301,7 +307,7 @@ func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 		CreatedAt:       time.Now(),
 	}
 
-	err := s.db.DB.Create(deployment).Error
+	err := s.deploymentService.CreateDeployment(deployment)
 	s.Require().NoError(err)
 
 	session := models.TransactionSession{
@@ -321,8 +327,7 @@ func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 	s.NoError(err)
 
 	// Verify deployment was updated
-	var updatedDeployment models.Deployment
-	err = s.db.DB.Where("transaction_hash = ?", deployment.TransactionHash).First(&updatedDeployment).Error
+	updatedDeployment, err := s.deploymentService.GetDeploymentByTransactionHash(deployment.TransactionHash)
 	s.Require().NoError(err)
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
 	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
@@ -340,7 +345,7 @@ func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
 		CreatedAt:       time.Now(),
 	}
 
-	err := s.db.DB.Create(deployment).Error
+	err := s.deploymentService.CreateDeployment(deployment)
 	s.Require().NoError(err)
 
 	session := models.TransactionSession{
@@ -363,8 +368,7 @@ func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
 	}
 
 	// Verify final state is consistent
-	var updatedDeployment models.Deployment
-	err = s.db.DB.Where("transaction_hash = ?", deployment.TransactionHash).First(&updatedDeployment).Error
+	updatedDeployment, err := s.deploymentService.GetDeploymentByTransactionHash(deployment.TransactionHash)
 	s.Require().NoError(err)
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
 	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)

@@ -40,7 +40,7 @@ func main() {
 
 	// Initialize MCP server
 	mcpServer := mcp.NewMCPServer(dbService, parsedPort, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
-	// Initialize API server for transaction signing
+	// Initialize API server for transaction signing (authenticator is created internally)
 	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
 	apiServer.SetMCPServer(mcpServer)
 	apiServer.EnableStreamableHttp()

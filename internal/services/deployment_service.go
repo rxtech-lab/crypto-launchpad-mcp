@@ -105,3 +105,13 @@ func (s *DeploymentService) GetDeploymentsByChain(chainID uint) ([]models.Deploy
 	err := s.db.Preload("Template").Preload("Chain").Where("chain_id = ?", chainID).Find(&deployments).Error
 	return deployments, err
 }
+
+// GetDeploymentByTransactionHash returns a deployment by its transaction hash
+func (s *DeploymentService) GetDeploymentByTransactionHash(txHash string) (*models.Deployment, error) {
+	var deployment models.Deployment
+	err := s.db.Preload("Template").Preload("Chain").Where("transaction_hash = ?", txHash).First(&deployment).Error
+	if err != nil {
+		return nil, err
+	}
+	return &deployment, nil
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 func NewListTemplateTool(templateService services.TemplateService) (mcp.Tool, server.ToolHandlerFunc) {
@@ -41,8 +42,12 @@ func NewListTemplateTool(templateService services.TemplateService) (mcp.Tool, se
 			return mcp.NewToolResultError("Invalid chain_type. Supported values: ethereum, solana"), nil
 		}
 
+		user, ok := utils.GetAuthenticatedUser(ctx)
+		if !ok {
+			return mcp.NewToolResultError("User not authenticated"), nil
+		}
 		// List templates with filters
-		templates, err := templateService.ListTemplates(chainType, keyword, limit)
+		templates, err := templateService.ListTemplates(user.Sub, chainType, keyword, limit)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error listing templates: %v", err)), nil
 		}

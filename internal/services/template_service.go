@@ -1,6 +1,7 @@
 package services
 
 import (
+	"github.com/pkg/errors"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"gorm.io/gorm"
 )
@@ -9,7 +10,7 @@ import (
 type TemplateService interface {
 	CreateTemplate(template *models.Template) error
 	GetTemplateByID(id uint) (*models.Template, error)
-	ListTemplates(chainType, keyword string, limit int) ([]models.Template, error)
+	ListTemplates(user, chainType, keyword string, limit int) ([]models.Template, error)
 	UpdateTemplate(template *models.Template) error
 	DeleteTemplate(id uint) error
 	DeleteTemplates(ids []uint) (int64, error)
@@ -40,8 +41,12 @@ func (s *templateService) GetTemplateByID(id uint) (*models.Template, error) {
 }
 
 // ListTemplates returns templates with optional filtering
-func (s *templateService) ListTemplates(chainType, keyword string, limit int) ([]models.Template, error) {
+func (s *templateService) ListTemplates(user, chainType, keyword string, limit int) ([]models.Template, error) {
 	query := s.db.Model(&models.Template{})
+
+	if len(user) == 0 {
+		return make([]models.Template, 0), errors.New("user is empty")
+	}
 
 	if chainType != "" {
 		query = query.Where("chain_type = ?", chainType)

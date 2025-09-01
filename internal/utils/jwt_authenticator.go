@@ -36,8 +36,8 @@ type AuthenticatedUser struct {
 	Sub      string   `json:"sub"`
 }
 
-func NewJwtAuthenticator(jwksUri string) *JwtAuthenticator {
-	return &JwtAuthenticator{
+func NewJwtAuthenticator(jwksUri string) JwtAuthenticator {
+	return JwtAuthenticator{
 		JwksUri:  jwksUri,
 		cacheTTL: 5 * time.Minute, // Cache keys for 5 minutes
 	}

@@ -9,6 +9,7 @@ import (
 type ChainService interface {
 	CreateChain(chain *models.Chain) error
 	GetActiveChain() (*models.Chain, error)
+	GetChainByType(chainType string) (*models.Chain, error)
 	SetActiveChain(chainType string) error
 	SetActiveChainByID(chainID uint) error
 	UpdateChainConfig(chainType, rpc, chainID string) error
@@ -33,6 +34,16 @@ func (s *chainService) CreateChain(chain *models.Chain) error {
 func (s *chainService) GetActiveChain() (*models.Chain, error) {
 	var chain models.Chain
 	err := s.db.Where("is_active = ?", true).First(&chain).Error
+	if err != nil {
+		return nil, err
+	}
+	return &chain, nil
+}
+
+// GetChainByType returns a chain by its chain type
+func (s *chainService) GetChainByType(chainType string) (*models.Chain, error) {
+	var chain models.Chain
+	err := s.db.Where("chain_type = ?", chainType).First(&chain).Error
 	if err != nil {
 		return nil, err
 	}
