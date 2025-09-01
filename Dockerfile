@@ -26,18 +26,13 @@ COPY frontend/signing/ ./
 RUN bun run build
 
 # Go build stage - use bullseye for better CGO compatibility
-FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS golang-builder
+# Use target platform for native compilation to support CGO dependencies
+FROM golang:1.25-bookworm AS golang-builder
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
-
-# Install build tools for cross-compilation
-RUN apt-get update && apt-get install -y \
-    gcc-aarch64-linux-gnu \
-    libc6-dev-arm64-cross \
-    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -57,15 +52,14 @@ ARG VERSION=docker
 ARG COMMIT_HASH
 ARG BUILD_TIME
 
-# Set environment variables for cross-compilation
-ENV GOOS=$TARGETOS
-ENV GOARCH=$TARGETARCH
-
 # Build the streamable-http binary (CGO enabled for v8go dependency)
+# Use native compilation instead of cross-compilation for CGO compatibility
 RUN CGO_ENABLED=1 go build \
     -ldflags "-X main.Version=${VERSION} -X main.CommitHash=${COMMIT_HASH} -X main.BuildTime=${BUILD_TIME}" \
     -o launchpad-mcp-http \
     ./cmd/streamable-http/main.go
+
+RUN ls -la
 
 # Final runtime stage
 FROM alpine:3.20
