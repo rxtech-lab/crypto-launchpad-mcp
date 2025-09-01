@@ -163,6 +163,11 @@ func (s *APIServer) GetMCPServer() *mcp.MCPServer {
 	return s.mcpServer
 }
 
+// GetFiberApp returns the Fiber app instance for Vercel integration
+func (s *APIServer) GetFiberApp() *fiber.App {
+	return s.app
+}
+
 // handleSigningAppJS serves the embedded signing app.js file
 func (s *APIServer) handleSigningAppJS(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/javascript")
