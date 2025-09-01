@@ -1,6 +1,6 @@
 module github.com/rxtech-lab/launchpad-mcp
 
-go 1.25
+go 1.24
 
 require (
 	github.com/chromedp/chromedp v0.14.1

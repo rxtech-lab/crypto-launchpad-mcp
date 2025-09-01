@@ -10,19 +10,9 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
-  - secrets.yaml
-
-commonLabels:
-  app: launchpad-mcp
-  managed-by: kustomize
-
-commonAnnotations:
-  app.kubernetes.io/name: launchpad-mcp
-  app.kubernetes.io/version: latest
-  app.kubernetes.io/managed-by: kustomize
 
 namespace: launchpad
 
 images:
   - name: ghcr.io/rxtech-lab/launchpad-mcp
-    newTag: latest
+    newTag: 2.0.3

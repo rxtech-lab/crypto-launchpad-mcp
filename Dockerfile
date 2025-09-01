@@ -38,8 +38,10 @@ ARG TARGETARCH
 WORKDIR /app
 
 # Copy source code (excluding Dockerfile to avoid circular dependency)
-COPY . .
+COPY go.mod go.sum ./
 RUN go mod download
+
+COPY . .
 RUN go generate ./...
 
 # Copy built frontend assets from previous stage
@@ -59,17 +61,19 @@ RUN CGO_ENABLED=1 go build \
     -o launchpad-mcp-http \
     ./cmd/streamable-http/main.go
 
-RUN ls -la
+
+CMD ["./launchpad-mcp-http"]
 
 # Final runtime stage
-FROM alpine:3.20
+FROM ubuntu:24.04
 
 # Install ca-certificates for HTTPS requests and wget for health check
-RUN apk --no-cache add ca-certificates tzdata wget
+RUN apt-get update && apt-get install -y ca-certificates tzdata wget && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -m appuser
 
 # Set working directory
 WORKDIR /app
@@ -85,10 +89,6 @@ USER appuser
 
 # Expose port (default 8080, configurable via PORT env var)
 EXPOSE 8080
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/health || exit 1
 
 # Environment variables with defaults
 ENV PORT=8080
