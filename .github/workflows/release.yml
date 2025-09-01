@@ -227,8 +227,53 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ github.event_name == 'release' && github.ref_name || format('dev-{0}', github.sha) }}
+            VERSION=${{ github.ref_name}}
             COMMIT_HASH=${{ github.sha }}
             BUILD_TIME=${{ github.run_started_at }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  k8s-deploy:
+    name: Deploy to Kubernetes
+    needs: docker-release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "latest"
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.K8S_CONFIG_FILE_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify kubectl connection
+        run: kubectl cluster-info
+
+      - name: Update deployment image
+        run: |
+          # Extract version from release tag
+          VERSION="${{ github.ref_name }}"
+
+          # Update kustomization with new image tag
+          cd k8s
+          kubectl kustomize . | kubectl apply -f -
+
+          # Update the deployment with the specific release tag
+          kubectl set image deployment/launchpad-mcp launchpad-mcp=ghcr.io/rxtech-lab/launchpad-mcp:${VERSION} -n launchpad
+
+          # Wait for rollout to complete
+          kubectl rollout status deployment/launchpad-mcp -n launchpad --timeout=300s
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -n launchpad -l app=launchpad-mcp
+          kubectl get service -n launchpad launchpad-mcp-service
