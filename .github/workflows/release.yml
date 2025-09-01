@@ -215,7 +215,11 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix={{branch}}-
+            type=sha,prefix=sha-
+
+      - name: Set build time
+        id: build_time
+        run: echo "BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -229,7 +233,7 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_name}}
             COMMIT_HASH=${{ github.sha }}
-            BUILD_TIME=${{ github.run_started_at }}
+            BUILD_TIME=${{ steps.build_time.outputs.BUILD_TIME }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
