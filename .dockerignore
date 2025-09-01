@@ -1,0 +1,46 @@
+# Documentation
+*.md
+README.md
+docs/
+
+# Development files
+.env
+.env.*
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+e2e/
+tests/
+
+# CI/CD
+.github/
+scripts/
+
+# Frontend development
+frontend/signing/node_modules/
+frontend/signing/.cache/
+frontend/signing/dist/
+# Keep package.json and bun.lock for builds
+!frontend/signing/package.json
+!frontend/signing/bun.lock
+coverage.out
+*.prof
