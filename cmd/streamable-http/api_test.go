@@ -212,7 +212,7 @@ func (suite *StreamableHTTPTestSuite) TestAllRoutesRequireAuthentication() {
 		{"GET", "/static/tx/app.js", http.StatusUnauthorized, "static JavaScript"},
 		{"GET", "/static/tx/app.css", http.StatusUnauthorized, "static CSS"},
 		{"POST", "/api/test/sign-transaction", http.StatusUnauthorized, "test endpoint"},
-		{"GET", "/health", http.StatusUnauthorized, "health check"},
+		{"GET", "/health", http.StatusOK, "health check"},
 	}
 
 	for _, testRoute := range testRoutes {
