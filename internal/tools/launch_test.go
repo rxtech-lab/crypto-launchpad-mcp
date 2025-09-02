@@ -623,6 +623,84 @@ func (suite *LaunchToolTestSuite) TestHandlerInvalidBindArguments() {
 	suite.Contains(err.Error(), "failed to bind arguments")
 }
 
+func (suite *LaunchToolTestSuite) TestHandlerMissingConstructorArgs() {
+	// Create a template that requires constructor arguments
+	contractCodeWithConstructor := `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract TokenRequiringConstructor {
+    string public name;
+    string public symbol;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+
+    constructor(string memory _name, string memory _symbol, uint256 _supply) {
+        name = _name;
+        symbol = _symbol;
+        totalSupply = _supply;
+        balanceOf[msg.sender] = _supply;
+    }
+}`
+
+	templateWithConstructor := &models.Template{
+		Name:         "TokenRequiringConstructor",
+		Description:  "A token contract template that requires constructor arguments",
+		ChainType:    models.TransactionChainTypeEthereum,
+		ContractName: "TokenRequiringConstructor",
+		TemplateCode: contractCodeWithConstructor,
+	}
+
+	err := suite.templateService.CreateTemplate(templateWithConstructor)
+	suite.Require().NoError(err)
+
+	// Test with nil constructor_args
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: map[string]interface{}{
+				"template_id":     fmt.Sprintf("%d", templateWithConstructor.ID),
+				"template_values": map[string]interface{}{
+					// This template doesn't use template substitution, just constructor args
+				},
+				// constructor_args is intentionally omitted (nil)
+				"value": "0",
+			},
+		},
+	}
+
+	handler := suite.launchTool.GetHandler()
+	result, err := handler(context.Background(), request)
+
+	suite.NoError(err)
+	suite.NotNil(result)
+	suite.True(result.IsError)
+	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
+		suite.Contains(textContent.Text, "contract constructor requires 3 arguments but none provided")
+	}
+
+	// Test with empty constructor_args array
+	request2 := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: map[string]interface{}{
+				"template_id":     fmt.Sprintf("%d", templateWithConstructor.ID),
+				"template_values": map[string]interface{}{
+					// This template doesn't use template substitution, just constructor args
+				},
+				"constructor_args": []interface{}{}, // Empty array
+				"value":            "0",
+			},
+		},
+	}
+
+	result2, err := handler(context.Background(), request2)
+
+	suite.NoError(err)
+	suite.NotNil(result2)
+	suite.True(result2.IsError)
+	if textContent, ok := result2.Content[0].(mcp.TextContent); ok {
+		suite.Contains(textContent.Text, "contract constructor requires 3 arguments but none provided")
+	}
+}
+
 func (suite *LaunchToolTestSuite) TestCreateEvmContractDeploymentTransaction() {
 	metadata := []models.TransactionMetadata{
 		{Key: "test_key", Value: "test_value"},

@@ -67,12 +67,13 @@ func NewListTemplateTool(templateService services.TemplateService) (mcp.Tool, se
 		templateList := make([]map[string]interface{}, len(templates))
 		for i, template := range templates {
 			templateList[i] = map[string]interface{}{
-				"id":          template.ID,
-				"name":        template.Name,
-				"description": template.Description,
-				"chain_type":  template.ChainType,
-				"created_at":  template.CreatedAt,
-				"updated_at":  template.UpdatedAt,
+				"id":                     template.ID,
+				"name":                   template.Name,
+				"description":            template.Description,
+				"chain_type":             template.ChainType,
+				"created_at":             template.CreatedAt,
+				"updated_at":             template.UpdatedAt,
+				"sample_template_values": template.SampleTemplateValues,
 			}
 		}
 

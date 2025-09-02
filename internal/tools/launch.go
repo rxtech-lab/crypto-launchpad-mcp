@@ -56,7 +56,10 @@ func (l *launchTool) GetTool() mcp.Tool {
 		),
 		mcp.WithArray(
 			"constructor_args",
-			mcp.Description("JSON array of constructor arguments for contract deployment (e.g., [\"arg1\", 123, true]). Optional."),
+			mcp.Description("JSON array of constructor arguments for contract deployment (e.g., [\"arg1\", 123, true]). Optional. Please provide this if the template requires constructor arguments."),
+			mcp.Items(map[string]interface{}{
+				"type": "any",
+			}),
 		),
 		mcp.WithString("value",
 			mcp.Description("ETH value to send with the deployment transaction in wei (e.g., \"1000000000000000000\" for 1 ETH). Optional, defaults to \"0\"."),
@@ -114,6 +117,11 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 		// Validate that template chain type matches active chain
 		if template.ChainType != activeChain.ChainType {
 			return mcp.NewToolResultError(fmt.Sprintf("Template chain type (%s) doesn't match active chain (%s)", template.ChainType, activeChain.ChainType)), nil
+		}
+
+		// validate template values contain all required sample keys
+		if err := utils.CheckSampleKeysMatch(template.SampleTemplateValues, args.TemplateValues); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Template values validation failed: %v", err)), nil
 		}
 
 		if activeChain.ChainType == models.TransactionChainTypeEthereum {

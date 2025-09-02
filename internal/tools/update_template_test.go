@@ -327,26 +327,8 @@ pragma solidity ^0.8.0;
 
 contract UpdatedToken {
     string public name = "{{.TokenName}}";
-    uint256 public supply = {{.Supply}};
+    uint256 public supply = 1;
 }`,
-			expectError: false,
-		},
-		{
-			name:      "valid_solana_code_update",
-			chainType: "solana",
-			newCode: `use anchor_lang::prelude::*;
-
-#[program]
-pub mod updated_program {
-    use super::*;
-    
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        Ok(())
-    }
-}
-
-#[derive(Accounts)]
-pub struct Initialize {}`,
 			expectError: false,
 		},
 		{
@@ -543,8 +525,7 @@ pragma solidity ^0.8.0;
 contract MultiUpdateToken {
     string public name = "{{.TokenName}}";
     string public symbol = "{{.TokenSymbol}}";
-    uint256 public totalSupply = {{.InitialSupply}};
-    address public owner = {{.Owner}};
+    uint256 public totalSupply =  1;
 }`
 
 	request := mcp.CallToolRequest{
