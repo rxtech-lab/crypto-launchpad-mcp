@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
@@ -14,7 +15,30 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-func NewUpdateTemplateTool(templateService services.TemplateService) (mcp.Tool, server.ToolHandlerFunc) {
+type updateTemplateTool struct {
+	templateService services.TemplateService
+}
+
+type UpdateTemplateArguments struct {
+	// Required fields
+	TemplateID string `json:"template_id" validate:"required"`
+
+	// Optional fields
+	Description      string                 `json:"description,omitempty"`
+	ChainType        string                 `json:"chain_type,omitempty"`
+	ContractName     string                 `json:"contract_name,omitempty"`
+	TemplateCode     string                 `json:"template_code,omitempty"`
+	TemplateMetadata string                 `json:"template_metadata,omitempty"`
+	TemplateValues   map[string]interface{} `json:"template_values,omitempty"`
+}
+
+func NewUpdateTemplateTool(templateService services.TemplateService) *updateTemplateTool {
+	return &updateTemplateTool{
+		templateService: templateService,
+	}
+}
+
+func (u *updateTemplateTool) GetTool() mcp.Tool {
 	tool := mcp.NewTool("update_template",
 		mcp.WithDescription("Update existing smart contract template with new description, chain type, template code, or metadata. Performs syntax validation on updated code."),
 		mcp.WithString("template_id",
@@ -36,166 +60,134 @@ func NewUpdateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 		mcp.WithString("template_metadata",
 			mcp.Description("JSON object defining template parameters as key-value pairs where values are empty strings (e.g., {\"TokenName\": \"\", \"TokenSymbol\": \"\"})"),
 		),
+		mcp.WithObject("template_values",
+			mcp.Description("JSON object with runtime values for template parameters for validation (e.g., {\"TokenName\": \"MyToken\", \"TokenSymbol\": \"MTK\"})"),
+		),
 	)
 
-	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		templateIDStr, err := request.RequireString("template_id")
-		if err != nil {
-			return nil, fmt.Errorf("template_id parameter is required: %w", err)
+	return tool
+}
+
+func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
+
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args UpdateTemplateArguments
+		if err := request.BindArguments(&args); err != nil {
+			return nil, fmt.Errorf("failed to bind arguments: %w", err)
 		}
 
-		templateID, err := strconv.ParseUint(templateIDStr, 10, 32)
-		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Invalid template_id: %v", err)),
-				},
-			}, nil
+		if err := validator.New().Struct(args); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid arguments: %v", err)), nil
 		}
 
-		description := request.GetString("description", "")
-		chainType := request.GetString("chain_type", "")
-		contractName := request.GetString("contract_name", "")
-		templateCode := request.GetString("template_code", "")
-		templateMetadata := request.GetString("template_metadata", "")
+		templateID, err := strconv.ParseUint(args.TemplateID, 10, 32)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid template_id: %v", err)), nil
+		}
 
 		// Parse template metadata if provided
 		var metadata models.JSON
-		if templateMetadata != "" {
-			if err := json.Unmarshal([]byte(templateMetadata), &metadata); err != nil {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						mcp.NewTextContent("Error: "),
-						mcp.NewTextContent(fmt.Sprintf("Invalid template_metadata JSON: %v", err)),
-					},
-				}, nil
+		if args.TemplateMetadata != "" {
+			if err := json.Unmarshal([]byte(args.TemplateMetadata), &metadata); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid template_metadata JSON: %v", err)), nil
 			}
 
 			// Validate metadata format - all values should be empty strings for parameter definitions
 			for key, value := range metadata {
 				if key == "" {
-					return &mcp.CallToolResult{
-						Content: []mcp.Content{
-							mcp.NewTextContent("Error: "),
-							mcp.NewTextContent("Metadata keys cannot be empty"),
-						},
-					}, nil
+					return mcp.NewToolResultError("Metadata keys cannot be empty"), nil
 				}
 				if str, ok := value.(string); !ok || str != "" {
-					return &mcp.CallToolResult{
-						Content: []mcp.Content{
-							mcp.NewTextContent("Error: "),
-							mcp.NewTextContent(fmt.Sprintf("Metadata values must be empty strings for parameter definitions, got %v for key %s", value, key)),
-						},
-					}, nil
+					return mcp.NewToolResultError(fmt.Sprintf("Metadata values must be empty strings for parameter definitions, got %v for key %s", value, key)), nil
 				}
 			}
 		}
 
 		// Get existing template
-		template, err := templateService.GetTemplateByID(uint(templateID))
+		template, err := u.templateService.GetTemplateByID(uint(templateID))
 		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Template not found: %v", err)),
-				},
-			}, nil
+			return mcp.NewToolResultError(fmt.Sprintf("Template not found: %v", err)), nil
 		}
 
 		// Track what's being updated
 		updates := make([]string, 0)
 
 		// Update description if provided
-		if description != "" {
-			template.Description = description
+		if args.Description != "" {
+			template.Description = args.Description
 			updates = append(updates, "description")
 		}
 
 		// Update chain type if provided
-		if chainType != "" {
-			if chainType != "ethereum" && chainType != "solana" {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						mcp.NewTextContent("Error: "),
-						mcp.NewTextContent("Invalid chain_type. Supported values: ethereum, solana"),
-					},
-				}, nil
+		if args.ChainType != "" {
+			if args.ChainType != "ethereum" && args.ChainType != "solana" {
+				return mcp.NewToolResultError("Invalid chain_type. Supported values: ethereum, solana"), nil
 			}
-			template.ChainType = models.TransactionChainType(chainType)
+			template.ChainType = models.TransactionChainType(args.ChainType)
 			updates = append(updates, "chain_type")
 		}
 
 		// Update contract name if provided
-		if contractName != "" {
-			template.ContractName = contractName
+		if args.ContractName != "" {
+			template.ContractName = args.ContractName
 			updates = append(updates, "contract_name")
 		}
 
 		// Update metadata if provided
-		if templateMetadata != "" {
+		if args.TemplateMetadata != "" {
 			template.Metadata = metadata
 			updates = append(updates, "metadata")
 		}
 
 		// Update template code if provided
-		if templateCode != "" {
+		if args.TemplateCode != "" {
 			// Use the current or new chain type for validation
 			validationChainType := template.ChainType
-			if chainType != "" {
-				validationChainType = models.TransactionChainType(chainType)
-			}
-
-			// Use existing template code if not provided
-			codeToValidate := templateCode
-			if codeToValidate == "" {
-				codeToValidate = template.TemplateCode
+			if args.ChainType != "" {
+				validationChainType = models.TransactionChainType(args.ChainType)
 			}
 
 			// Validate template code using Solidity compiler for Ethereum
 			if validationChainType == "ethereum" {
-				// Replace Go template variables with dummy values for compilation validation
-				validationCode := utils.ReplaceTemplateVariables(codeToValidate)
-				// Use Solidity version 0.8.20 for validation
-				_, err := utils.CompileSolidity("0.8.20", validationCode)
+				// For validation, use dummy values if TemplateValues not provided
+				templateValues := args.TemplateValues
+				if templateValues == nil {
+					templateValues = map[string]interface{}{
+						"TokenName":     "TestToken",
+						"TokenSymbol":   "TST",
+						"InitialSupply": "1000",
+						"Supply":        "1000",
+						"Owner":         "msg.sender",
+					}
+				}
+
+				renderedCode, err := utils.RenderContractTemplate(args.TemplateCode, templateValues)
 				if err != nil {
-					return &mcp.CallToolResult{
-						Content: []mcp.Content{
-							mcp.NewTextContent("Error: "),
-							mcp.NewTextContent(fmt.Sprintf("Solidity compilation failed: %v", err)),
-						},
-					}, nil
+					return mcp.NewToolResultError(fmt.Sprintf("Error rendering template: %v", err)), nil
+				}
+
+				// Use Solidity version 0.8.27 for validation
+				_, err = utils.CompileSolidity("0.8.27", renderedCode)
+				if err != nil {
+					return mcp.NewToolResultError(fmt.Sprintf("Solidity compilation failed: %v", err)), nil
 				}
 			} else if validationChainType == "solana" {
 				// Solana validation skipped - accept any template code
 			}
 
-			// Update the template code if provided
-			if templateCode != "" {
-				template.TemplateCode = codeToValidate
-				updates = append(updates, "template_code")
-			}
+			// Update the template code
+			template.TemplateCode = args.TemplateCode
+			updates = append(updates, "template_code")
 		}
 
 		// Check if any updates were provided
 		if len(updates) == 0 {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent("No update parameters provided. Specify description, chain_type, template_code, or template_metadata"),
-				},
-			}, nil
+			return mcp.NewToolResultError("No update parameters provided. Specify description, chain_type, template_code, or template_metadata"), nil
 		}
 
 		// Save updated template
-		if err := templateService.UpdateTemplate(template); err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error updating template: %v", err)),
-				},
-			}, nil
+		if err := u.templateService.UpdateTemplate(template); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Error updating template: %v", err)), nil
 		}
 
 		// Prepare result with comprehensive information
@@ -210,7 +202,7 @@ func NewUpdateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 		}
 
 		// Add metadata information if updated
-		if templateMetadata != "" && len(metadata) > 0 {
+		if args.TemplateMetadata != "" && len(metadata) > 0 {
 			result["metadata"] = metadata
 			result["template_parameters"] = len(metadata)
 		}
@@ -229,6 +221,4 @@ func NewUpdateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 			},
 		}, nil
 	}
-
-	return tool, handler
 }

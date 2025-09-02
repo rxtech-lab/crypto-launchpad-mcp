@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
@@ -12,7 +13,30 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-func NewCreateTemplateTool(templateService services.TemplateService) (mcp.Tool, server.ToolHandlerFunc) {
+type createTemplateTool struct {
+	templateService services.TemplateService
+}
+
+type CreateTemplateArguments struct {
+	// Required fields
+	Name           string         `json:"name" validate:"required"`
+	Description    string         `json:"description" validate:"required"`
+	ContractName   string         `json:"contract_name" validate:"required"`
+	ChainType      string         `json:"chain_type" validate:"required"`
+	TemplateCode   string         `json:"template_code" validate:"required"`
+	TemplateValues map[string]any `json:"template_values" validate:"required"`
+
+	// Optional fields
+	TemplateMetadata string `json:"template_metadata,omitempty"`
+}
+
+func NewCreateTemplateTool(templateService services.TemplateService) *createTemplateTool {
+	return &createTemplateTool{
+		templateService: templateService,
+	}
+}
+
+func (c *createTemplateTool) GetTool() mcp.Tool {
 	tool := mcp.NewTool("create_template",
 		mcp.WithDescription("Create new smart contract template with syntax validation. Template code should use Go template syntax ({{.VariableName}}) for dynamic parameters. OpenZeppelin contracts are available to use."),
 		mcp.WithString("name",
@@ -33,14 +57,24 @@ func NewCreateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 		),
 		mcp.WithString("template_code",
 			mcp.Required(),
-			mcp.Description("The smart contract source code template with Go template syntax ({{.VariableName}}). Don't need to include the contract owner info since it will be set during the deployment. Use msg.sender as the contract owner if not specified."),
+			mcp.Description("The smart contract source code template with Go template syntax ({{.VariableName}}). Don't need to include the contract owner info since it will be set during the deployment. Use msg.sender as the contract owner if not specified."+
+				"Please fix the SPDX-License-Identifier and pragma statements"),
 		),
 		mcp.WithString("template_metadata",
 			mcp.Description("JSON object defining template parameters as key-value pairs where values are empty strings (e.g., {\"TokenName\": \"\", \"TokenSymbol\": \"\"})"),
 		),
+		mcp.WithObject("template_values",
+			mcp.Required(),
+			mcp.Description("JSON object with runtime values for template parameters (e.g., {\"TokenName\": \"MyToken\", \"TokenSymbol\": \"MTK\"})"),
+		),
 	)
 
-	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return tool
+}
+
+func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
+
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Check if user is authenticated (optional for this tool, but log for audit)
 		var createdBy string
 		if user, ok := utils.GetAuthenticatedUser(ctx); ok {
@@ -52,36 +86,19 @@ func NewCreateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 			fmt.Println("Template creation requested by unauthenticated user")
 		}
 
-		name, err := request.RequireString("name")
-		if err != nil {
-			return nil, fmt.Errorf("name parameter is required: %w", err)
+		var args CreateTemplateArguments
+		if err := request.BindArguments(&args); err != nil {
+			return nil, fmt.Errorf("failed to bind arguments: %w", err)
 		}
 
-		description, err := request.RequireString("description")
-		if err != nil {
-			return nil, fmt.Errorf("description parameter is required: %w", err)
-		}
-
-		contractName, err := request.RequireString("contract_name")
-		if err != nil {
-			return nil, fmt.Errorf("contract_name parameter is required: %w", err)
-		}
-
-		chainType, err := request.RequireString("chain_type")
-		if err != nil {
-			return nil, fmt.Errorf("chain_type parameter is required: %w", err)
-		}
-
-		templateCode, err := request.RequireString("template_code")
-		if err != nil {
-			return nil, fmt.Errorf("template_code parameter is required: %w", err)
+		if err := validator.New().Struct(args); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid arguments: %v", err)), nil
 		}
 
 		// Parse template metadata if provided
 		var metadata models.JSON
-		templateMetadata := request.GetString("template_metadata", "")
-		if templateMetadata != "" {
-			if err := json.Unmarshal([]byte(templateMetadata), &metadata); err != nil {
+		if args.TemplateMetadata != "" {
+			if err := json.Unmarshal([]byte(args.TemplateMetadata), &metadata); err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid template_metadata JSON: %v", err)), nil
 			}
 
@@ -97,26 +114,34 @@ func NewCreateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 		}
 
 		// Validate chain type
-		if chainType != "ethereum" && chainType != "solana" {
+		if args.ChainType != "ethereum" && args.ChainType != "solana" {
 			return mcp.NewToolResultError("Invalid chain_type. Supported values: ethereum, solana"), nil
 		}
 
 		// Validate template code using Solidity compiler for Ethereum
 		var compilationResult *utils.CompilationResult
-		switch chainType {
+		switch args.ChainType {
 		case "ethereum":
-			// Replace Go template variables with dummy values for compilation validation
-			validationCode := utils.ReplaceTemplateVariables(templateCode)
+			// Render template with dummy values
+			validationCode, err := utils.RenderContractTemplate(args.TemplateCode, args.TemplateValues)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Error rendering template with provided values: %v", err)), nil
+			}
 
 			// Use Solidity version 0.8.20 for validation
 			result, err := utils.CompileSolidity("0.8.27", validationCode)
-			// check if the contract name is in the result
-			contract := result.Abi[contractName]
-			if contract == nil {
-				return mcp.NewToolResultError(fmt.Sprintf("Contract %s not found in the compilation result", contractName)), nil
-			}
 			if err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("Solidity compilation failed: %v", err)), nil
+				return mcp.NewToolResultError(fmt.Sprintf("Solidity compilation failed. Please fix the template code base on the error: %v", err)), nil
+			}
+			// check if the contract name is in the result
+			contract := result.Abi[args.ContractName]
+			if contract == nil {
+				availableContracts := ""
+				for name := range result.Abi {
+					availableContracts += name + ","
+				}
+				return mcp.NewToolResultError(fmt.Sprintf("Contract %s not found in the compilation result. Make sure the contract name matches the contract name defined in your code. "+
+					"AvailableContracts are: %s", args.ContractName, availableContracts)), nil
 			}
 			compilationResult = &result
 		case "solana":
@@ -125,15 +150,15 @@ func NewCreateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 
 		// Create template
 		template := &models.Template{
-			Name:         name,
-			Description:  description,
-			ChainType:    models.TransactionChainType(chainType),
-			ContractName: contractName,
-			TemplateCode: templateCode,
+			Name:         args.Name,
+			Description:  args.Description,
+			ChainType:    models.TransactionChainType(args.ChainType),
+			ContractName: args.ContractName,
+			TemplateCode: args.TemplateCode,
 			Metadata:     metadata,
 		}
 
-		if err := templateService.CreateTemplate(template); err != nil {
+		if err := c.templateService.CreateTemplate(template); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error creating template: %v", err)), nil
 		}
 
@@ -169,7 +194,7 @@ func NewCreateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 		successMessage := "Template created successfully"
 		if compilationResult != nil {
 			successMessage += " (Solidity compilation validated)"
-		} else if chainType == "solana" {
+		} else if args.ChainType == "solana" {
 			successMessage += " (Rust syntax validated)"
 		}
 
@@ -181,6 +206,4 @@ func NewCreateTemplateTool(templateService services.TemplateService) (mcp.Tool, 
 			},
 		}, nil
 	}
-
-	return tool, handler
 }

@@ -71,11 +71,11 @@ func (s *MCPServer) InitializeTools(dbService services.DBService, serverPort int
 	listTemplateTool, listTemplateHandler := tools.NewListTemplateTool(templateService)
 	srv.AddTool(listTemplateTool, listTemplateHandler)
 
-	createTemplateTool, createTemplateHandler := tools.NewCreateTemplateTool(templateService)
-	srv.AddTool(createTemplateTool, createTemplateHandler)
+	createTemplateToolInstance := tools.NewCreateTemplateTool(templateService)
+	srv.AddTool(createTemplateToolInstance.GetTool(), createTemplateToolInstance.GetHandler())
 
-	updateTemplateTool, updateTemplateHandler := tools.NewUpdateTemplateTool(templateService)
-	srv.AddTool(updateTemplateTool, updateTemplateHandler)
+	updateTemplateToolInstance := tools.NewUpdateTemplateTool(templateService)
+	srv.AddTool(updateTemplateToolInstance.GetTool(), updateTemplateToolInstance.GetHandler())
 
 	deleteTemplateTool, deleteTemplateHandler := tools.NewDeleteTemplateTool(templateService)
 	srv.AddTool(deleteTemplateTool, deleteTemplateHandler)

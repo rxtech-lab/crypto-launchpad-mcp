@@ -30,17 +30,13 @@ func VerifyTransactionOwnershipBySignature(rpcUrl, txHash, signature, message st
 	if signature == "" {
 		return false, fmt.Errorf("signature cannot be empty")
 	}
-
-	// Encode the message to hex format (same as ethers.js does)
-	encodedMessage := "0x" + hex.EncodeToString([]byte(message))
-
 	// Get transaction sender from blockchain
 	txSender, err := getTransactionSender(txHash, rpcUrl)
 	if err != nil {
 		return false, fmt.Errorf("failed to get transaction sender: %w", err)
 	}
 	// Verify the signature was created by the transaction sender
-	return verifyAddressWithMessage(signature, txSender, encodedMessage)
+	return verifyAddressWithMessage(signature, txSender, message)
 }
 
 // getAddressFromSignature recovers the Ethereum address from a signature and message

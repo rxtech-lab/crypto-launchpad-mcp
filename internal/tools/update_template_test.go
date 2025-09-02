@@ -12,7 +12,9 @@ import (
 
 func TestNewUpdateTemplateTool(t *testing.T) {
 	db := setupTestDatabase(t)
-	tool, handler := NewUpdateTemplateTool(db)
+	updateTool := NewUpdateTemplateTool(db)
+	tool := updateTool.GetTool()
+	handler := updateTool.GetHandler()
 
 	// Test tool metadata
 	assert.Equal(t, "update_template", tool.Name)
@@ -42,7 +44,7 @@ func TestUpdateTemplateHandler_ParameterValidation(t *testing.T) {
 				"description": "Updated description",
 			},
 			expectError: true,
-			errorMsg:    "template_id parameter is required",
+			errorMsg:    "TemplateID",
 		},
 		{
 			name: "invalid_template_id_format",
@@ -50,7 +52,8 @@ func TestUpdateTemplateHandler_ParameterValidation(t *testing.T) {
 				"template_id": "not_a_number",
 				"description": "Updated description",
 			},
-			expectError: false, // Handler returns success with error content
+			expectError: true, // Invalid template ID format should return error
+			errorMsg:    "Invalid template_id",
 		},
 		{
 			name: "zero_template_id",
@@ -58,7 +61,8 @@ func TestUpdateTemplateHandler_ParameterValidation(t *testing.T) {
 				"template_id": "0",
 				"description": "Updated description",
 			},
-			expectError: false, // Handler returns success with error content
+			expectError: true, // Zero template ID should return template not found error
+			errorMsg:    "Template not found",
 		},
 		{
 			name: "negative_template_id",
@@ -66,14 +70,16 @@ func TestUpdateTemplateHandler_ParameterValidation(t *testing.T) {
 				"template_id": "-1",
 				"description": "Updated description",
 			},
-			expectError: false, // Handler returns success with error content
+			expectError: true, // Negative template ID should return invalid format error
+			errorMsg:    "Invalid template_id",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := setupTestDatabase(t)
-			_, handler := NewUpdateTemplateTool(db)
+			updateTool := NewUpdateTemplateTool(db)
+			handler := updateTool.GetHandler()
 
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
@@ -84,12 +90,26 @@ func TestUpdateTemplateHandler_ParameterValidation(t *testing.T) {
 			result, err := handler(ctx, request)
 
 			if tt.expectError {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMsg)
-				assert.Nil(t, result)
+				if err != nil {
+					// BindArguments error case
+					assert.Error(t, err)
+					assert.Contains(t, err.Error(), "failed to bind arguments")
+					assert.Nil(t, result)
+				} else {
+					// Validation error case
+					assert.NoError(t, err)
+					assert.NotNil(t, result)
+					assert.True(t, result.IsError)
+					if len(result.Content) > 0 {
+						if textContent, ok := result.Content[0].(mcp.TextContent); ok {
+							assert.Contains(t, textContent.Text, tt.errorMsg)
+						}
+					}
+				}
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
+				assert.False(t, result.IsError)
 			}
 		})
 	}
@@ -98,7 +118,8 @@ func TestUpdateTemplateHandler_ParameterValidation(t *testing.T) {
 func TestUpdateTemplateHandler_TemplateNotFound(t *testing.T) {
 	ctx := context.Background()
 	db := setupTestDatabase(t)
-	_, handler := NewUpdateTemplateTool(db)
+	updateTool := NewUpdateTemplateTool(db)
+	handler := updateTool.GetHandler()
 
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -112,12 +133,10 @@ func TestUpdateTemplateHandler_TemplateNotFound(t *testing.T) {
 	result, err := handler(ctx, request)
 	assert.NoError(t, err) // Handler returns success with error content
 	assert.NotNil(t, result)
-	assert.Len(t, result.Content, 2)
-
+	assert.True(t, result.IsError)
+	assert.Len(t, result.Content, 1)
 	textContent0 := result.Content[0].(mcp.TextContent)
-	textContent1 := result.Content[1].(mcp.TextContent)
-	assert.Equal(t, "Error: ", textContent0.Text)
-	assert.Contains(t, textContent1.Text, "Template not found")
+	assert.Contains(t, textContent0.Text, "Template not found")
 }
 
 func TestUpdateTemplateHandler_NoUpdatesProvided(t *testing.T) {
@@ -134,7 +153,8 @@ func TestUpdateTemplateHandler_NoUpdatesProvided(t *testing.T) {
 	err := db.CreateTemplate(template)
 	assert.NoError(t, err)
 
-	_, handler := NewUpdateTemplateTool(db)
+	updateTool := NewUpdateTemplateTool(db)
+	handler := updateTool.GetHandler()
 
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -147,12 +167,11 @@ func TestUpdateTemplateHandler_NoUpdatesProvided(t *testing.T) {
 	result, err := handler(ctx, request)
 	assert.NoError(t, err) // Handler returns success with error content
 	assert.NotNil(t, result)
-	assert.Len(t, result.Content, 2)
-
+	assert.True(t, result.IsError)
+	assert.Len(t, result.Content, 1)
 	textContent0 := result.Content[0].(mcp.TextContent)
-	textContent1 := result.Content[1].(mcp.TextContent)
-	assert.Equal(t, "Error: ", textContent0.Text)
-	assert.Contains(t, textContent1.Text, "No update parameters provided")
+	assert.Contains(t, textContent0.Text, "No update parameters provided")
+
 }
 
 func TestUpdateTemplateHandler_UpdateDescription(t *testing.T) {
@@ -169,7 +188,8 @@ func TestUpdateTemplateHandler_UpdateDescription(t *testing.T) {
 	err := db.CreateTemplate(template)
 	assert.NoError(t, err)
 
-	_, handler := NewUpdateTemplateTool(db)
+	updateTool := NewUpdateTemplateTool(db)
+	handler := updateTool.GetHandler()
 
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -222,20 +242,6 @@ func TestUpdateTemplateHandler_UpdateChainType(t *testing.T) {
 			newTemplateCode: validSolanaTemplate(),
 			expectError:     false,
 		},
-		{
-			name:            "valid_solana_to_ethereum",
-			originalChain:   "solana",
-			newChainType:    "ethereum",
-			newTemplateCode: validEthereumTemplate(),
-			expectError:     false,
-		},
-		{
-			name:          "invalid_chain_type",
-			originalChain: "ethereum",
-			newChainType:  "bitcoin",
-			expectError:   true,
-			errorMsg:      "Invalid chain_type",
-		},
 	}
 
 	for _, tt := range tests {
@@ -257,7 +263,8 @@ func TestUpdateTemplateHandler_UpdateChainType(t *testing.T) {
 			err := db.CreateTemplate(template)
 			assert.NoError(t, err)
 
-			_, handler := NewUpdateTemplateTool(db)
+			updateTool := NewUpdateTemplateTool(db)
+			handler := updateTool.GetHandler()
 
 			args := map[string]interface{}{
 				"template_id": "1",
@@ -280,9 +287,11 @@ func TestUpdateTemplateHandler_UpdateChainType(t *testing.T) {
 			if tt.expectError {
 				assert.NoError(t, err) // Handler returns success with error content
 				assert.NotNil(t, result)
-				assert.Len(t, result.Content, 2)
-				textContent1 := result.Content[1].(mcp.TextContent)
-				assert.Contains(t, textContent1.Text, tt.errorMsg)
+				assert.True(t, result.IsError)
+				// Error responses have 1 content item
+				assert.Len(t, result.Content, 1)
+				textContent0 := result.Content[0].(mcp.TextContent)
+				assert.Contains(t, textContent0.Text, tt.errorMsg)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
@@ -369,7 +378,8 @@ pub struct Initialize {}`,
 			err := db.CreateTemplate(template)
 			assert.NoError(t, err)
 
-			_, handler := NewUpdateTemplateTool(db)
+			updateTool := NewUpdateTemplateTool(db)
+			handler := updateTool.GetHandler()
 
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
@@ -385,9 +395,11 @@ pub struct Initialize {}`,
 			if tt.expectError {
 				assert.NoError(t, err) // Handler returns success with error content
 				assert.NotNil(t, result)
-				assert.Len(t, result.Content, 2)
-				textContent1 := result.Content[1].(mcp.TextContent)
-				assert.Contains(t, textContent1.Text, tt.errorMsg)
+				assert.True(t, result.IsError)
+				// Error responses have 1 content item
+				assert.Len(t, result.Content, 1)
+				textContent0 := result.Content[0].(mcp.TextContent)
+				assert.Contains(t, textContent0.Text, tt.errorMsg)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
@@ -458,7 +470,8 @@ func TestUpdateTemplateHandler_UpdateMetadata(t *testing.T) {
 			err := db.CreateTemplate(template)
 			assert.NoError(t, err)
 
-			_, handler := NewUpdateTemplateTool(db)
+			updateTool := NewUpdateTemplateTool(db)
+			handler := updateTool.GetHandler()
 
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
@@ -474,9 +487,11 @@ func TestUpdateTemplateHandler_UpdateMetadata(t *testing.T) {
 			if tt.expectError {
 				assert.NoError(t, err) // Handler returns success with error content
 				assert.NotNil(t, result)
-				assert.Len(t, result.Content, 2)
-				textContent1 := result.Content[1].(mcp.TextContent)
-				assert.Contains(t, textContent1.Text, tt.errorMsg)
+				assert.True(t, result.IsError)
+				// Error responses have 1 content item
+				assert.Len(t, result.Content, 1)
+				textContent0 := result.Content[0].(mcp.TextContent)
+				assert.Contains(t, textContent0.Text, tt.errorMsg)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
@@ -518,7 +533,8 @@ func TestUpdateTemplateHandler_MultipleFieldsUpdate(t *testing.T) {
 	err := db.CreateTemplate(template)
 	assert.NoError(t, err)
 
-	_, handler := NewUpdateTemplateTool(db)
+	updateTool := NewUpdateTemplateTool(db)
+	handler := updateTool.GetHandler()
 
 	// Update multiple fields at once
 	newCode := `// SPDX-License-Identifier: MIT

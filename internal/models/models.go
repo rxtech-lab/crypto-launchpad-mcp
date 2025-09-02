@@ -26,10 +26,25 @@ func (j *JSON) Scan(value interface{}) error {
 		*j = nil
 		return nil
 	}
-	bytes, ok := value.([]byte)
-	if !ok {
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	case nil:
+		*j = nil
+		return nil
+	default:
 		return errors.New("type assertion to []byte failed")
 	}
+
+	if len(bytes) == 0 {
+		*j = nil
+		return nil
+	}
+
 	return json.Unmarshal(bytes, j)
 }
 

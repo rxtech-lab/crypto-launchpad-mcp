@@ -217,10 +217,9 @@ func TestSignatureUtilities(t *testing.T) {
 
 		// Create a signature for the current message
 		message := GenerateMessage()
-		hexMessage := "0x" + hex.EncodeToString([]byte(message))
 
 		// Sign the hex-encoded message (as the frontend would do)
-		hexMessageHash := accounts.TextHash([]byte(hexMessage))
+		hexMessageHash := accounts.TextHash([]byte(message))
 		signature, err := crypto.Sign(hexMessageHash, privateKey)
 		require.NoError(t, err)
 		signatureHex := "0x" + hex.EncodeToString(signature)
@@ -645,6 +644,15 @@ func TestSignatureUtilities(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestVerifyRealAddressWithSignature(t *testing.T) {
+	signature := "0x403163eee64372c6cc53777e08cd1360d61b7d7cb18f7390ad5089872de74d124865c46ec9c3c486b320f7450b25403c10587812623daa7eb1e57e7d2ad295b91c"
+	address := "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+	message := "I am signing into Launchpad at 1756811045"
+	verified, err := verifyAddressWithMessage(signature, address, message)
+	require.NoError(t, err)
+	assert.True(t, verified, "The signature should be valid for the given address and message")
 }
 
 // waitForTransaction waits for a transaction to be mined.

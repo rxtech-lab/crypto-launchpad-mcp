@@ -21,14 +21,15 @@ import (
 )
 
 type APIServer struct {
-	app           *fiber.App
-	dbService     services.DBService
-	txService     services.TransactionService
-	hookService   services.HookService
-	chainService  services.ChainService
-	mcpServer     *mcp.MCPServer
-	authenticator *utils.JwtAuthenticator
-	port          int
+	app                   *fiber.App
+	dbService             services.DBService
+	txService             services.TransactionService
+	hookService           services.HookService
+	chainService          services.ChainService
+	mcpServer             *mcp.MCPServer
+	authenticator         *utils.JwtAuthenticator
+	port                  int
+	authenticationEnabled bool
 }
 
 func NewAPIServer(dbService services.DBService, txService services.TransactionService, hookService services.HookService, chainService services.ChainService) *APIServer {
@@ -66,8 +67,6 @@ func NewAPIServer(dbService services.DBService, txService services.TransactionSe
 }
 
 func (s *APIServer) SetupRoutes() {
-	// oauth routes
-	s.app.Get("/.well-known/oauth-protected-resource/mcp", s.handleOAuthProtectedResource)
 	// Universal transaction signing routes
 	s.app.Get("/tx/:session_id", s.handleTransactionPage)
 	s.app.Post("/api/tx/:session_id/transaction/:index", s.handleTransactionAPI)
@@ -85,6 +84,11 @@ func (s *APIServer) SetupRoutes() {
 }
 
 func (s *APIServer) EnableAuthentication() {
+	// Set authentication enabled state
+	s.authenticationEnabled = true
+
+	// oauth routes
+	s.app.Get("/.well-known/oauth-protected-resource/mcp", s.handleOAuthProtectedResource)
 	// Add authentication middleware to all routes
 	s.app.Use(middleware.AuthMiddleware(middleware.AuthConfig{
 		SkipWellKnown: true,
@@ -101,8 +105,8 @@ func (s *APIServer) EnableAuthentication() {
 	}))
 }
 
-// EnableStreamableHttp enables the MCP Streamable HTTP server with authentication
-// on the /mcp and /mcp/* routes
+// EnableStreamableHttp enables the MCP Streamable HTTP server conditionally with authentication
+// on the /mcp and /mcp/* routes based on whether EnableAuthentication was called
 
 func (s *APIServer) EnableStreamableHttp() {
 	if s.mcpServer == nil {
@@ -112,11 +116,20 @@ func (s *APIServer) EnableStreamableHttp() {
 	// Start the streamable HTTP server
 	streamableServer := s.mcpServer.StartStreamableHTTPServer()
 
-	// Create a custom handler that extracts authentication and adds to context
-	authenticatedHandler := s.createAuthenticatedMCPHandler(streamableServer, s.authenticator)
+	// Create a custom handler based on authentication state
+	var mcpHandler fiber.Handler
+	if s.authenticationEnabled {
+		// Use authenticated handler if authentication was enabled
+		mcpHandler = s.createAuthenticatedMCPHandler(streamableServer, s.authenticator)
+		log.Println("MCP handlers enabled with authentication")
+	} else {
+		// Use unauthenticated handler if authentication was not enabled
+		mcpHandler = s.createUnauthenticatedMCPHandler(streamableServer)
+		log.Println("MCP handlers enabled without authentication")
+	}
 
-	s.app.All("/mcp", authenticatedHandler)
-	s.app.All("/mcp/*", authenticatedHandler)
+	s.app.All("/mcp", mcpHandler)
+	s.app.All("/mcp/*", mcpHandler)
 }
 
 // Start starts the server on a random available port
@@ -236,6 +249,21 @@ func (s *APIServer) createAuthenticatedMCPHandler(streamableServer *server.Strea
 			r = r.WithContext(ctx)
 
 			// Forward to the actual MCP streamable server
+			streamableServer.ServeHTTP(w, r)
+		})
+
+		// Use Fiber's adaptor to convert
+		return adaptor.HTTPHandler(httpHandler)(c)
+	}
+}
+
+// createUnauthenticatedMCPHandler creates a Fiber handler that does not enforce authentication
+// and passes the request directly to the MCP streamable HTTP server
+func (s *APIServer) createUnauthenticatedMCPHandler(streamableServer *server.StreamableHTTPServer) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Create a simple HTTP handler that forwards directly to MCP server
+		httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Forward to the actual MCP streamable server without authentication context
 			streamableServer.ServeHTTP(w, r)
 		})
 

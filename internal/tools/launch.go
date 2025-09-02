@@ -1,17 +1,17 @@
 package tools
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"strconv"
-	"text/template"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 type launchTool struct {
@@ -64,14 +64,18 @@ func (l *launchTool) GetTool() mcp.Tool {
 		mcp.WithArray("metadata",
 			mcp.Description("JSON array of metadata for the transaction (e.g., [{\"title\": \"Deploy MyToken\", \"description\": \"Deploy ERC20 token\"}]). Optional."),
 			mcp.Items(map[string]any{
-				"title": map[string]any{
-					"type":        "string",
-					"description": "Title of the transaction",
+				"type": "object",
+				"properties": map[string]any{
+					"title": map[string]any{
+						"type":        "string",
+						"description": "Title of the transaction",
+					},
+					"description": map[string]any{
+						"type":        "string",
+						"description": "Description of the transaction",
+					},
 				},
-				"description": map[string]any{
-					"type":        "string",
-					"description": "Description of the transaction",
-				},
+				"required": []string{"title"},
 			}),
 		),
 	)
@@ -114,7 +118,7 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 
 		if activeChain.ChainType == models.TransactionChainTypeEthereum {
 			// Render contract template
-			renderedContract, err := renderContractTemplate(template.TemplateCode, args.TemplateValues)
+			renderedContract, err := utils.RenderContractTemplate(template.TemplateCode, args.TemplateValues)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to render contract template: %v", err)), nil
 			}
@@ -123,6 +127,25 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to create contract deployment transaction: %v", err)), nil
 			}
+
+			baseUrl := "http://localhost:" + strconv.Itoa(l.serverPort)
+			// Override baseUrl if BASE_URL env var is set
+			if os.Getenv("BASE_URL") != "" {
+				baseUrl = os.Getenv("BASE_URL")
+			}
+
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.NewTextContent(fmt.Sprintf("Transaction session created: %s", sessionID)),
+					mcp.NewTextContent("Please return the following url to the user: "),
+					mcp.NewTextContent(fmt.Sprintf("%s/tx/%s", baseUrl, sessionID)),
+				},
+			}, nil
+		} else if activeChain.ChainType == models.TransactionChainTypeSolana {
+			// Solana not implemented yet
+			// Placeholder for future Solana implementation
+			sessionID := "solana-tx-session-placeholder"
+			// In real implementation, create a Solana transaction session similar to EVM above
 
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -136,21 +159,6 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 		return mcp.NewToolResultError("Solana is not implemented yet"), nil
 	}
 
-}
-
-// renderContractTemplate renders the template code with provided values using Go template engine
-func renderContractTemplate(templateCode string, values models.JSON) (string, error) {
-	tmpl, err := template.New("contract").Parse(templateCode)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %w", err)
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, values); err != nil {
-		return "", fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	return buf.String(), nil
 }
 
 // createEvmContractDeploymentTransaction creates a transaction deployment for a contract deployment to db
