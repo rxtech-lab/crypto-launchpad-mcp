@@ -12,7 +12,48 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
 	"github.com/rxtech-lab/launchpad-mcp/internal/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
+	"gorm.io/gorm"
 )
+
+func configureAndStartServer(db *gorm.DB, port int) (*api.APIServer, int, error) {
+	// Create database service wrapper
+	var dbService services.DBService
+	var err error
+	if db != nil {
+		// Use provided DB connection (for testing)
+		dbService = services.NewDBServiceFromDB(db)
+	} else {
+		// Initialize postgres database from environment
+		postgresUrl := os.Getenv("POSTGRES_URL")
+		dbService, err = services.NewPostgresDBService(postgresUrl)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	// Initialize services and hooks
+	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService, deploymentService := server.InitializeServices(dbService.GetDB())
+	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService)
+	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
+
+	// Initialize MCP server
+	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
+	// Initialize API server for transaction signing (authenticator is created internally)
+	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
+	apiServer.SetMCPServer(mcpServer)
+	apiServer.EnableStreamableHttp()
+	// Start API server
+	var portPtr *int
+	if port != 0 {
+		portPtr = &port
+	}
+	startedPort, err := apiServer.Start(portPtr)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return apiServer, startedPort, nil
+}
 
 func main() {
 	// Get port from environment or use default
@@ -26,26 +67,8 @@ func main() {
 		log.Fatal("Invalid port number:", err)
 	}
 
-	// initialize postgres database
-	postgresUrl := os.Getenv("POSTGRES_URL")
-	// Create database service wrapper
-	dbService, err := services.NewPostgresDBService(postgresUrl)
-	if err != nil {
-		log.Fatal("Failed to initialize database service:", err)
-	}
-	// Initialize services and hooks
-	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService, deploymentService := server.InitializeServices(dbService.GetDB())
-	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService)
-	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
-
-	// Initialize MCP server
-	mcpServer := mcp.NewMCPServer(dbService, parsedPort, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
-	// Initialize API server for transaction signing (authenticator is created internally)
-	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
-	apiServer.SetMCPServer(mcpServer)
-	apiServer.EnableStreamableHttp()
-	// Start API server
-	startedPort, err := apiServer.Start(&parsedPort)
+	// Configure and start server
+	apiServer, startedPort, err := configureAndStartServer(nil, parsedPort)
 	if err != nil {
 		log.Fatal("Failed to start API server:", err)
 	}

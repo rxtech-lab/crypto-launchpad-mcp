@@ -105,11 +105,8 @@ func (s *APIServer) EnableStreamableHttp() {
 			if s.authenticator != nil {
 				return s.authenticator.ValidateToken(token)
 			}
-			// Default validation when no authenticator is configured
-			if token == "" {
-				return nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid token")
-			}
-			return &utils.AuthenticatedUser{}, nil
+			// Default validation when no authenticator is configured - reject all tokens
+			return nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid token")
 		},
 	}))
 }
@@ -185,15 +182,30 @@ func (s *APIServer) createAuthenticatedMCPHandler(streamableServer *server.Strea
 
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
-			if token != "" && authenticator != nil {
-				// Validate token using JWT authenticator
-				if user, err := authenticator.ValidateToken(token); err == nil {
-					authenticatedUser = user
-					log.Printf("MCP request authenticated as user: %s", user.Sub)
+			if token != "" {
+				if authenticator != nil {
+					// Validate token using JWT authenticator
+					if user, err := authenticator.ValidateToken(token); err == nil {
+						authenticatedUser = user
+						log.Printf("MCP request authenticated as user: %s", user.Sub)
+					} else {
+						log.Printf("MCP authentication failed: %v", err)
+						return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+							"error": "Invalid token",
+						})
+					}
 				} else {
-					log.Printf("MCP authentication failed: %v", err)
+					// No authenticator configured - reject all tokens
+					return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+						"error": "Invalid token",
+					})
 				}
 			}
+		} else {
+			// No Authorization header or not Bearer token - reject
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Missing or invalid Bearer token",
+			})
 		}
 
 		// Create a custom HTTP handler that injects authentication context

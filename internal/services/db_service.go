@@ -59,6 +59,13 @@ func NewSqliteDBService(dbPath string) (DBService, error) {
 	return service, nil
 }
 
+// NewDBServiceFromDB creates a DBService from an existing GORM database connection
+func NewDBServiceFromDB(db *gorm.DB) DBService {
+	service := &dbService{db: db}
+	// Don't migrate since the database may already be migrated
+	return service
+}
+
 func NewPostgresDBService(dsn string) (DBService, error) {
 	// Configure GORM logger - only log errors and slow queries
 	gormLogger := logger.New(
