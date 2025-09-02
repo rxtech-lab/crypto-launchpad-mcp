@@ -76,6 +76,7 @@ func (s *APIServer) SetupRoutes() {
 	s.app.Get("/static/tx/app.css", s.handleSigningAppCSS)
 	// Test API for E2E testing
 	s.app.Post("/api/test/sign-transaction", s.handleTestSignTransaction)
+	s.app.Post("/api/test/personal-sign", s.handleTestPersonalSign)
 
 	// Health check
 	s.app.Get("/health", func(c *fiber.Ctx) error {

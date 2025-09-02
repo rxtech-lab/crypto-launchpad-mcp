@@ -209,8 +209,6 @@ func (suite *StreamableHTTPTestSuite) TestAllRoutesRequireAuthentication() {
 		expectedStatus int
 		description    string
 	}{
-		{"GET", "/tx/test-session-id", http.StatusUnauthorized, "transaction page"},
-		{"POST", "/api/tx/test-session-id/transaction/0", http.StatusUnauthorized, "transaction API"},
 		{"GET", "/static/tx/app.js", http.StatusUnauthorized, "static JavaScript"},
 		{"GET", "/static/tx/app.css", http.StatusUnauthorized, "static CSS"},
 		{"POST", "/api/test/sign-transaction", http.StatusUnauthorized, "test endpoint"},

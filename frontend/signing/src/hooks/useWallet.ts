@@ -327,6 +327,25 @@ export function useWallet() {
     [state.selectedProvider, state.account]
   );
 
+  // Sign message
+  const signMessage = useCallback(
+    async (message: string): Promise<string> => {
+      if (!state.selectedProvider || !state.account) {
+        throw new Error("No wallet connected");
+      }
+
+      const ethersProvider = new BrowserProvider(
+        state.selectedProvider.provider
+      );
+      const signer = await ethersProvider.getSigner();
+
+      // Use personal_sign method for message signing
+      const signature = await signer.signMessage(message);
+      return signature;
+    },
+    [state.selectedProvider, state.account]
+  );
+
   // Get signer
   const getSigner = useCallback(async (): Promise<Signer | null> => {
     if (!state.selectedProvider) return null;
@@ -347,6 +366,7 @@ export function useWallet() {
     disconnectWallet,
     switchNetwork,
     signTransaction,
+    signMessage,
     getSigner,
     discoverWallets,
     networkSwitchError,

@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 // TestSignTransactionRequest represents a request to sign a transaction for testing
@@ -316,4 +317,42 @@ func (s *APIServer) executeETHTransfer(client *ethclient.Client, auth *bind.Tran
 
 	log.Printf("ETH transfer sent: %s", signedTx.Hash().Hex())
 	return signedTx.Hash().Hex(), nil
+}
+
+// TestPersonalSignRequest represents a request to personal sign a message for testing
+type TestPersonalSignRequest struct {
+	PrivateKey string `json:"privateKey"`
+	Message    string `json:"message"`
+}
+
+// TestPersonalSignResponse represents the response from personal signing
+type TestPersonalSignResponse struct {
+	Success   bool   `json:"success"`
+	Signature string `json:"signature,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// handleTestPersonalSign handles personal message signing for E2E tests
+func (s *APIServer) handleTestPersonalSign(c *fiber.Ctx) error {
+	var req TestPersonalSignRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(TestPersonalSignResponse{
+			Success: false,
+			Error:   "Invalid request body",
+		})
+	}
+
+	// Use the new PersonalSignFromHex utility
+	signature, err := utils.PersonalSignFromHex(req.Message, req.PrivateKey)
+	if err != nil {
+		return c.Status(400).JSON(TestPersonalSignResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+	}
+
+	return c.JSON(TestPersonalSignResponse{
+		Success:   true,
+		Signature: signature,
+	})
 }
