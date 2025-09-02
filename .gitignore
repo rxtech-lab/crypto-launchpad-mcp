@@ -72,4 +72,3 @@ secrets.yaml
 # Test coverage output
 coverage.out
 *.coverprofile
-

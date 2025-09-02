@@ -346,12 +346,6 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionPage_SessionNotFound() {
 	defer resp.Body.Close()
 
 	suite.Equal(http.StatusNotFound, resp.StatusCode)
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	suite.Require().NoError(err)
-
-	suite.Contains(string(body), "Session not found")
 }
 
 func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_Success() {

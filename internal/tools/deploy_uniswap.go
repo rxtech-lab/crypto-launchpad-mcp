@@ -143,6 +143,8 @@ func (d *deployUniswapTool) createUniswapV2DeploymentSession(activeChain *models
 			return mcp.NewToolResultError(fmt.Sprintf("Error creating Uniswap deployment record: %v", createErr)), nil
 		}
 		uniswapDeployment.ID = createdDeploymentId
+	} else {
+		uniswapDeployment = existingDeployment
 	}
 
 	// Get Uniswap V2 contracts

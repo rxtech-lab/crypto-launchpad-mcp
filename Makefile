@@ -53,6 +53,18 @@ binaries: build-frontend
 test:
 	go test -v -p 1 -cover ./...
 
+# Run tests with coverage output for codecov
+test-coverage:
+	go test -v -p 1 -race -coverprofile=coverage.out -covermode=atomic ./...
+
+# Upload coverage to codecov (requires CODECOV_TOKEN)
+test-coverage-upload: test-coverage
+	@if command -v codecov >/dev/null 2>&1; then \
+		codecov -f coverage.out; \
+	else \
+		curl -s https://codecov.io/bash | bash -s -- -f coverage.out; \
+	fi
+
 # Run the MCP server directly (no build)
 run:
 	go run ./cmd/stdio/main.go
@@ -79,6 +91,7 @@ package: build
 clean: clean-frontend
 	@echo "Cleaning build artifacts..."
 	rm -rf $(BUILD_DIR)/
+	rm -f coverage.out
 	sudo rm -rf /usr/local/bin/$(BINARY_NAME) 2>/dev/null || true
 	go clean
 

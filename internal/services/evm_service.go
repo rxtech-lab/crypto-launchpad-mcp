@@ -37,11 +37,12 @@ func (s *evmService) GetContractDeploymentTransactionWithContractCode(args Contr
 	}
 
 	return models.TransactionDeployment{
-		Data:        txData,
-		Title:       args.Title,
-		Description: args.Description,
-		Value:       args.Value,
-		Receiver:    args.Receiver,
+		Data:            txData,
+		Title:           args.Title,
+		Description:     args.Description,
+		Value:           args.Value,
+		Receiver:        args.Receiver,
+		TransactionType: args.TransactionType,
 	}, nil
 }
 
@@ -58,11 +59,12 @@ func (s *evmService) GetContractDeploymentTransactionWithBytecodeAndAbi(args Con
 	}
 
 	return models.TransactionDeployment{
-		Data:        txData,
-		Title:       args.Title,
-		Description: args.Description,
-		Value:       args.Value,
-		Receiver:    args.Receiver,
+		Data:            txData,
+		Title:           args.Title,
+		Description:     args.Description,
+		Value:           args.Value,
+		Receiver:        args.Receiver,
+		TransactionType: args.TransactionType,
 	}, nil
 }
 

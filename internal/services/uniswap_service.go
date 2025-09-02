@@ -49,9 +49,6 @@ func (u *uniswapService) UpdateStatus(deploymentID uint, status models.Transacti
 		if deployment.WETHAddress == "" {
 			missingAddresses = append(missingAddresses, "weth_address")
 		}
-		if deployment.DeployerAddress == "" {
-			missingAddresses = append(missingAddresses, "deployer_address")
-		}
 
 		if len(missingAddresses) > 0 {
 			return errors.New("cannot confirm deployment with missing addresses: " +

@@ -33,11 +33,27 @@ func (u *UniswapDeploymentHook) OnTransactionConfirmed(txType models.Transaction
 
 	switch txType {
 	case models.TransactionTypeUniswapV2TokenDeployment:
-		return u.uniswapService.UpdateFactoryAddress(currentDeployment.ID, contractAddress)
+		if err := u.uniswapService.UpdateWETHAddress(currentDeployment.ID, contractAddress); err != nil {
+			return err
+		}
 	case models.TransactionTypeUniswapV2FactoryDeployment:
-		return u.uniswapService.UpdateFactoryAddress(currentDeployment.ID, contractAddress)
+		if err := u.uniswapService.UpdateFactoryAddress(currentDeployment.ID, contractAddress); err != nil {
+			return err
+		}
 	case models.TransactionTypeUniswapV2RouterDeployment:
-		return u.uniswapService.UpdateRouterAddress(currentDeployment.ID, contractAddress)
+		if err := u.uniswapService.UpdateRouterAddress(currentDeployment.ID, contractAddress); err != nil {
+			return err
+		}
+	}
+
+	// Check if all three addresses are now set, and if so, mark deployment as confirmed
+	updatedDeployment, err := u.uniswapService.GetUniswapDeployment(currentDeployment.ID)
+	if err != nil {
+		return err
+	}
+
+	if updatedDeployment.WETHAddress != "" && updatedDeployment.FactoryAddress != "" && updatedDeployment.RouterAddress != "" {
+		return u.uniswapService.UpdateStatus(currentDeployment.ID, models.TransactionStatusConfirmed)
 	}
 
 	return nil
