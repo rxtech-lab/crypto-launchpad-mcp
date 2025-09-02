@@ -16,7 +16,7 @@ type MCPServer struct {
 	dbService services.DBService
 }
 
-func NewMCPServer(dbService services.DBService, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService, chainService services.ChainService, templateService services.TemplateService, uniswapSettingsService services.UniswapSettingsService, deploymentService *services.DeploymentService) *MCPServer {
+func NewMCPServer(dbService services.DBService, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService, chainService services.ChainService, templateService services.TemplateService, uniswapSettingsService services.UniswapSettingsService, deploymentService services.DeploymentService) *MCPServer {
 	mcpServer := &MCPServer{
 		dbService: dbService,
 	}
@@ -24,7 +24,7 @@ func NewMCPServer(dbService services.DBService, serverPort int, evmService servi
 	return mcpServer
 }
 
-func (s *MCPServer) InitializeTools(dbService services.DBService, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService, chainService services.ChainService, templateService services.TemplateService, uniswapSettingsService services.UniswapSettingsService, deploymentService *services.DeploymentService) {
+func (s *MCPServer) InitializeTools(dbService services.DBService, serverPort int, evmService services.EvmService, txService services.TransactionService, uniswapService services.UniswapService, liquidityService services.LiquidityService, chainService services.ChainService, templateService services.TemplateService, uniswapSettingsService services.UniswapSettingsService, deploymentService services.DeploymentService) {
 	srv := server.NewMCPServer(
 		"Crypto Launchpad MCP Server",
 		"1.0.0",
@@ -81,7 +81,7 @@ func (s *MCPServer) InitializeTools(dbService services.DBService, serverPort int
 	srv.AddTool(deleteTemplateTool, deleteTemplateHandler)
 
 	// Deployment Tools
-	launchTool := tools.NewLaunchTool(templateService, chainService, serverPort, evmService, txService)
+	launchTool := tools.NewLaunchTool(templateService, chainService, serverPort, evmService, txService, deploymentService)
 	srv.AddTool(launchTool.GetTool(), launchTool.GetHandler())
 
 	listDeploymentsTool, listDeploymentsHandler := tools.NewListDeploymentsTool(deploymentService)

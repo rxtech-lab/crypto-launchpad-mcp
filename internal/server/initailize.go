@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func InitializeServices(db *gorm.DB) (services.EvmService, services.TransactionService, services.UniswapService, services.LiquidityService, services.HookService, services.ChainService, services.TemplateService, services.UniswapSettingsService, *services.DeploymentService) {
+func InitializeServices(db *gorm.DB) (services.EvmService, services.TransactionService, services.UniswapService, services.LiquidityService, services.HookService, services.ChainService, services.TemplateService, services.UniswapSettingsService, services.DeploymentService) {
 	evmService := services.NewEvmService()
 	txService := services.NewTransactionService(db)
 	uniswapService := services.NewUniswapService(db)
@@ -22,8 +22,8 @@ func InitializeServices(db *gorm.DB) (services.EvmService, services.TransactionS
 	return evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService, deploymentService
 }
 
-func InitializeHooks(db *gorm.DB, hookService services.HookService, uniswapService services.UniswapService) (services.Hook, services.Hook) {
-	tokenDeploymentHook := hooks.NewTokenDeploymentHook(db)
+func InitializeHooks(db *gorm.DB, hookService services.HookService, uniswapService services.UniswapService, deploymentService services.DeploymentService) (services.Hook, services.Hook) {
+	tokenDeploymentHook := hooks.NewTokenDeploymentHook(deploymentService)
 	uniswapDeploymentHook := hooks.NewUniswapDeploymentHook(db, uniswapService)
 
 	return tokenDeploymentHook, uniswapDeploymentHook

@@ -12,7 +12,7 @@ import (
 type TokenDeploymentHookTestSuite struct {
 	suite.Suite
 	dbService         services.DBService
-	deploymentService *services.DeploymentService
+	deploymentService services.DeploymentService
 	templateService   services.TemplateService
 	chainService      services.ChainService
 	hook              *TokenDeploymentHook
@@ -30,7 +30,9 @@ func (s *TokenDeploymentHookTestSuite) SetupSuite() {
 	s.chainService = services.NewChainService(db.GetDB())
 
 	// Create hook instance
-	s.hook = &TokenDeploymentHook{db: db.GetDB()}
+	s.hook = &TokenDeploymentHook{
+		deploymentService: s.deploymentService,
+	}
 
 	// Setup test data
 	s.setupTestData()
@@ -88,9 +90,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_TokenDeploymen
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Test Token",
-		TokenSymbol:     "TST",
+		Status:          models.TransactionStatusPending,
 		CreatedAt:       time.Now(),
 	}
 
@@ -129,9 +129,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2Token
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Uniswap Token",
-		TokenSymbol:     "UNI",
+		Status:          models.TransactionStatusPending,
 		CreatedAt:       time.Now(),
 	}
 
@@ -194,9 +192,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_EmptyContractA
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Test Token",
-		TokenSymbol:     "TST",
+		Status:          models.TransactionStatusPending,
 		CreatedAt:       time.Now(),
 	}
 
@@ -236,18 +232,14 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: txHash,
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Test Token 1",
-		TokenSymbol:     "TST1",
+		Status:          models.TransactionStatusPending,
 		CreatedAt:       time.Now(),
 	}
 	deployment2 := &models.Deployment{
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: txHash,
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Test Token 2",
-		TokenSymbol:     "TST2",
+		Status:          models.TransactionStatusPending,
 		CreatedAt:       time.Now(),
 	}
 
@@ -288,7 +280,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 
 func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 	// Test constructor function
-	hook := NewTokenDeploymentHook(s.dbService.GetDB())
+	hook := NewTokenDeploymentHook(s.deploymentService)
 	s.NotNil(hook)
 
 	// Verify it implements the Hook interface
@@ -301,9 +293,7 @@ func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: "0x2222222222222222222222222222222222222222222222222222222222222222",
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Constructor Test Token",
-		TokenSymbol:     "CTT",
+		Status:          models.TransactionStatusPending,
 		CreatedAt:       time.Now(),
 	}
 
@@ -339,9 +329,7 @@ func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: "0x3333333333333333333333333333333333333333333333333333333333333333",
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Integrity Test Token",
-		TokenSymbol:     "ITT",
+		Status:          models.TransactionStatusPending,
 		CreatedAt:       time.Now(),
 	}
 

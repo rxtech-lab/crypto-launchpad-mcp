@@ -15,11 +15,12 @@ import (
 )
 
 type launchTool struct {
-	templateService services.TemplateService
-	chainService    services.ChainService
-	evmService      services.EvmService
-	txService       services.TransactionService
-	serverPort      int
+	templateService   services.TemplateService
+	chainService      services.ChainService
+	evmService        services.EvmService
+	txService         services.TransactionService
+	deploymentService services.DeploymentService
+	serverPort        int
 }
 
 type LaunchArguments struct {
@@ -33,13 +34,14 @@ type LaunchArguments struct {
 	Metadata        []models.TransactionMetadata `json:"metadata,omitempty"`
 }
 
-func NewLaunchTool(templateService services.TemplateService, chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService) *launchTool {
+func NewLaunchTool(templateService services.TemplateService, chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService, deploymentService services.DeploymentService) *launchTool {
 	return &launchTool{
-		templateService: templateService,
-		chainService:    chainService,
-		evmService:      evmService,
-		txService:       txService,
-		serverPort:      serverPort,
+		templateService:   templateService,
+		chainService:      chainService,
+		evmService:        evmService,
+		txService:         txService,
+		serverPort:        serverPort,
+		deploymentService: deploymentService,
 	}
 }
 
@@ -121,7 +123,7 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 
 		// validate template values contain all required sample keys
 		if err := utils.CheckSampleKeysMatch(template.SampleTemplateValues, args.TemplateValues); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Template values validation failed: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("Template values validation failed, make sure your template values matches %s", template.SampleTemplateValues)), nil
 		}
 
 		if activeChain.ChainType == models.TransactionChainTypeEthereum {
@@ -131,7 +133,7 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to render contract template: %v", err)), nil
 			}
 
-			sessionID, err := l.createEvmContractDeploymentTransaction(activeChain, args.Metadata, renderedContract, template.ContractName, args.ConstructorArgs, args.Value, "Deploy Contract", "Deploy contract to the active chain")
+			sessionID, err := l.createEvmContractDeploymentTransaction(activeChain, args.Metadata, renderedContract, template.ContractName, args.ConstructorArgs, args.Value, "Deploy Contract", "Deploy contract to the active chain", template.ID, args.TemplateValues)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to create contract deployment transaction: %v", err)), nil
 			}
@@ -178,7 +180,7 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 // value is the value of the transaction that needs to be sent. 0 means no value is needed.
 // title is the title of the transaction
 // description is the description of the transaction
-func (l *launchTool) createEvmContractDeploymentTransaction(activeChain *models.Chain, metadata []models.TransactionMetadata, renderedContract string, contractName string, args []any, value string, title string, description string) (string, error) {
+func (l *launchTool) createEvmContractDeploymentTransaction(activeChain *models.Chain, metadata []models.TransactionMetadata, renderedContract string, contractName string, args []any, value string, title string, description string, templateId uint, templateValues models.JSON) (string, error) {
 	tx, err := l.evmService.GetContractDeploymentTransactionWithContractCode(services.ContractDeploymentWithContractCodeTransactionArgs{
 		ContractCode:    renderedContract,
 		ContractName:    contractName,
@@ -202,6 +204,21 @@ func (l *launchTool) createEvmContractDeploymentTransaction(activeChain *models.
 
 	if err != nil {
 		return "", fmt.Errorf("failed to create transaction session: %w", err)
+	}
+
+	// create a deployment
+	err = l.deploymentService.CreateDeployment(
+		&models.Deployment{
+			ChainID:        activeChain.ID,
+			TemplateID:     templateId,
+			Status:         models.TransactionStatusPending,
+			TemplateValues: templateValues,
+			SessionId:      sessionID,
+		},
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to create deployment: %w", err)
 	}
 
 	return sessionID, nil

@@ -10,7 +10,7 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewMonitorPoolTool(chainService services.ChainService, liquidityService services.LiquidityService, deploymentService *services.DeploymentService) (mcp.Tool, server.ToolHandlerFunc) {
+func NewMonitorPoolTool(chainService services.ChainService, liquidityService services.LiquidityService, deploymentService services.DeploymentService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("monitor_pool",
 		mcp.WithDescription("Real-time pool monitoring and event tracking. Returns current pool status, recent transactions, and activity metrics. This is a read-only operation."),
 		mcp.WithString("token_address",
@@ -151,8 +151,6 @@ func NewMonitorPoolTool(chainService services.ChainService, liquidityService ser
 			if deployment.ContractAddress == tokenAddress {
 				tokenDeployment = map[string]interface{}{
 					"id":               deployment.ID,
-					"token_name":       deployment.TokenName,
-					"token_symbol":     deployment.TokenSymbol,
 					"deployer_address": deployment.DeployerAddress,
 					"transaction_hash": deployment.TransactionHash,
 					"status":           deployment.Status,

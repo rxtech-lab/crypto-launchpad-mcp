@@ -8,10 +8,11 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 )
 
-func NewListDeploymentsTool(deploymentService *services.DeploymentService) (mcp.Tool, server.ToolHandlerFunc) {
+func NewListDeploymentsTool(deploymentService services.DeploymentService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("list_deployments",
 		mcp.WithDescription("List all token deployments with pagination support and filtering options including status, contract addresses, and transaction hashes."),
 		mcp.WithString("status",
@@ -63,7 +64,7 @@ func NewListDeploymentsTool(deploymentService *services.DeploymentService) (mcp.
 		var filteredDeployments []interface{}
 		for _, deployment := range deployments {
 			// Apply status filter
-			if status != "" && deployment.Status != status {
+			if status != "" && deployment.Status != models.TransactionStatus(status) {
 				continue
 			}
 
@@ -77,8 +78,6 @@ func NewListDeploymentsTool(deploymentService *services.DeploymentService) (mcp.
 				"id":               deployment.ID,
 				"template_id":      deployment.TemplateID,
 				"contract_address": deployment.ContractAddress,
-				"token_name":       deployment.TokenName,
-				"token_symbol":     deployment.TokenSymbol,
 				"chain_id":         deployment.ChainID,
 				"chain":            deployment.Chain,
 				"deployer_address": deployment.DeployerAddress,
