@@ -139,6 +139,11 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 			updates = append(updates, "metadata")
 		}
 
+		if args.TemplateValues != nil {
+			template.SampleTemplateValues = args.TemplateValues
+			updates = append(updates, "sample_template_values")
+		}
+
 		// Update template code if provided
 		if args.TemplateCode != "" {
 			// Use the current or new chain type for validation
@@ -151,16 +156,6 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 			if validationChainType == "ethereum" {
 				// For validation, use dummy values if TemplateValues not provided
 				templateValues := args.TemplateValues
-				if templateValues == nil {
-					templateValues = map[string]interface{}{
-						"TokenName":     "TestToken",
-						"TokenSymbol":   "TST",
-						"InitialSupply": "1000",
-						"Supply":        "1000",
-						"Owner":         "msg.sender",
-					}
-				}
-
 				renderedCode, err := utils.RenderContractTemplate(args.TemplateCode, templateValues)
 				if err != nil {
 					return mcp.NewToolResultError(fmt.Sprintf("Error rendering template: %v", err)), nil

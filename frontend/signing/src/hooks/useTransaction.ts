@@ -95,7 +95,7 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
 
   // Execute transaction
   const executeTransaction = useCallback(
-    async (index: number, signTransaction: (tx: any) => Promise<any>, signMessage?: (message: string) => Promise<string>) => {
+    async (index: number, signTransaction: (tx: any) => Promise<any>) => {
       if (!state.session) {
         throw new Error("No session loaded");
       }
@@ -132,26 +132,6 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
             return newMap;
           });
         }
-
-        // Generate signature for ownership verification if signMessage is provided
-        let signature = "";
-        let signedMessage = "";
-        if (signMessage) {
-          try {
-            // Get the signing message from meta tag
-            const messageMetaTag = document.querySelector('meta[name="signing-message"]');
-            let message = "Default signing message"; // fallback
-            if (messageMetaTag) {
-              message = messageMetaTag.getAttribute("content") || message;
-            }
-            signedMessage = message; // Store the message that was signed
-            signature = await signMessage(message);
-          } catch (signError) {
-            console.warn("Failed to generate signature for ownership verification:", signError);
-            // Continue without signature - backend will log warning
-          }
-        }
-
         // Update session status on backend
         if (state.session.id) {
           await fetch(`/api/tx/${state.session.id}/transaction/${index}`, {
@@ -161,8 +141,6 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
               status: receipt.status === 1 ? "confirmed" : "failed",
               transactionHash: receipt.hash,
               contractAddress: receipt.contractAddress,
-              signature: signature,
-              signedMessage: signedMessage,
             }),
           });
         }
@@ -178,7 +156,7 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
 
   // Execute all transactions sequentially
   const executeAllTransactions = useCallback(
-    async (signTransaction: (tx: any) => Promise<any>, signMessage?: (message: string) => Promise<string>) => {
+    async (signTransaction: (tx: any) => Promise<any>) => {
       if (!state.session) {
         throw new Error("No session loaded");
       }
@@ -189,7 +167,7 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
         const results = [];
         for (let i = 0; i < state.session.transaction_deployments.length; i++) {
           setState((prev) => ({ ...prev, currentIndex: i }));
-          const receipt = await executeTransaction(i, signTransaction, signMessage);
+          const receipt = await executeTransaction(i, signTransaction);
           results.push(receipt);
         }
 

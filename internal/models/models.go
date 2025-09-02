@@ -69,12 +69,13 @@ type Template struct {
 	ChainType   TransactionChainType `gorm:"not null" json:"chain_type"` // ethereum, solana
 	// ContractName is the name of the contract to be deployed.
 	// Sometimes the template code contains multiple contracts, so we need to specify the name of the contract to be deployed.
-	ContractName string         `gorm:"not null" json:"contract_name"`
-	TemplateCode string         `gorm:"type:text;not null" json:"template_code"`
-	Metadata     JSON           `gorm:"type:text" json:"metadata"` // Template parameter definitions (key: empty value pairs)
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+	ContractName         string         `gorm:"not null" json:"contract_name"`
+	TemplateCode         string         `gorm:"type:text;not null" json:"template_code"`
+	Metadata             JSON           `gorm:"type:text" json:"metadata"` // Template parameter definitions (key: empty value pairs)
+	SampleTemplateValues JSON           `gorm:"type:text" json:"sample_template_values"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	DeletedAt            gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // Deployment represents deployed token contracts

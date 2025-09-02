@@ -11,18 +11,27 @@ import (
 )
 
 func EncodeContractConstructorArgs(abiJSON string, args []any) ([]byte, error) {
-	if len(args) == 0 {
-		return []byte{}, nil
-	}
-
 	parsedABI, err := abi.JSON(strings.NewReader(abiJSON))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
 
 	constructor := parsedABI.Constructor
-	// Check if constructor exists by checking if it has inputs
-	// In go-ethereum, Constructor is always present but may have empty inputs
+
+	// Check if constructor requires arguments but none provided
+	if len(constructor.Inputs) > 0 && len(args) == 0 {
+		return nil, fmt.Errorf("contract constructor requires %d arguments but none provided", len(constructor.Inputs))
+	}
+
+	// If no constructor arguments required and none provided, return empty
+	if len(constructor.Inputs) == 0 && len(args) == 0 {
+		return []byte{}, nil
+	}
+
+	// If no arguments provided (already handled above), return empty
+	if len(args) == 0 {
+		return []byte{}, nil
+	}
 
 	processedArgs, err := processConstructorArgs(constructor.Inputs, args)
 	if err != nil {
@@ -204,4 +213,32 @@ func BuildDeploymentTransactionData(bytecode string, encodedConstructorArgs []by
 
 	txData := bytecode + hex.EncodeToString(encodedConstructorArgs)
 	return "0x" + txData
+}
+
+func CheckSampleKeysMatch(sampleMaps, currentMaps map[string]any) error {
+	for key, sampleValue := range sampleMaps {
+		currentValue, exists := currentMaps[key]
+		if !exists {
+			return fmt.Errorf("key %s missing in current maps", key)
+		}
+
+		sampleType := fmt.Sprintf("%T", sampleValue)
+		currentType := fmt.Sprintf("%T", currentValue)
+
+		if sampleType != currentType {
+			return fmt.Errorf("type mismatch for key %s: expected %s, got %s", key, sampleType, currentType)
+		}
+
+		// If the value is a nested map, recurse
+		if sampleMap, ok := sampleValue.(map[string]any); ok {
+			currentMap, ok := currentValue.(map[string]any)
+			if !ok {
+				return fmt.Errorf("type mismatch for key %s: expected map, got %T", key, currentValue)
+			}
+			if err := CheckSampleKeysMatch(sampleMap, currentMap); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

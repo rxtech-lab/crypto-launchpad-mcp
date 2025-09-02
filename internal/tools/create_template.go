@@ -150,12 +150,13 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 
 		// Create template
 		template := &models.Template{
-			Name:         args.Name,
-			Description:  args.Description,
-			ChainType:    models.TransactionChainType(args.ChainType),
-			ContractName: args.ContractName,
-			TemplateCode: args.TemplateCode,
-			Metadata:     metadata,
+			Name:                 args.Name,
+			Description:          args.Description,
+			ChainType:            models.TransactionChainType(args.ChainType),
+			ContractName:         args.ContractName,
+			TemplateCode:         args.TemplateCode,
+			SampleTemplateValues: args.TemplateValues,
+			Metadata:             metadata,
 		}
 
 		if err := c.templateService.CreateTemplate(template); err != nil {

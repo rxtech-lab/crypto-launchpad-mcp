@@ -41,6 +41,10 @@ func (s *APIServer) handleTransactionPage(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).SendString("Session not found")
 	}
 
+	if session.TransactionStatus == models.TransactionStatusConfirmed {
+		return c.Status(fiber.StatusNotAcceptable).SendString("Transaction already confirmed")
+	}
+
 	// Prepare template data
 	data := map[string]interface{}{
 		"SessionID": sessionID,
@@ -114,6 +118,7 @@ func (s *APIServer) handleTransactionAPI(c *fiber.Ctx) error {
 
 	allConfirmed := true
 	session.TransactionDeployments[parsedIndex].Status = models.TransactionStatusConfirmed
+	deployment := &session.TransactionDeployments[parsedIndex]
 
 	// if all deployments are confirmed, update the session status
 	for _, deployment := range session.TransactionDeployments {
@@ -134,12 +139,10 @@ func (s *APIServer) handleTransactionAPI(c *fiber.Ctx) error {
 			"error": "Failed to update session",
 		})
 	}
-
 	// use hook
-	if err := s.hookService.OnTransactionConfirmed(models.TransactionTypeUniswapV2FactoryDeployment, body.TransactionHash, *body.ContractAddress, *session); err != nil {
+	if err := s.hookService.OnTransactionConfirmed(deployment.TransactionType, body.TransactionHash, *body.ContractAddress, *session); err != nil {
 		log.Printf("Error on transaction confirmed: %v", err)
 	}
-
 	// Return the session data as JSON
 	return c.JSON(body)
 }

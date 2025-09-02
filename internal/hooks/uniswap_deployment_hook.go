@@ -43,8 +43,9 @@ func (u *UniswapDeploymentHook) OnTransactionConfirmed(txType models.Transaction
 	return nil
 }
 
-func NewUniswapDeploymentHook(db *gorm.DB) services.Hook {
+func NewUniswapDeploymentHook(db *gorm.DB, uniswapService services.UniswapService) services.Hook {
 	return &UniswapDeploymentHook{
-		db: db,
+		db:             db,
+		uniswapService: uniswapService,
 	}
 }
