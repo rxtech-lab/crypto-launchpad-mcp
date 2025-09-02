@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -364,12 +365,22 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_Success() {
 	txHash, contractAddress, err := suite.deployTestContract()
 	suite.Require().NoError(err)
 
+	// Generate a consistent signing message and create signature
+	// The frontend signs the hex-encoded message but sends the original message to backend
+	originalMessage := "I am signing into Launchpad at 1234567890"
+	hexEncodedMessage := "0x" + hex.EncodeToString([]byte(originalMessage))
+	signature, err := utils.PersonalSignFromHex(hexEncodedMessage, TESTING_PK_1)
+	suite.Require().NoError(err)
+	signedMessage := originalMessage // Backend receives the original message
+
 	// Test the transaction API endpoint
 	contractAddrStr := contractAddress.Hex()
 	requestBody := TransactionCompleteRequest{
 		TransactionHash: txHash.Hex(),
 		Status:          models.TransactionStatusConfirmed,
 		ContractAddress: &contractAddrStr,
+		SignedMessage:   signedMessage,
+		Signature:       signature,
 	}
 
 	resp, err := suite.makeRequest("POST", fmt.Sprintf("/api/tx/%s/transaction/0", sessionID), requestBody)
@@ -406,9 +417,18 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_InvalidTransactionHash
 	// Use an invalid transaction hash
 	invalidTxHash := "0x1234567890123456789012345678901234567890123456789012345678901234"
 
+	// Generate signing message and create signature (even though tx is invalid)
+	originalMessage := "I am signing into Launchpad at 1234567890"
+	hexEncodedMessage := "0x" + hex.EncodeToString([]byte(originalMessage))
+	signature, err := utils.PersonalSignFromHex(hexEncodedMessage, TESTING_PK_1)
+	suite.Require().NoError(err)
+	signedMessage := originalMessage // Backend receives the original message
+
 	requestBody := TransactionCompleteRequest{
 		TransactionHash: invalidTxHash,
 		Status:          models.TransactionStatusConfirmed,
+		SignedMessage:   signedMessage,
+		Signature:       signature,
 	}
 
 	resp, err := suite.makeRequest("POST", fmt.Sprintf("/api/tx/%s/transaction/0", sessionID), requestBody)
@@ -434,9 +454,19 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_InvalidTransactionHash
 func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_SessionNotFound() {
 	nonExistentSessionID := uuid.New().String()
 
+	// Generate a consistent signing message and create signature
+	// The frontend signs the hex-encoded message but sends the original message to backend
+	originalMessage := "I am signing into Launchpad at 1234567890"
+	hexEncodedMessage := "0x" + hex.EncodeToString([]byte(originalMessage))
+	signature, err := utils.PersonalSignFromHex(hexEncodedMessage, TESTING_PK_1)
+	suite.Require().NoError(err)
+	signedMessage := originalMessage // Backend receives the original message
+
 	requestBody := TransactionCompleteRequest{
 		TransactionHash: "0x1234567890123456789012345678901234567890123456789012345678901234",
 		Status:          models.TransactionStatusConfirmed,
+		SignedMessage:   signedMessage,
+		Signature:       signature,
 	}
 
 	resp, err := suite.makeRequest("POST", fmt.Sprintf("/api/tx/%s/transaction/0", nonExistentSessionID), requestBody)
@@ -559,12 +589,22 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_PartialConfirmation() 
 	txHash, contractAddress, err := suite.deployTestContract()
 	suite.Require().NoError(err)
 
+	// Generate a consistent signing message and create signature
+	// The frontend signs the hex-encoded message but sends the original message to backend
+	originalMessage := "I am signing into Launchpad at 1234567890"
+	hexEncodedMessage := "0x" + hex.EncodeToString([]byte(originalMessage))
+	signature, err := utils.PersonalSignFromHex(hexEncodedMessage, TESTING_PK_1)
+	suite.Require().NoError(err)
+	signedMessage := originalMessage // Backend receives the original message
+
 	// Confirm only the first deployment
 	contractAddrStr := contractAddress.Hex()
 	requestBody := TransactionCompleteRequest{
 		TransactionHash: txHash.Hex(),
 		Status:          models.TransactionStatusConfirmed,
 		ContractAddress: &contractAddrStr,
+		SignedMessage:   signedMessage,
+		Signature:       signature,
 	}
 
 	resp, err := suite.makeRequest("POST", fmt.Sprintf("/api/tx/%s/transaction/0", sessionID), requestBody)
@@ -584,11 +624,20 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_PartialConfirmation() 
 	txHash2, contractAddress2, err := suite.deployTestContract()
 	suite.Require().NoError(err)
 
+	// Generate new signing message and signature for second transaction
+	originalMessage2 := "I am signing into Launchpad at 1234567890" // Use same consistent message
+	hexEncodedMessage2 := "0x" + hex.EncodeToString([]byte(originalMessage2))
+	signature2, err := utils.PersonalSignFromHex(hexEncodedMessage2, TESTING_PK_1)
+	suite.Require().NoError(err)
+	signedMessage2 := originalMessage2 // Backend receives the original message
+
 	contractAddr2Str := contractAddress2.Hex()
 	requestBody2 := TransactionCompleteRequest{
 		TransactionHash: txHash2.Hex(),
 		Status:          models.TransactionStatusConfirmed,
 		ContractAddress: &contractAddr2Str,
+		SignedMessage:   signedMessage2,
+		Signature:       signature2,
 	}
 
 	resp2, err := suite.makeRequest("POST", fmt.Sprintf("/api/tx/%s/transaction/1", sessionID), requestBody2)
@@ -603,6 +652,34 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_PartialConfirmation() 
 	suite.Equal(models.TransactionStatusConfirmed, finalSession.TransactionStatus, "Session should be fully confirmed")
 	suite.Equal(models.TransactionStatusConfirmed, finalSession.TransactionDeployments[0].Status)
 	suite.Equal(models.TransactionStatusConfirmed, finalSession.TransactionDeployments[1].Status)
+}
+
+func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_MissingSignature() {
+	sessionID := suite.createTestSession()
+
+	// Generate signing message but don't include signature
+	originalMessage := "I am signing into Launchpad at 1234567890"
+	signedMessage := originalMessage // Backend receives the original message
+
+	requestBody := TransactionCompleteRequest{
+		TransactionHash: "0x1234567890123456789012345678901234567890123456789012345678901234",
+		Status:          models.TransactionStatusConfirmed,
+		SignedMessage:   signedMessage,
+		// Signature is intentionally missing
+	}
+
+	resp, err := suite.makeRequest("POST", fmt.Sprintf("/api/tx/%s/transaction/0", sessionID), requestBody)
+	suite.Require().NoError(err)
+	defer resp.Body.Close()
+
+	suite.Equal(http.StatusBadRequest, resp.StatusCode)
+
+	// Parse error response
+	var errorResponse fiber.Map
+	err = json.NewDecoder(resp.Body).Decode(&errorResponse)
+	suite.Require().NoError(err)
+
+	suite.Contains(errorResponse["reason"], "Signature is required")
 }
 
 func TestTxHandlerTestSuite(t *testing.T) {

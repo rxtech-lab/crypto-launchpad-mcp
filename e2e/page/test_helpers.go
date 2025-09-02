@@ -266,12 +266,37 @@ func (s *ChromedpTestSetup) InitializeTestWallet() error {
 					});
 				}
 			} else if (request.action === "personal_sign") {
-				// For personal sign, we can use a mock since it's not critical for deployment testing
-				return JSON.stringify({
-					success: true,
-					signature: "0x" + Array.from(crypto.getRandomValues(new Uint8Array(65)))
-						.map(b => b.toString(16).padStart(2, '0')).join('')
-				});
+				// For personal sign, we need to actually sign the message using Go crypto
+				try {
+					console.log("Personal sign request:", request.message);
+					
+					// Make HTTP request to our test signing endpoint for personal sign
+					const response = await fetch('/api/test/personal-sign', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify({
+							privateKey: request.privateKey,
+							message: request.message
+						})
+					});
+					
+					if (!response.ok) {
+						throw new Error('HTTP ' + response.status + ': ' + await response.text());
+					}
+					
+					const result = await response.json();
+					console.log("Personal sign result:", result);
+					
+					return JSON.stringify(result);
+				} catch (error) {
+					console.error("Personal sign error:", error);
+					return JSON.stringify({
+						success: false,
+						error: error.message
+					});
+				}
 			}
 			
 			return JSON.stringify({

@@ -46,6 +46,11 @@ func AuthMiddleware(config ...AuthConfig) fiber.Handler {
 	}
 
 	return func(c *fiber.Ctx) error {
+		// skip /tx routes
+		if strings.HasPrefix(c.Path(), "/tx") {
+			return c.Next()
+		}
+
 		// Allow public access to well-known endpoints for metadata discovery
 		if cfg.SkipWellKnown && strings.Contains(c.Path(), ".well-known") {
 			return c.Next()

@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="session-id" content="{{.SessionID}}" />
     <meta name="rpc-network" content="{{.RPCNetwork | json}}" />
+    <meta name="signing-message" content="{{.SigningMessage}}" />
     {{if .SessionData}}
     <meta name="transaction-session" content="{{.SessionData | json}}" />
     {{end}}

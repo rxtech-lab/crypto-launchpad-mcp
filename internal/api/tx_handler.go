@@ -24,6 +24,9 @@ type TransactionCompleteRequest struct {
 	TransactionHash string                   `json:"transactionHash"`
 	Status          models.TransactionStatus `json:"status"`
 	ContractAddress *string                  `json:"contractAddress,omitempty"`
+	SignedMessage   string                   `json:"signedMessage"`
+	// Signature is signed by user to prove the ownership
+	Signature string `json:"signature"`
 }
 
 // handleTransactionPage serves the universal transaction signing page
@@ -46,13 +49,9 @@ func (s *APIServer) handleTransactionPage(c *fiber.Ctx) error {
 			Name:    session.Chain.Name,
 			Rpc:     session.Chain.RPC,
 		},
+		"SigningMessage": utils.GenerateMessage(),
+		"SessionData":    session,
 	}
-
-	// Only add SessionData if session exists
-	if session != nil {
-		data["SessionData"] = session
-	}
-
 	// Render the template with custom functions
 	tmplBytes := assets.SigningHTML
 	tmpl, err := template.New("signing").Funcs(GetTemplateFuncs()).Parse(string(tmplBytes))
@@ -100,6 +99,13 @@ func (s *APIServer) handleTransactionAPI(c *fiber.Ctx) error {
 		})
 	}
 
+	// verify transaction ownership through signature]
+	if body.Signature == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"reason": "Signature is required",
+		})
+	}
+
 	// verify the transaction hash
 	if err := s.verifyTransactionOnChain(body.TransactionHash, session.Chain); err != nil {
 		log.Printf("Error verifying transaction %s: %v", body.TransactionHash, err)
@@ -113,8 +119,23 @@ func (s *APIServer) handleTransactionAPI(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get address from signature using the same message that was signed
+	verified, err := utils.VerifyTransactionOwnershipBySignature(session.Chain.RPC, body.TransactionHash, body.Signature, body.SignedMessage)
+	if err != nil {
+		log.Printf("Error verifying signature for transaction %s: %v", body.TransactionHash, err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Failed to verify signature",
+		})
+	}
+
+	if !verified {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"reason": "Signature does not match transaction sender",
+		})
+	}
+
 	allConfirmed := true
-	session.TransactionDeployments[parsedIndex].Status = body.Status
+	session.TransactionDeployments[parsedIndex].Status = models.TransactionStatusConfirmed
 
 	// if all deployments are confirmed, update the session status
 	for _, deployment := range session.TransactionDeployments {

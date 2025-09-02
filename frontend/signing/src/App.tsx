@@ -32,7 +32,7 @@ function App() {
     }
 
     try {
-      await transaction.executeAllTransactions(wallet.signTransaction);
+      await transaction.executeAllTransactions(wallet.signTransaction, wallet.signMessage);
     } catch (error) {
       console.error("Transaction failed:", error);
     }

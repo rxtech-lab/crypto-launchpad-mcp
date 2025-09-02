@@ -72,7 +72,22 @@ For operations requiring user signatures, the system generates a frontend page w
 4. System checks/switches to correct network
 5. User reviews transaction details
 6. User signs and sends transaction
-7. Real-time status updates until confirmation
+7. User signs ownership verification message (for security)
+8. Real-time status updates until confirmation
+
+### Security Enhancement - Transaction Ownership Verification
+
+To prevent unauthorized transaction confirmations, the system implements signature-based ownership verification:
+
+#### Process
+- After transaction execution, user signs a timestamped message: "I am signing into Launchpad at {timestamp}"
+- Backend verifies the signature matches the transaction sender address
+- Only verified ownership allows transaction status updates
+
+#### API Integration
+- `POST /api/tx/{sessionId}/transaction/{index}` now includes optional `signature` field
+- Backend calls `utils.TransactionOwnershipBySignature()` to verify ownership
+- Returns 401 Unauthorized if verification fails
 
 ## Workflow
 

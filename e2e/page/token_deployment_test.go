@@ -142,6 +142,8 @@ func (s *TokenDeploymentTestSuite) testDeploymentWorkflow(page *TokenDeploymentP
 }
 
 func (s *TokenDeploymentTestSuite) testDatabaseVerification(sessionID string) {
+	// sleep for a short time to ensure DB is updated
+	time.Sleep(2 * time.Second)
 	// Get session from database
 	session, err := s.setup.TestSetup.TxService.GetTransactionSession(sessionID)
 	s.Require().NoError(err, "Failed to get transaction session")
