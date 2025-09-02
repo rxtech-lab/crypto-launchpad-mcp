@@ -40,7 +40,11 @@ func configureAndStartServer(db *gorm.DB, port int) (*api.APIServer, int, error)
 	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
 	// Initialize API server for transaction signing (authenticator is created internally)
 	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
-	apiServer.EnableAuthentication()
+	if os.Getenv("DISABLE_AUTHENTICATION") != "true" {
+		apiServer.EnableAuthentication()
+	} else {
+		log.Println("Warning: Authentication is disabled")
+	}
 	apiServer.SetupRoutes()
 	apiServer.SetMCPServer(mcpServer)
 	apiServer.EnableStreamableHttp()

@@ -27,18 +27,14 @@ func configureAndStartServer(dbService services.DBService, port int) (*api.APISe
 	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService)
 	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
 
-	// Initialize MCP server
-	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
-
 	// Initialize API server (HTTP server for transaction signing) - NO AUTHENTICATION
 	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
 
 	// Setup routes WITHOUT enabling authentication (key difference from streamable-http)
 	apiServer.SetupRoutes()
-	apiServer.SetMCPServer(mcpServer)
 	// NOTE: NOT calling EnableAuthentication() or EnableStreamableHttp()
 
-	// Start API server
+	// Start API server first to get the actual port
 	var portPtr *int
 	if port != 0 {
 		portPtr = &port
@@ -47,6 +43,10 @@ func configureAndStartServer(dbService services.DBService, port int) (*api.APISe
 	if err != nil {
 		return nil, 0, err
 	}
+
+	// Now initialize MCP server with the actual port
+	mcpServer := mcp.NewMCPServer(dbService, startedPort, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
+	apiServer.SetMCPServer(mcpServer)
 
 	return apiServer, startedPort, nil
 }

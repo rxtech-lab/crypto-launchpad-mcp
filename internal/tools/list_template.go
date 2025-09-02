@@ -42,12 +42,13 @@ func NewListTemplateTool(templateService services.TemplateService) (mcp.Tool, se
 			return mcp.NewToolResultError("Invalid chain_type. Supported values: ethereum, solana"), nil
 		}
 
-		user, ok := utils.GetAuthenticatedUser(ctx)
-		if !ok {
-			return mcp.NewToolResultError("User not authenticated"), nil
-		}
+		user, _ := utils.GetAuthenticatedUser(ctx)
 		// List templates with filters
-		templates, err := templateService.ListTemplates(user.Sub, chainType, keyword, limit)
+		var userId *string
+		if user != nil {
+			userId = &user.Sub
+		}
+		templates, err := templateService.ListTemplates(userId, chainType, keyword, limit)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error listing templates: %v", err)), nil
 		}

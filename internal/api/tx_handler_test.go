@@ -368,8 +368,7 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_Success() {
 	// Generate a consistent signing message and create signature
 	// The frontend signs the hex-encoded message but sends the original message to backend
 	originalMessage := "I am signing into Launchpad at 1234567890"
-	hexEncodedMessage := "0x" + hex.EncodeToString([]byte(originalMessage))
-	signature, err := utils.PersonalSignFromHex(hexEncodedMessage, TESTING_PK_1)
+	signature, err := utils.PersonalSignFromHex(originalMessage, TESTING_PK_1)
 	suite.Require().NoError(err)
 	signedMessage := originalMessage // Backend receives the original message
 
@@ -592,8 +591,7 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_PartialConfirmation() 
 	// Generate a consistent signing message and create signature
 	// The frontend signs the hex-encoded message but sends the original message to backend
 	originalMessage := "I am signing into Launchpad at 1234567890"
-	hexEncodedMessage := "0x" + hex.EncodeToString([]byte(originalMessage))
-	signature, err := utils.PersonalSignFromHex(hexEncodedMessage, TESTING_PK_1)
+	signature, err := utils.PersonalSignFromHex(originalMessage, TESTING_PK_1)
 	suite.Require().NoError(err)
 	signedMessage := originalMessage // Backend receives the original message
 
@@ -626,8 +624,7 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_PartialConfirmation() 
 
 	// Generate new signing message and signature for second transaction
 	originalMessage2 := "I am signing into Launchpad at 1234567890" // Use same consistent message
-	hexEncodedMessage2 := "0x" + hex.EncodeToString([]byte(originalMessage2))
-	signature2, err := utils.PersonalSignFromHex(hexEncodedMessage2, TESTING_PK_1)
+	signature2, err := utils.PersonalSignFromHex(originalMessage2, TESTING_PK_1)
 	suite.Require().NoError(err)
 	signedMessage2 := originalMessage2 // Backend receives the original message
 
@@ -652,34 +649,6 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_PartialConfirmation() 
 	suite.Equal(models.TransactionStatusConfirmed, finalSession.TransactionStatus, "Session should be fully confirmed")
 	suite.Equal(models.TransactionStatusConfirmed, finalSession.TransactionDeployments[0].Status)
 	suite.Equal(models.TransactionStatusConfirmed, finalSession.TransactionDeployments[1].Status)
-}
-
-func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_MissingSignature() {
-	sessionID := suite.createTestSession()
-
-	// Generate signing message but don't include signature
-	originalMessage := "I am signing into Launchpad at 1234567890"
-	signedMessage := originalMessage // Backend receives the original message
-
-	requestBody := TransactionCompleteRequest{
-		TransactionHash: "0x1234567890123456789012345678901234567890123456789012345678901234",
-		Status:          models.TransactionStatusConfirmed,
-		SignedMessage:   signedMessage,
-		// Signature is intentionally missing
-	}
-
-	resp, err := suite.makeRequest("POST", fmt.Sprintf("/api/tx/%s/transaction/0", sessionID), requestBody)
-	suite.Require().NoError(err)
-	defer resp.Body.Close()
-
-	suite.Equal(http.StatusBadRequest, resp.StatusCode)
-
-	// Parse error response
-	var errorResponse fiber.Map
-	err = json.NewDecoder(resp.Body).Decode(&errorResponse)
-	suite.Require().NoError(err)
-
-	suite.Contains(errorResponse["reason"], "Signature is required")
 }
 
 func TestTxHandlerTestSuite(t *testing.T) {

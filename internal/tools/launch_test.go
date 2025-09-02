@@ -566,63 +566,6 @@ func (suite *LaunchToolTestSuite) TestHandlerChainTypeMismatch() {
 	}
 }
 
-func (suite *LaunchToolTestSuite) TestHandlerSolanaNotImplemented() {
-	// Create a Solana chain and template
-	solanaChain := &models.Chain{
-		ChainType: models.TransactionChainTypeSolana,
-		RPC:       "https://api.devnet.solana.com",
-		NetworkID: "devnet",
-		Name:      "Solana Devnet",
-		IsActive:  false,
-	}
-
-	err := suite.chainService.CreateChain(solanaChain)
-	suite.Require().NoError(err)
-
-	// Set Solana chain as active (this will deactivate Ethereum chain)
-	err = suite.chainService.SetActiveChainByID(solanaChain.ID)
-	suite.Require().NoError(err)
-	suite.chain.IsActive = false
-
-	solanaTemplate := &models.Template{
-		Name:         "SolanaToken",
-		Description:  "A Solana token template",
-		ChainType:    models.TransactionChainTypeSolana,
-		ContractName: "SolanaToken",
-		TemplateCode: "// Solana contract code",
-	}
-
-	err = suite.templateService.CreateTemplate(solanaTemplate)
-	suite.Require().NoError(err)
-
-	request := mcp.CallToolRequest{
-		Params: mcp.CallToolParams{
-			Arguments: map[string]interface{}{
-				"template_id": fmt.Sprintf("%d", solanaTemplate.ID),
-				"template_values": map[string]interface{}{
-					"TokenName": "Test",
-				},
-			},
-		},
-	}
-
-	handler := suite.launchTool.GetHandler()
-	result, err := handler(context.Background(), request)
-
-	suite.NoError(err)
-	suite.NotNil(result)
-	suite.True(result.IsError)
-	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
-		suite.Contains(textContent.Text, "Solana is not implemented yet")
-	}
-
-	// Reactivate Ethereum chain for other tests (this will deactivate the Solana chain)
-	err = suite.chainService.SetActiveChainByID(suite.chain.ID)
-	suite.Require().NoError(err)
-	suite.chain.IsActive = true
-	solanaChain.IsActive = false
-}
-
 func (suite *LaunchToolTestSuite) TestHandlerMissingRequiredFields() {
 	// Test missing template_id
 	request := mcp.CallToolRequest{

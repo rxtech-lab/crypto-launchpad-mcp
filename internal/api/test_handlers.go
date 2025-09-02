@@ -343,7 +343,10 @@ func (s *APIServer) handleTestPersonalSign(c *fiber.Ctx) error {
 	}
 
 	// Use the new PersonalSignFromHex utility
-	signature, err := utils.PersonalSignFromHex(req.Message, req.PrivateKey)
+	// decode message
+	decodedMessage, err := hex.DecodeString(req.Message)
+	stringMessage := string(decodedMessage)
+	signature, err := utils.PersonalSignFromHex(stringMessage, req.PrivateKey)
 	if err != nil {
 		return c.Status(400).JSON(TestPersonalSignResponse{
 			Success: false,

@@ -83,7 +83,7 @@ export function QuickStartSection() {
 
   return (
     <section className="py-20 bg-muted/30">
-      <div className="container mx-auto px-4 max-w-4xl">
+      <div className="container mx-auto px-4 max-w-[90vw] md:max-w-4xl">
         <AnimatedContainer className="text-center mb-12">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Quick Start</h2>
           <p className="text-lg text-muted-foreground">

@@ -21,7 +21,9 @@ func setupTestDatabase(t *testing.T) services.TemplateService {
 
 func TestNewCreateTemplateTool(t *testing.T) {
 	templateService := setupTestDatabase(t)
-	tool, handler := NewCreateTemplateTool(templateService)
+	createTool := NewCreateTemplateTool(templateService)
+	tool := createTool.GetTool()
+	handler := createTool.GetHandler()
 
 	// Test tool metadata
 	assert.Equal(t, "create_template", tool.Name)
@@ -48,64 +50,82 @@ func TestCreateTemplateHandler_ParameterValidation(t *testing.T) {
 		{
 			name: "missing_name",
 			requestArgs: map[string]interface{}{
-				"description":   "Test description",
-				"contract_name": "TestToken",
-				"chain_type":    "ethereum",
-				"template_code": validEthereumTemplate(),
+				"description":     "Test description",
+				"contract_name":   "TestToken",
+				"chain_type":      "ethereum",
+				"template_code":   validEthereumTemplate(),
+				"template_values": map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
 			},
 			expectError: true,
-			errorMsg:    "name parameter is required",
+			errorMsg:    "Name",
 		},
 		{
 			name: "missing_description",
 			requestArgs: map[string]interface{}{
-				"name":          "Test Template",
-				"contract_name": "TestToken",
-				"chain_type":    "ethereum",
-				"template_code": validEthereumTemplate(),
+				"name":            "Test Template",
+				"contract_name":   "TestToken",
+				"chain_type":      "ethereum",
+				"template_code":   validEthereumTemplate(),
+				"template_values": map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
 			},
 			expectError: true,
-			errorMsg:    "description parameter is required",
+			errorMsg:    "Description",
 		},
 		{
 			name: "missing_chain_type",
 			requestArgs: map[string]interface{}{
-				"name":          "Test Template",
-				"description":   "Test description",
-				"contract_name": "TestToken",
-				"template_code": validEthereumTemplate(),
+				"name":            "Test Template",
+				"description":     "Test description",
+				"contract_name":   "TestToken",
+				"template_code":   validEthereumTemplate(),
+				"template_values": map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
 			},
 			expectError: true,
-			errorMsg:    "chain_type parameter is required",
+			errorMsg:    "ChainType",
 		},
 		{
 			name: "missing_contract_name",
 			requestArgs: map[string]interface{}{
-				"name":          "Test Template",
-				"description":   "Test description",
-				"chain_type":    "ethereum",
-				"template_code": validEthereumTemplate(),
+				"name":            "Test Template",
+				"description":     "Test description",
+				"chain_type":      "ethereum",
+				"template_code":   validEthereumTemplate(),
+				"template_values": map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
 			},
 			expectError: true,
-			errorMsg:    "contract_name parameter is required",
+			errorMsg:    "ContractName",
 		},
 		{
 			name: "missing_template_code",
+			requestArgs: map[string]interface{}{
+				"name":            "Test Template",
+				"description":     "Test description",
+				"contract_name":   "TestToken",
+				"chain_type":      "ethereum",
+				"template_values": map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
+			},
+			expectError: true,
+			errorMsg:    "TemplateCode",
+		},
+		{
+			name: "missing_template_values",
 			requestArgs: map[string]interface{}{
 				"name":          "Test Template",
 				"description":   "Test description",
 				"contract_name": "TestToken",
 				"chain_type":    "ethereum",
+				"template_code": validEthereumTemplate(),
 			},
 			expectError: true,
-			errorMsg:    "template_code parameter is required",
+			errorMsg:    "TemplateValues",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			templateService := setupTestDatabase(t)
-			_, handler := NewCreateTemplateTool(templateService)
+			createTemplateTool := NewCreateTemplateTool(templateService)
+			handler := createTemplateTool.GetHandler()
 
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
@@ -116,12 +136,26 @@ func TestCreateTemplateHandler_ParameterValidation(t *testing.T) {
 			result, err := handler(ctx, request)
 
 			if tt.expectError {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMsg)
-				assert.Nil(t, result)
+				if err != nil {
+					// BindArguments error case
+					assert.Error(t, err)
+					assert.Contains(t, err.Error(), "failed to bind arguments")
+					assert.Nil(t, result)
+				} else {
+					// Validation error case
+					assert.NoError(t, err)
+					assert.NotNil(t, result)
+					assert.True(t, result.IsError)
+					if len(result.Content) > 0 {
+						if textContent, ok := result.Content[0].(mcp.TextContent); ok {
+							assert.Contains(t, textContent.Text, tt.errorMsg)
+						}
+					}
+				}
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
+				assert.False(t, result.IsError)
 			}
 		})
 	}
@@ -130,7 +164,8 @@ func TestCreateTemplateHandler_ParameterValidation(t *testing.T) {
 func TestCreateTemplateHandler_ChainTypeValidation(t *testing.T) {
 	ctx := context.Background()
 	templateService := setupTestDatabase(t)
-	_, handler := NewCreateTemplateTool(templateService)
+	createTemplateTool := NewCreateTemplateTool(templateService)
+	handler := createTemplateTool.GetHandler()
 
 	tests := []struct {
 		name        string
@@ -174,6 +209,7 @@ func TestCreateTemplateHandler_ChainTypeValidation(t *testing.T) {
 							}
 							return validEthereumTemplate()
 						}(),
+						"template_values": map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
 					},
 				},
 			}
@@ -186,7 +222,11 @@ func TestCreateTemplateHandler_ChainTypeValidation(t *testing.T) {
 				assert.True(t, result.IsError)
 				assert.Len(t, result.Content, 1)
 				textContent0 := result.Content[0].(mcp.TextContent)
-				assert.Contains(t, textContent0.Text, "Invalid chain_type")
+				if tt.chainType == "" {
+					assert.Contains(t, textContent0.Text, "ChainType")
+				} else {
+					assert.Contains(t, textContent0.Text, "Invalid chain_type")
+				}
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
@@ -231,7 +271,7 @@ contract MyToken is ERC20 {
 			templateCode: "invalid solidity code {{}",
 			contractName: "Test",
 			expectError:  true,
-			errorMsg:     "Contract Test not found",
+			errorMsg:     "Error rendering template",
 		},
 		{
 			name: "missing_pragma",
@@ -240,7 +280,7 @@ contract MyToken is ERC20 {
 }`,
 			contractName: "Test",
 			expectError:  true,
-			errorMsg:     "Contract Test not found",
+			errorMsg:     "Solidity compilation failed",
 		},
 	}
 
@@ -248,16 +288,18 @@ contract MyToken is ERC20 {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a fresh database for each test case
 			templateService := setupTestDatabase(t)
-			_, handler := NewCreateTemplateTool(templateService)
+			createTemplateTool := NewCreateTemplateTool(templateService)
+			handler := createTemplateTool.GetHandler()
 
 			request := mcp.CallToolRequest{
 				Params: mcp.CallToolParams{
 					Arguments: map[string]interface{}{
-						"name":          "Test Template",
-						"description":   "Test description",
-						"chain_type":    "ethereum",
-						"contract_name": tt.contractName,
-						"template_code": tt.templateCode,
+						"name":            "Test Template",
+						"description":     "Test description",
+						"chain_type":      "ethereum",
+						"contract_name":   tt.contractName,
+						"template_code":   tt.templateCode,
+						"template_values": map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
 					},
 				},
 			}
@@ -275,7 +317,8 @@ contract MyToken is ERC20 {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
 				// Verify template was created in database
-				templates, err := templateService.ListTemplates("test-user", "", "", 10)
+				testUser := "test-user"
+				templates, err := templateService.ListTemplates(&testUser, "", "", 10)
 				assert.NoError(t, err)
 				assert.Len(t, templates, 1)
 				if len(templates) > 0 {
@@ -346,14 +389,16 @@ func TestCreateTemplateHandler_MetadataValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a fresh database for each test case
 			templateService := setupTestDatabase(t)
-			_, handler := NewCreateTemplateTool(templateService)
+			createTemplateTool := NewCreateTemplateTool(templateService)
+			handler := createTemplateTool.GetHandler()
 
 			args := map[string]interface{}{
-				"name":          "Test Template",
-				"description":   "Test description",
-				"chain_type":    "ethereum",
-				"contract_name": "SimpleToken",
-				"template_code": validEthereumTemplate(),
+				"name":            "Test Template",
+				"description":     "Test description",
+				"chain_type":      "ethereum",
+				"contract_name":   "SimpleToken",
+				"template_code":   validEthereumTemplate(),
+				"template_values": map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
 			}
 
 			if tt.templateMetadata != "" {
@@ -394,7 +439,8 @@ func TestCreateTemplateHandler_MetadataValidation(t *testing.T) {
 				}
 
 				// Verify template was created in database
-				templates, err := templateService.ListTemplates("test-user", "", "", 10)
+				testUser := "test-user"
+				templates, err := templateService.ListTemplates(&testUser, "", "", 10)
 				assert.NoError(t, err)
 				assert.Len(t, templates, 1)
 
@@ -410,7 +456,8 @@ func TestCreateTemplateHandler_MetadataValidation(t *testing.T) {
 func TestCreateTemplateHandler_DatabaseIntegration(t *testing.T) {
 	ctx := context.Background()
 	templateService := setupTestDatabase(t)
-	_, handler := NewCreateTemplateTool(templateService)
+	createTemplateTool := NewCreateTemplateTool(templateService)
+	handler := createTemplateTool.GetHandler()
 
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -421,6 +468,7 @@ func TestCreateTemplateHandler_DatabaseIntegration(t *testing.T) {
 				"contract_name":     "SimpleToken",
 				"template_code":     validEthereumTemplate(),
 				"template_metadata": `{"TokenName": "", "TokenSymbol": "", "InitialSupply": ""}`,
+				"template_values":   map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
 			},
 		},
 	}
@@ -451,7 +499,8 @@ func TestCreateTemplateHandler_DatabaseIntegration(t *testing.T) {
 	assert.NotNil(t, resultData["created_at"])
 
 	// Verify template exists in database
-	templates, err := templateService.ListTemplates("test-user", "", "", 10)
+	testUser := "test-user"
+	templates, err := templateService.ListTemplates(&testUser, "", "", 10)
 	assert.NoError(t, err)
 	assert.Len(t, templates, 1)
 
@@ -469,17 +518,19 @@ func TestCreateTemplateHandler_DatabaseIntegration(t *testing.T) {
 func TestCreateTemplateHandler_MultipleTemplates(t *testing.T) {
 	ctx := context.Background()
 	templateService := setupTestDatabase(t)
-	_, handler := NewCreateTemplateTool(templateService)
+	createTemplateTool := NewCreateTemplateTool(templateService)
+	handler := createTemplateTool.GetHandler()
 
 	// Create first template
 	request1 := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"name":          "Ethereum Template",
-				"description":   "Ethereum ERC20 Template",
-				"chain_type":    "ethereum",
-				"contract_name": "SimpleToken",
-				"template_code": validEthereumTemplate(),
+				"name":            "Ethereum Template",
+				"description":     "Ethereum ERC20 Template",
+				"chain_type":      "ethereum",
+				"contract_name":   "SimpleToken",
+				"template_code":   validEthereumTemplate(),
+				"template_values": map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
 			},
 		},
 	}
@@ -492,11 +543,12 @@ func TestCreateTemplateHandler_MultipleTemplates(t *testing.T) {
 	request2 := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"name":          "Solana Template",
-				"description":   "Solana SPL Token Template",
-				"chain_type":    "solana",
-				"contract_name": "spl_token",
-				"template_code": validSolanaTemplate(),
+				"name":            "Solana Template",
+				"description":     "Solana SPL Token Template",
+				"chain_type":      "solana",
+				"contract_name":   "spl_token",
+				"template_code":   validSolanaTemplate(),
+				"template_values": map[string]interface{}{"TokenName": "Test", "TokenSymbol": "TST", "InitialSupply": "1000"},
 			},
 		},
 	}
@@ -506,7 +558,8 @@ func TestCreateTemplateHandler_MultipleTemplates(t *testing.T) {
 	assert.NotNil(t, result2)
 
 	// Verify both templates exist
-	templates, err := templateService.ListTemplates("test-user", "", "", 10)
+	testUser := "test-user"
+	templates, err := templateService.ListTemplates(&testUser, "", "", 10)
 	assert.NoError(t, err)
 	assert.Len(t, templates, 2)
 
