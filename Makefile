@@ -51,7 +51,7 @@ binaries: build-frontend
 
 # Run tests
 test:
-	go test -v -p 1 ./...
+	go test -v -p 1 -cover ./...
 
 # Run the MCP server directly (no build)
 run:

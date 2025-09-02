@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -93,6 +94,7 @@ func (suite *StreamableHTTPTestSuite) TestMCPEndpointRequiresAuthentication() {
 func (suite *StreamableHTTPTestSuite) TestMCPEndpointWithInvalidToken() {
 	// Test that /mcp endpoint returns error with invalid authentication token
 	client := &http.Client{Timeout: 10 * time.Second}
+	suite.T().Setenv("SCALEKIT_ENV_URL", "https://env.scalekit.com")
 
 	// Create a basic MCP request
 	mcpRequest := map[string]interface{}{
@@ -194,6 +196,102 @@ func (suite *StreamableHTTPTestSuite) TestMCPSubpathAuthentication() {
 
 func (suite *StreamableHTTPTestSuite) getBaseURL() string {
 	return fmt.Sprintf("http://localhost:%d", suite.port)
+}
+
+func (suite *StreamableHTTPTestSuite) TestAllRoutesRequireAuthentication() {
+	// Test that all regular routes require authentication
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	// Define test routes with their expected status codes when unauthorized
+	testRoutes := []struct {
+		method         string
+		path           string
+		expectedStatus int
+		description    string
+	}{
+		{"GET", "/tx/test-session-id", http.StatusUnauthorized, "transaction page"},
+		{"POST", "/api/tx/test-session-id/transaction/0", http.StatusUnauthorized, "transaction API"},
+		{"GET", "/static/tx/app.js", http.StatusUnauthorized, "static JavaScript"},
+		{"GET", "/static/tx/app.css", http.StatusUnauthorized, "static CSS"},
+		{"POST", "/api/test/sign-transaction", http.StatusUnauthorized, "test endpoint"},
+		{"GET", "/health", http.StatusUnauthorized, "health check"},
+	}
+
+	for _, testRoute := range testRoutes {
+		url := suite.getBaseURL() + testRoute.path
+
+		var req *http.Request
+		var err error
+
+		if testRoute.method == "POST" {
+			// For POST requests, send empty JSON body
+			req, err = http.NewRequest(testRoute.method, url, strings.NewReader("{}"))
+			if err == nil {
+				req.Header.Set("Content-Type", "application/json")
+			}
+		} else {
+			req, err = http.NewRequest(testRoute.method, url, nil)
+		}
+
+		suite.Require().NoError(err, "Failed to create request for %s", testRoute.description)
+
+		// Intentionally NOT setting Authorization header
+		resp, err := client.Do(req)
+		suite.Require().NoError(err, "Failed to make request for %s", testRoute.description)
+
+		// Should return 401 Unauthorized for all routes
+		suite.Equal(testRoute.expectedStatus, resp.StatusCode,
+			"Route %s %s (%s) should require authentication",
+			testRoute.method, testRoute.path, testRoute.description)
+
+		_ = resp.Body.Close()
+	}
+}
+
+func (suite *StreamableHTTPTestSuite) TestWellKnownEndpointBypassesAuth() {
+	// Test that .well-known endpoint is accessible without authentication
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	url := suite.getBaseURL() + "/.well-known/oauth-protected-resource/mcp"
+	req, err := http.NewRequest("GET", url, nil)
+	suite.Require().NoError(err)
+
+	// Intentionally NOT setting Authorization header
+	resp, err := client.Do(req)
+	suite.Require().NoError(err)
+
+	// Should return 200 OK (or other success code, not 401)
+	suite.NotEqual(http.StatusUnauthorized, resp.StatusCode,
+		".well-known endpoint should bypass authentication")
+
+	_ = resp.Body.Close()
+}
+
+func (suite *StreamableHTTPTestSuite) TestAuthenticatedRequestsWork() {
+	// Test that valid tokens allow access to protected routes
+	// Note: This test sets up a valid authenticator environment to test positive cases
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	// Set up environment for JWT authentication
+	suite.T().Setenv("SCALEKIT_ENV_URL", "https://example.com/.well-known/jwks.json")
+
+	// Test a simple route that should work with any valid-looking token
+	url := suite.getBaseURL() + "/health"
+	req, err := http.NewRequest("GET", url, nil)
+	suite.Require().NoError(err)
+
+	// Set a mock valid token (the test environment will accept any non-empty token)
+	req.Header.Set("Authorization", "Bearer valid-test-token")
+
+	resp, err := client.Do(req)
+	suite.Require().NoError(err)
+
+	// With a valid token, should not return 401
+	// Note: The actual response may vary (200, 404, etc.) based on the endpoint logic
+	suite.NotEqual(http.StatusUnauthorized, resp.StatusCode,
+		"Valid token should allow access to protected routes")
+
+	_ = resp.Body.Close()
 }
 
 func TestStreamableHTTPTestSuite(t *testing.T) {

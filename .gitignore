@@ -69,3 +69,7 @@ __debug_bin*
 internal/assets/*.js
 internal/assets/*.css
 secrets.yaml
+# Test coverage output
+coverage.out
+*.coverprofile
+
