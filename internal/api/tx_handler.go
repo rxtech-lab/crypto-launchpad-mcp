@@ -29,6 +29,36 @@ type TransactionCompleteRequest struct {
 	Signature string `json:"signature"`
 }
 
+type ErrorPageData struct {
+	Title      string
+	Message    string
+	StatusCode int
+}
+
+// renderErrorPage renders the error HTML template with the provided data
+func (s *APIServer) renderErrorPage(c *fiber.Ctx, statusCode int, title, message string) error {
+	data := ErrorPageData{
+		Title:      title,
+		Message:    message,
+		StatusCode: statusCode,
+	}
+
+	tmpl, err := template.New("error").Parse(string(assets.ErrorHTML))
+	if err != nil {
+		log.Printf("Error parsing error template: %v", err)
+		return c.Status(statusCode).SendString(title)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		log.Printf("Error rendering error template: %v", err)
+		return c.Status(statusCode).SendString(title)
+	}
+
+	c.Set("Content-Type", "text/html; charset=utf-8")
+	return c.Status(statusCode).Send(buf.Bytes())
+}
+
 // handleTransactionPage serves the universal transaction signing page
 func (s *APIServer) handleTransactionPage(c *fiber.Ctx) error {
 	sessionID := c.Params("session_id")
@@ -37,12 +67,13 @@ func (s *APIServer) handleTransactionPage(c *fiber.Ctx) error {
 	session, err := s.txService.GetTransactionSession(sessionID)
 	if err != nil {
 		log.Printf("Error getting session %s: %v", sessionID, err)
-		// Still serve the page but let the React app handle the error
-		return c.Status(fiber.StatusNotFound).SendString("Session not found")
+		return s.renderErrorPage(c, fiber.StatusNotFound, "Session Not Found",
+			"The requested transaction session could not be found. This may be because the session has expired, been completed, or the URL is incorrect.")
 	}
 
 	if session.TransactionStatus == models.TransactionStatusConfirmed {
-		return c.Status(fiber.StatusNotAcceptable).SendString("Transaction already confirmed")
+		return s.renderErrorPage(c, fiber.StatusNotAcceptable, "Transaction Already Confirmed",
+			"This transaction has already been confirmed and completed. No further action is required.")
 	}
 
 	// Prepare template data

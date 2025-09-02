@@ -10,3 +10,6 @@ var SigningAppJS []byte
 
 //go:embed signing_app.css
 var SigningAppCSS []byte
+
+//go:embed error.html
+var ErrorHTML []byte
