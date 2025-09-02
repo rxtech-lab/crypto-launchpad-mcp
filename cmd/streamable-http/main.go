@@ -40,6 +40,8 @@ func configureAndStartServer(db *gorm.DB, port int) (*api.APIServer, int, error)
 	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
 	// Initialize API server for transaction signing (authenticator is created internally)
 	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
+	apiServer.EnableAuthentication()
+	apiServer.SetupRoutes()
 	apiServer.SetMCPServer(mcpServer)
 	apiServer.EnableStreamableHttp()
 	// Start API server

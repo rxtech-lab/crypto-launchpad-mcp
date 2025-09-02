@@ -58,6 +58,7 @@ func (suite *TxHandlerTestSuite) SetupSuite() {
 
 	// Initialize API server
 	apiServer := NewAPIServer(db, txService, hookService, suite.chainService)
+	apiServer.SetupRoutes()
 	port, err := apiServer.Start(nil) // Let it find an available port
 	suite.Require().NoError(err)
 	suite.apiServer = apiServer

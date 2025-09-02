@@ -21,6 +21,36 @@ var (
 	BuildTime  = "unknown"
 )
 
+func configureAndStartServer(dbService services.DBService, port int) (*api.APIServer, int, error) {
+	// Initialize services and hooks
+	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService, deploymentService := server.InitializeServices(dbService.GetDB())
+	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService)
+	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
+
+	// Initialize MCP server
+	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
+
+	// Initialize API server (HTTP server for transaction signing) - NO AUTHENTICATION
+	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
+
+	// Setup routes WITHOUT enabling authentication (key difference from streamable-http)
+	apiServer.SetupRoutes()
+	apiServer.SetMCPServer(mcpServer)
+	// NOTE: NOT calling EnableAuthentication() or EnableStreamableHttp()
+
+	// Start API server
+	var portPtr *int
+	if port != 0 {
+		portPtr = &port
+	}
+	startedPort, err := apiServer.Start(portPtr)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return apiServer, startedPort, nil
+}
+
 func main() {
 	// Command line flags
 	var showVersion = flag.Bool("version", false, "Show version information")
@@ -71,28 +101,19 @@ func main() {
 	}
 	defer dbService.Close()
 
-	// Initialize services
-	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService, deploymentService := server.InitializeServices(dbService.GetDB())
-	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService)
-	// Register hooks
-	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
-
-	// Initialize and start API server (HTTP server for transaction signing)
-	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
-
-	// StartStdioServer API server and get the assigned port
-	port, err := apiServer.Start(nil)
+	// Configure and start server
+	apiServer, port, err := configureAndStartServer(dbService, 0) // 0 for random port
 	if err != nil {
 		log.Fatal("Failed to start API server:", err)
 	}
 
 	log.Printf("API server started on port %d\n", port)
 
-	// Initialize MCP server with the API server port
-	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
-
-	// Set MCP server reference in API server for cross-communication
-	apiServer.SetMCPServer(mcpServer)
+	// Get MCP server for stdio communication
+	mcpServer := apiServer.GetMCPServer()
+	if mcpServer == nil {
+		log.Fatal("MCP server not found")
+	}
 
 	// StartStdioServer MCP server in a goroutine
 	go func() {
