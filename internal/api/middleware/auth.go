@@ -51,6 +51,12 @@ func AuthMiddleware(config ...AuthConfig) fiber.Handler {
 			return c.Next()
 		}
 
+		// skip /health route
+		if c.Path() == "/health" {
+			return c.Next()
+		}
+
+		// Skip auth for well-known endpoints if configured
 		// Allow public access to well-known endpoints for metadata discovery
 		if cfg.SkipWellKnown && strings.Contains(c.Path(), ".well-known") {
 			return c.Next()
