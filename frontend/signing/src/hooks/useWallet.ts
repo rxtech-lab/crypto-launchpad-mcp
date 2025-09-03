@@ -174,6 +174,9 @@ export function useWallet() {
                 isConnected: true,
                 isConnecting: false,
               }));
+              
+              // Save wallet to localStorage on successful connection
+              localStorage.setItem("selectedWalletUuid", provider.info.uuid);
             } catch (networkError) {
               console.warn(
                 "Failed to get updated network info after switch:",
@@ -188,6 +191,9 @@ export function useWallet() {
                 isConnected: true,
                 isConnecting: false,
               }));
+              
+              // Save wallet to localStorage on successful connection
+              localStorage.setItem("selectedWalletUuid", provider.info.uuid);
             }
           } else {
             setState((prev) => ({
@@ -198,6 +204,9 @@ export function useWallet() {
               isConnected: true,
               isConnecting: false,
             }));
+            
+            // Save wallet to localStorage on successful connection
+            localStorage.setItem("selectedWalletUuid", provider.info.uuid);
           }
         } else {
           setState((prev) => ({
@@ -208,6 +217,9 @@ export function useWallet() {
             isConnected: true,
             isConnecting: false,
           }));
+          
+          // Save wallet to localStorage on successful connection
+          localStorage.setItem("selectedWalletUuid", provider.info.uuid);
         }
 
         // Listen for account changes
@@ -292,6 +304,9 @@ export function useWallet() {
 
   // Disconnect wallet
   const disconnectWallet = useCallback(() => {
+    // Clear saved wallet from localStorage
+    localStorage.removeItem("selectedWalletUuid");
+    
     setState((prev) => ({
       ...prev,
       selectedProvider: null,
@@ -353,6 +368,19 @@ export function useWallet() {
     const ethersProvider = new BrowserProvider(state.selectedProvider.provider);
     return await ethersProvider.getSigner();
   }, [state.selectedProvider]);
+
+  // Auto-reconnect to saved wallet
+  useEffect(() => {
+    if (!state.isConnected && state.providers.length > 0) {
+      const savedWalletUuid = localStorage.getItem("selectedWalletUuid");
+      if (savedWalletUuid) {
+        const savedProvider = state.providers.find(p => p.info.uuid === savedWalletUuid);
+        if (savedProvider) {
+          connectWallet(savedWalletUuid);
+        }
+      }
+    }
+  }, [state.providers, state.isConnected, connectWallet]);
 
   // Initialize wallet discovery on mount
   useEffect(() => {

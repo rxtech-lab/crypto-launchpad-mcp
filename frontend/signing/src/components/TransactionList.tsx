@@ -83,10 +83,7 @@ export function TransactionList({
   }
 
   return (
-    <div 
-      data-testid="transaction-list-container"
-      className="space-y-3"
-    >
+    <div data-testid="transaction-list-container" className="space-y-3">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-800 flex items-center">
           <Layers className="h-5 w-5 mr-2 text-gray-600" />
@@ -115,22 +112,27 @@ export function TransactionList({
             `}
           >
             <div className="flex items-center">
-              <div 
+              <div
                 data-testid={`transaction-status-icon-${index}`}
                 className="flex-shrink-0 mr-4"
               >
                 {getStatusIcon(status, index)}
               </div>
 
-              <div className="flex-grow">
-                <h4 
+              <div className="flex-grow min-w-0">
+                <h4
                   data-testid={`transaction-title-${index}`}
                   className="font-medium text-gray-800"
                 >
                   {tx.title || `Transaction ${index + 1}`}
                 </h4>
                 {tx.description && (
-                  <p className="text-sm text-gray-600 mt-1">{tx.description}</p>
+                  <p
+                    title={tx.description}
+                    className="text-sm text-gray-600 mt-1 overflow-hidden whitespace-nowrap text-ellipsis"
+                  >
+                    {tx.description}
+                  </p>
                 )}
                 {status === "pending" && (
                   <p className="text-xs text-blue-600 mt-1">
@@ -139,7 +141,7 @@ export function TransactionList({
                 )}
               </div>
 
-              <div 
+              <div
                 data-testid={`transaction-value-${index}`}
                 className="text-right"
               >
@@ -163,7 +165,7 @@ export function TransactionList({
                     Contract Address:
                   </span>
                   <div className="flex items-center space-x-2">
-                    <code 
+                    <code
                       data-testid={`deployed-contract-address-${index}`}
                       className="text-xs font-mono bg-gray-100 px-2 py-1 rounded"
                     >

@@ -21,18 +21,6 @@ export function WalletSelector({
   onConnect,
   onDisconnect,
 }: WalletSelectorProps) {
-  // Try to reconnect to saved wallet on mount
-  useEffect(() => {
-    if (!isConnected && providers.length > 0) {
-      const savedWalletUuid = localStorage.getItem(WALLET_STORAGE_KEY);
-      if (savedWalletUuid) {
-        const savedProvider = providers.find(p => p.info.uuid === savedWalletUuid);
-        if (savedProvider) {
-          onConnect(savedWalletUuid);
-        }
-      }
-    }
-  }, [providers, isConnected, onConnect]);
 
   // Save selected wallet to localStorage when connected
   useEffect(() => {
