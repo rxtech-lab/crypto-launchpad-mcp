@@ -47,7 +47,7 @@ func NewGetPoolInfoTool(chainService services.ChainService, liquidityService ser
 		}
 
 		// Get pool information from database
-		pool, err := liquidityService.GetLiquidityPoolByTokenAddress(tokenAddress)
+		pool, err := liquidityService.GetLiquidityPoolByTokenAddress(tokenAddress, "")
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -55,28 +55,6 @@ func NewGetPoolInfoTool(chainService services.ChainService, liquidityService ser
 					mcp.NewTextContent("Liquidity pool not found for this token"),
 				},
 			}, nil
-		}
-
-		// Get liquidity positions for this pool
-		positions, err := liquidityService.GetLiquidityPositionsByUser("") // Get all positions for the pool
-		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error getting liquidity positions: %v", err)),
-				},
-			}, nil
-		}
-
-		// Calculate total liquidity from positions
-		var totalLiquidityProviders int
-		var totalLiquidityAmount string = "0"
-		for _, position := range positions {
-			if position.PoolID == pool.ID && position.Status == "confirmed" {
-				if position.Action == "add" {
-					totalLiquidityProviders++
-				}
-			}
 		}
 
 		// Get recent swap transactions
@@ -123,11 +101,6 @@ func NewGetPoolInfoTool(chainService services.ChainService, liquidityService ser
 				"creator_address": pool.CreatorAddress,
 				"status":          pool.Status,
 				"created_at":      pool.CreatedAt,
-			},
-			"liquidity_metrics": map[string]interface{}{
-				"total_liquidity_providers": totalLiquidityProviders,
-				"total_liquidity_amount":    totalLiquidityAmount,
-				"pool_status":               pool.Status,
 			},
 			"trading_activity": map[string]interface{}{
 				"total_swaps":  len(tokenSwaps),

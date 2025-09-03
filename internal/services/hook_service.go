@@ -6,7 +6,7 @@ import (
 
 type HookService interface {
 	AddHook(hook Hook) error
-	OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress string, session models.TransactionSession) error
+	OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress *string, session models.TransactionSession) error
 }
 
 type hookService struct {
@@ -24,7 +24,7 @@ func (h *hookService) AddHook(hook Hook) error {
 	return nil
 }
 
-func (h *hookService) OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress string, session models.TransactionSession) error {
+func (h *hookService) OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress *string, session models.TransactionSession) error {
 	for _, hook := range h.hooks {
 		if hook.CanHandle(txType) {
 			if err := hook.OnTransactionConfirmed(txType, txHash, contractAddress, session); err != nil {

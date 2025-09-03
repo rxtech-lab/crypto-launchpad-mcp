@@ -81,7 +81,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestCanHandle() {
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_WETHDeployment() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -97,7 +97,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_WETHDepl
 	err = suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2TokenDeployment,
 		"0xabcd1234",
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	suite.NoError(err)
@@ -113,7 +113,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_WETHDepl
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_FactoryDeployment() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -129,7 +129,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_FactoryD
 	err = suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2FactoryDeployment,
 		"0xdef5678",
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	suite.NoError(err)
@@ -145,7 +145,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_FactoryD
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_RouterDeployment() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -161,7 +161,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_RouterDe
 	err = suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2RouterDeployment,
 		"0x987654",
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	suite.NoError(err)
@@ -177,7 +177,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_RouterDe
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddressesSet() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -197,7 +197,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddre
 	err = suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2TokenDeployment,
 		"0xweth",
-		wethAddress,
+		&wethAddress,
 		session,
 	)
 	suite.NoError(err)
@@ -211,7 +211,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddre
 	err = suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2FactoryDeployment,
 		"0xfactory",
-		factoryAddress,
+		&factoryAddress,
 		session,
 	)
 	suite.NoError(err)
@@ -225,7 +225,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddre
 	err = suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2RouterDeployment,
 		"0xrouter",
-		routerAddress,
+		&routerAddress,
 		session,
 	)
 	suite.NoError(err)
@@ -241,7 +241,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddre
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddressesSetDifferentOrder() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -261,7 +261,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddre
 	err = suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2FactoryDeployment,
 		"0xfactory",
-		factoryAddress,
+		&factoryAddress,
 		session,
 	)
 	suite.NoError(err)
@@ -270,7 +270,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddre
 	err = suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2RouterDeployment,
 		"0xrouter",
-		routerAddress,
+		&routerAddress,
 		session,
 	)
 	suite.NoError(err)
@@ -279,7 +279,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddre
 	err = suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2TokenDeployment,
 		"0xweth",
-		wethAddress,
+		&wethAddress,
 		session,
 	)
 	suite.NoError(err)
@@ -302,11 +302,13 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_NoDeploy
 		TransactionChainType: models.TransactionChainTypeEthereum,
 	}
 
+	address := "0x1234567890123456789012345678901234567890"
+
 	// Test should return error when no deployment found
 	err := suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2TokenDeployment,
 		"0xabcd1234",
-		"0x1234567890123456789012345678901234567890",
+		&address,
 		session,
 	)
 	suite.Error(err)
@@ -315,7 +317,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_NoDeploy
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_ServiceError() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -330,7 +332,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_ServiceE
 	err = suite.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2TokenDeployment,
 		"0xabcd1234",
-		"", // Empty contract address
+		nil, // Empty contract address
 		session,
 	)
 

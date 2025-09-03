@@ -2,7 +2,6 @@ package hooks
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
@@ -10,103 +9,79 @@ import (
 )
 
 type LiquidityPoolHook struct {
-	db               *gorm.DB
-	liquidityService services.LiquidityService
+	db                     *gorm.DB
+	liquidityService       services.LiquidityService
+	uniswapContractService services.UniswapContractService
+	chainService           services.ChainService
 }
 
 // CanHandle implements Hook.
 func (l *LiquidityPoolHook) CanHandle(txType models.TransactionType) bool {
-	return txType == models.TransactionTypeLiquidityPoolCreation ||
-		txType == models.TransactionTypeAddLiquidity ||
-		txType == models.TransactionTypeRemoveLiquidity
+	return txType == models.TransactionTypeLiquidityPoolCreation
 }
 
 // OnTransactionConfirmed implements Hook.
-func (l *LiquidityPoolHook) OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress string, session models.TransactionSession) error {
+func (l *LiquidityPoolHook) OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress *string, session models.TransactionSession) error {
 	switch txType {
 	case models.TransactionTypeLiquidityPoolCreation:
-		return l.handleLiquidityPoolCreation(txHash, contractAddress, session)
-	case models.TransactionTypeAddLiquidity:
-		return l.handleAddLiquidity(txHash, session)
-	case models.TransactionTypeRemoveLiquidity:
-		return l.handleRemoveLiquidity(txHash, session)
+		// only handle the creation of the liquidity pool
+		// position should be fetched from the blockchain
+		return l.handleLiquidityPoolCreation(txHash, session)
 	default:
-		return fmt.Errorf("unsupported transaction type: %s", txType)
+		return nil
 	}
 }
 
 // handleLiquidityPoolCreation updates the liquidity pool with the confirmed transaction details
-func (l *LiquidityPoolHook) handleLiquidityPoolCreation(txHash string, pairAddress string, session models.TransactionSession) error {
-	// Find pool ID from metadata
-	var poolID uint
-	for _, metadata := range session.Metadata {
-		if metadata.Key == "pool_id" {
-			id, err := strconv.ParseUint(metadata.Value, 10, 32)
-			if err != nil {
-				return fmt.Errorf("invalid pool_id in metadata: %v", err)
-			}
-			poolID = uint(id)
-			break
-		}
+func (l *LiquidityPoolHook) handleLiquidityPoolCreation(txHash string, session models.TransactionSession) error {
+	// find the pool by session id
+	pool, err := l.liquidityService.GetLiquidityPoolBySessionId(session.ID)
+	if err != nil {
+		return err
 	}
 
-	if poolID == 0 {
-		return fmt.Errorf("pool_id not found in session metadata")
+	// Get token addresses from session metadata
+	token0Address, token1Address, err := l.getTokenAddressesFromSession(session)
+	if err != nil {
+		return fmt.Errorf("failed to get token addresses: %w", err)
+	}
+
+	// Get pair address from Uniswap Factory contract
+	pairAddress, err := l.uniswapContractService.GetPairAddress(token0Address, token1Address, &session.Chain)
+	if err != nil {
+		return fmt.Errorf("failed to get pair address: %w", err)
 	}
 
 	// Update the pool with transaction hash and pair address
-	return l.liquidityService.UpdateLiquidityPoolStatus(poolID, models.TransactionStatusConfirmed, pairAddress, txHash)
+	return l.liquidityService.UpdateLiquidityPoolStatus(pool.ID, models.TransactionStatusConfirmed, pairAddress, txHash)
 }
 
-// handleAddLiquidity updates the liquidity position with the confirmed transaction details
-func (l *LiquidityPoolHook) handleAddLiquidity(txHash string, session models.TransactionSession) error {
-	// Find position ID from metadata
-	var positionID uint
-	for _, metadata := range session.Metadata {
-		if metadata.Key == "position_id" {
-			id, err := strconv.ParseUint(metadata.Value, 10, 32)
-			if err != nil {
-				return fmt.Errorf("invalid position_id in metadata: %v", err)
-			}
-			positionID = uint(id)
-			break
+// getTokenAddressesFromSession extracts token addresses from transaction session metadata
+func (l *LiquidityPoolHook) getTokenAddressesFromSession(session models.TransactionSession) (string, string, error) {
+	var token0Address, token1Address string
+
+	// Extract from metadata
+	for _, meta := range session.Metadata {
+		if meta.Key == services.METADATA_TOKEN0_ADDRESS {
+			token0Address = meta.Value
+		}
+		if meta.Key == services.METADATA_TOKEN1_ADDRESS {
+			token1Address = meta.Value
 		}
 	}
 
-	if positionID == 0 {
-		return fmt.Errorf("position_id not found in session metadata")
+	if token0Address == "" || token1Address == "" {
+		return "", "", fmt.Errorf("token addresses not found in session metadata")
 	}
 
-	// Update the position with transaction hash
-	return l.liquidityService.UpdateLiquidityPositionStatus(positionID, models.TransactionStatusConfirmed, txHash)
+	return token0Address, token1Address, nil
 }
 
-// handleRemoveLiquidity updates the liquidity position with the confirmed transaction details
-func (l *LiquidityPoolHook) handleRemoveLiquidity(txHash string, session models.TransactionSession) error {
-	// Find position ID from metadata
-	var positionID uint
-	for _, metadata := range session.Metadata {
-		if metadata.Key == "position_id" {
-			id, err := strconv.ParseUint(metadata.Value, 10, 32)
-			if err != nil {
-				return fmt.Errorf("invalid position_id in metadata: %v", err)
-			}
-			positionID = uint(id)
-			break
-		}
-	}
-
-	if positionID == 0 {
-		return fmt.Errorf("position_id not found in session metadata")
-	}
-
-	// Update the position with transaction hash
-	return l.liquidityService.UpdateLiquidityPositionStatus(positionID, models.TransactionStatusConfirmed, txHash)
-}
-
-func NewLiquidityPoolHook(db *gorm.DB, liquidityService services.LiquidityService) services.Hook {
+func NewLiquidityPoolHook(db *gorm.DB, liquidityService services.LiquidityService, uniswapContractService services.UniswapContractService, chainService services.ChainService) services.Hook {
 	return &LiquidityPoolHook{
-		db:               db,
-		liquidityService: liquidityService,
+		db:                     db,
+		liquidityService:       liquidityService,
+		uniswapContractService: uniswapContractService,
+		chainService:           chainService,
 	}
 }

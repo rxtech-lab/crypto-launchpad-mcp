@@ -32,12 +32,12 @@ func configureAndStartServer(db *gorm.DB, port int) (*api.APIServer, int, error)
 	}
 
 	// Initialize services and hooks
-	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService, deploymentService := server.InitializeServices(dbService.GetDB())
-	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService, uniswapService)
-	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
+	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, deploymentService, uniswapContractService := server.InitializeServices(dbService.GetDB())
+	tokenDeploymentHook, uniswapDeploymentHook, liquidityHook := server.InitializeHooks(dbService.GetDB(), hookService, uniswapService, deploymentService, liquidityService, uniswapContractService, chainService)
+	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook, liquidityHook)
 
 	// Initialize MCP server
-	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
+	mcpServer := mcp.NewMCPServer(dbService, port, evmService, txService, uniswapService, liquidityService, chainService, templateService, deploymentService)
 	// Initialize API server for transaction signing (authenticator is created internally)
 	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)
 	if os.Getenv("DISABLE_AUTHENTICATION") != "true" {

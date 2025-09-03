@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func InitializeServices(db *gorm.DB) (services.EvmService, services.TransactionService, services.UniswapService, services.LiquidityService, services.HookService, services.ChainService, services.TemplateService, services.UniswapSettingsService, *services.DeploymentService) {
+func InitializeServices(db *gorm.DB) (services.EvmService, services.TransactionService, services.UniswapService, services.LiquidityService, services.HookService, services.ChainService, services.TemplateService, services.DeploymentService, services.UniswapContractService) {
 	evmService := services.NewEvmService()
 	txService := services.NewTransactionService(db)
 	uniswapService := services.NewUniswapService(db)
@@ -16,24 +16,24 @@ func InitializeServices(db *gorm.DB) (services.EvmService, services.TransactionS
 	hookService := services.NewHookService()
 	chainService := services.NewChainService(db)
 	templateService := services.NewTemplateService(db)
-	uniswapSettingsService := services.NewUniswapSettingsService(db)
 	deploymentService := services.NewDeploymentService(db)
+	uniswapContractService := services.NewUniswapContractService(uniswapService)
 
-	return evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService, deploymentService
+	return evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, deploymentService, uniswapContractService
 }
 
-func InitializeHooks(db *gorm.DB, hookService services.HookService, uniswapService services.UniswapService) (services.Hook, services.Hook) {
-	tokenDeploymentHook := hooks.NewTokenDeploymentHook(db)
+func InitializeHooks(db *gorm.DB, hookService services.HookService, uniswapService services.UniswapService, deploymentService services.DeploymentService, liquidityService services.LiquidityService, uniswapContractService services.UniswapContractService, chainService services.ChainService) (services.Hook, services.Hook, services.Hook) {
+	tokenDeploymentHook := hooks.NewTokenDeploymentHook(deploymentService)
 	uniswapDeploymentHook := hooks.NewUniswapDeploymentHook(db, uniswapService)
+	liquidityHook := hooks.NewLiquidityPoolHook(db, liquidityService, uniswapContractService, chainService)
 
-	return tokenDeploymentHook, uniswapDeploymentHook
+	return tokenDeploymentHook, uniswapDeploymentHook, liquidityHook
 }
 
-func RegisterHooks(hookService services.HookService, tokenDeploymentHook services.Hook, uniswapDeploymentHook services.Hook) {
-	if err := hookService.AddHook(tokenDeploymentHook); err != nil {
-		log.Fatal("Failed to register token deployment hook:", err)
-	}
-	if err := hookService.AddHook(uniswapDeploymentHook); err != nil {
-		log.Fatal("Failed to register uniswap deployment hook:", err)
+func RegisterHooks(hookService services.HookService, hooks ...services.Hook) {
+	for _, hook := range hooks {
+		if err := hookService.AddHook(hook); err != nil {
+			log.Fatal("Failed to register hook:", err)
+		}
 	}
 }

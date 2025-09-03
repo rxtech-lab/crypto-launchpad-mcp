@@ -1,5 +1,10 @@
-import { useEffect } from "react";
-import { Loader2, Wallet, ChevronDown, LogOut, CheckCircle } from "lucide-react";
+import {
+  CheckCircle,
+  ChevronDown,
+  Loader2,
+  LogOut,
+  Wallet,
+} from "lucide-react";
 import type { EIP6963Provider } from "../types/wallet";
 
 interface WalletSelectorProps {
@@ -11,8 +16,6 @@ interface WalletSelectorProps {
   onDisconnect?: () => void;
 }
 
-const WALLET_STORAGE_KEY = "selectedWalletUuid";
-
 export function WalletSelector({
   providers,
   selectedProvider,
@@ -21,26 +24,6 @@ export function WalletSelector({
   onConnect,
   onDisconnect,
 }: WalletSelectorProps) {
-  // Try to reconnect to saved wallet on mount
-  useEffect(() => {
-    if (!isConnected && providers.length > 0) {
-      const savedWalletUuid = localStorage.getItem(WALLET_STORAGE_KEY);
-      if (savedWalletUuid) {
-        const savedProvider = providers.find(p => p.info.uuid === savedWalletUuid);
-        if (savedProvider) {
-          onConnect(savedWalletUuid);
-        }
-      }
-    }
-  }, [providers, isConnected, onConnect]);
-
-  // Save selected wallet to localStorage when connected
-  useEffect(() => {
-    if (isConnected && selectedProvider) {
-      localStorage.setItem(WALLET_STORAGE_KEY, selectedProvider.info.uuid);
-    }
-  }, [isConnected, selectedProvider]);
-
   const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const providerUuid = event.target.value;
     if (providerUuid && !isConnected) {
@@ -52,7 +35,6 @@ export function WalletSelector({
   };
 
   const handleDisconnect = () => {
-    localStorage.removeItem(WALLET_STORAGE_KEY);
     if (onDisconnect) {
       onDisconnect();
     }
@@ -60,7 +42,7 @@ export function WalletSelector({
 
   if (isConnected && selectedProvider) {
     return (
-      <div 
+      <div
         data-testid="wallet-connected-status"
         className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl"
       >
@@ -70,10 +52,14 @@ export function WalletSelector({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">Connected to</span>
+              <span className="text-sm font-medium text-gray-700">
+                Connected to
+              </span>
               <CheckCircle className="h-4 w-4 text-green-500" />
             </div>
-            <span className="text-base font-semibold text-gray-900">{selectedProvider.info.name}</span>
+            <span className="text-base font-semibold text-gray-900">
+              {selectedProvider.info.name}
+            </span>
           </div>
         </div>
         {onDisconnect && (
@@ -108,9 +94,10 @@ export function WalletSelector({
             text-base font-medium
             appearance-none cursor-pointer
             transition-all duration-200
-            ${isConnecting 
-              ? 'border-blue-300 bg-blue-50' 
-              : 'border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100'
+            ${
+              isConnecting
+                ? "border-blue-300 bg-blue-50"
+                : "border-gray-200 hover:border-gray-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             }
             disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50
             focus:outline-none
@@ -124,8 +111,8 @@ export function WalletSelector({
               : "No wallets detected"}
           </option>
           {providers.map((provider, index) => (
-            <option 
-              key={provider.info.uuid} 
+            <option
+              key={provider.info.uuid}
               value={provider.info.uuid}
               data-testid={`wallet-selector-option-${index}`}
             >
@@ -141,9 +128,9 @@ export function WalletSelector({
           )}
         </div>
       </div>
-      
+
       {providers.length === 0 && (
-        <p 
+        <p
           data-testid="wallet-no-wallets-message"
           className="mt-3 text-sm text-gray-500"
         >

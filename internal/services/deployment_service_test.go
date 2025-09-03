@@ -36,7 +36,6 @@ func TestDeploymentService(t *testing.T) {
 	template := &models.Template{
 		Name:         "Test Template",
 		ChainType:    models.TransactionChainTypeEthereum,
-		ContractName: "TestContract",
 		TemplateCode: "pragma solidity ^0.8.0;",
 	}
 	err = db.Create(template).Error
@@ -48,7 +47,7 @@ func TestDeploymentService(t *testing.T) {
 			TemplateID:      template.ID,
 			ChainID:         chain.ID,
 			ContractAddress: "0x123",
-			Status:          string(models.TransactionStatusPending),
+			Status:          models.TransactionStatusPending,
 		}
 
 		err := service.CreateDeploymentWithUser(deployment, &userID)
@@ -66,7 +65,7 @@ func TestDeploymentService(t *testing.T) {
 			TemplateID:      template.ID,
 			ChainID:         chain.ID,
 			ContractAddress: "0x456",
-			Status:          string(models.TransactionStatusConfirmed),
+			Status:          models.TransactionStatusConfirmed,
 			UserID:          &user1,
 		}
 		err := db.Create(deployment1).Error
@@ -76,7 +75,7 @@ func TestDeploymentService(t *testing.T) {
 			TemplateID:      template.ID,
 			ChainID:         chain.ID,
 			ContractAddress: "0x789",
-			Status:          string(models.TransactionStatusConfirmed),
+			Status:          models.TransactionStatusConfirmed,
 			UserID:          &user2,
 		}
 		err = db.Create(deployment2).Error
@@ -86,7 +85,7 @@ func TestDeploymentService(t *testing.T) {
 			TemplateID:      template.ID,
 			ChainID:         chain.ID,
 			ContractAddress: "0xabc",
-			Status:          string(models.TransactionStatusConfirmed),
+			Status:          models.TransactionStatusConfirmed,
 			UserID:          &user1,
 		}
 		err = db.Create(deployment3).Error

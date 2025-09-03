@@ -54,8 +54,11 @@ func (suite *LaunchToolTestSuite) SetupSuite() {
 	err = suite.verifyEthereumConnection()
 	suite.Require().NoError(err)
 
+	// Initialize deployment service
+	deploymentService := services.NewDeploymentService(suite.db.GetDB())
+
 	// Initialize launch tool
-	suite.launchTool = NewLaunchTool(suite.templateService, suite.chainService, TEST_SERVER_PORT, evmService, txService)
+	suite.launchTool = NewLaunchTool(suite.templateService, suite.chainService, TEST_SERVER_PORT, evmService, txService, deploymentService)
 
 	// Setup test data
 	suite.setupTestChain()
@@ -132,7 +135,6 @@ contract CustomToken {
 		Name:         "CustomToken",
 		Description:  "A custom token contract template for testing",
 		ChainType:    models.TransactionChainTypeEthereum,
-		ContractName: "CustomToken",
 		TemplateCode: contractCode,
 	}
 
@@ -206,6 +208,7 @@ func (suite *LaunchToolTestSuite) TestHandlerSuccess() {
 					"TokenSymbol": "TST",
 					"TotalSupply": "1000000",
 				},
+				"contract_name":    "CustomToken",
 				"constructor_args": []interface{}{},
 				"value":            "0",
 				"metadata": []interface{}{
@@ -299,6 +302,7 @@ func (suite *LaunchToolTestSuite) TestHandlerTemplateRendering() {
 			Arguments: map[string]interface{}{
 				"template_id":     fmt.Sprintf("%d", suite.template.ID),
 				"template_values": templateValues,
+				"contract_name":   "CustomToken",
 			},
 		},
 	}
@@ -392,7 +396,6 @@ contract TokenWithConstructor {
 		Name:         "TokenWithConstructor",
 		Description:  "A token contract template that uses constructor arguments",
 		ChainType:    models.TransactionChainTypeEthereum,
-		ContractName: "TokenWithConstructor",
 		TemplateCode: contractCodeWithConstructor,
 	}
 
@@ -411,7 +414,8 @@ contract TokenWithConstructor {
 					"CTK",
 					1000000,
 				},
-				"value": "0",
+				"contract_name": "TokenWithConstructor",
+				"value":         "0",
 			},
 		},
 	}
@@ -537,7 +541,6 @@ func (suite *LaunchToolTestSuite) TestHandlerChainTypeMismatch() {
 		Name:         "SolanaToken",
 		Description:  "A Solana token template",
 		ChainType:    models.TransactionChainTypeSolana,
-		ContractName: "SolanaToken",
 		TemplateCode: "// Solana contract code",
 	}
 
@@ -646,7 +649,6 @@ contract TokenRequiringConstructor {
 		Name:         "TokenRequiringConstructor",
 		Description:  "A token contract template that requires constructor arguments",
 		ChainType:    models.TransactionChainTypeEthereum,
-		ContractName: "TokenRequiringConstructor",
 		TemplateCode: contractCodeWithConstructor,
 	}
 
@@ -662,7 +664,8 @@ contract TokenRequiringConstructor {
 					// This template doesn't use template substitution, just constructor args
 				},
 				// constructor_args is intentionally omitted (nil)
-				"value": "0",
+				"value":         "0",
+				"contract_name": "TokenRequiringConstructor",
 			},
 		},
 	}
@@ -687,6 +690,7 @@ contract TokenRequiringConstructor {
 				},
 				"constructor_args": []interface{}{}, // Empty array
 				"value":            "0",
+				"contract_name":    "TokenRequiringConstructor",
 			},
 		},
 	}
@@ -724,6 +728,9 @@ contract TestContract {
 		"0",
 		"Deploy TestContract",
 		"Deploy a test contract",
+		suite.template.ID,
+		models.JSON{},
+		nil,
 	)
 
 	suite.NoError(err)
@@ -779,6 +786,7 @@ func (suite *LaunchToolTestSuite) TestURLGeneration() {
 					"TokenSymbol": "URL",
 					"TotalSupply": "1000",
 				},
+				"contract_name": "CustomToken",
 			},
 		},
 	}

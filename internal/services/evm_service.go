@@ -13,6 +13,7 @@ type EvmService interface {
 	GetContractDeploymentTransactionWithContractCode(args ContractDeploymentWithContractCodeTransactionArgs) (models.TransactionDeployment, error)
 	GetContractDeploymentTransactionWithBytecodeAndAbi(args ContractDeploymentWithBytecodeAndAbiTransactionArgs) (models.TransactionDeployment, error)
 	GetTransactionData(args GetTransactionDataArgs) (string, error)
+	GetContractFunctionCallTransaction(args GetContractFunctionCallTransactionArgs) (models.TransactionDeployment, error)
 }
 
 type evmService struct {
@@ -81,6 +82,28 @@ func (s *evmService) GetTransactionData(args GetTransactionDataArgs) (string, er
 	}
 
 	return encodedData, nil
+}
+
+// GetContractFunctionCallTransaction returns a transaction deployment for a contract function call
+func (s *evmService) GetContractFunctionCallTransaction(args GetContractFunctionCallTransactionArgs) (models.TransactionDeployment, error) {
+	err := s.validator.Struct(args)
+	if err != nil {
+		return models.TransactionDeployment{}, err
+	}
+
+	encodedData, err := utils.EncodeContractFunctionCall(args.Abi, args.FunctionName, args.FunctionArgs)
+	if err != nil {
+		return models.TransactionDeployment{}, fmt.Errorf("failed to encode function call: %w", err)
+	}
+
+	return models.TransactionDeployment{
+		Data:            encodedData,
+		Title:           args.Title,
+		Description:     args.Description,
+		Value:           args.Value,
+		Receiver:        args.ContractAddress,
+		TransactionType: args.TransactionType,
+	}, nil
 }
 
 func (s *evmService) getContractDeploymentTransactionDataWithBytecodeAndAbi(abi string, bytecode string, constructorArgs []any) (string, error) {

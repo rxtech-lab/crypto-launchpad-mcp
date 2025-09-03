@@ -12,7 +12,7 @@ import (
 type TokenDeploymentHookTestSuite struct {
 	suite.Suite
 	dbService         services.DBService
-	deploymentService *services.DeploymentService
+	deploymentService services.DeploymentService
 	templateService   services.TemplateService
 	chainService      services.ChainService
 	hook              *TokenDeploymentHook
@@ -30,7 +30,9 @@ func (s *TokenDeploymentHookTestSuite) SetupSuite() {
 	s.chainService = services.NewChainService(db.GetDB())
 
 	// Create hook instance
-	s.hook = &TokenDeploymentHook{db: db.GetDB()}
+	s.hook = &TokenDeploymentHook{
+		deploymentService: s.deploymentService,
+	}
 
 	// Setup test data
 	s.setupTestData()
@@ -64,7 +66,6 @@ func (s *TokenDeploymentHookTestSuite) setupTestData() {
 		Name:         "Test ERC20",
 		Description:  "Test ERC20 token template",
 		ChainType:    "ethereum",
-		ContractName: "TestToken",
 		TemplateCode: `pragma solidity ^0.8.0; contract TestToken { constructor(string memory name) {} }`,
 		Metadata:     models.JSON{"name": ""},
 	}
@@ -88,9 +89,8 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_TokenDeploymen
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Test Token",
-		TokenSymbol:     "TST",
+		Status:          models.TransactionStatusPending,
+		SessionId:       "test-session-id",
 		CreatedAt:       time.Now(),
 	}
 
@@ -110,7 +110,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_TokenDeploymen
 	err = s.hook.OnTransactionConfirmed(
 		models.TransactionTypeTokenDeployment,
 		deployment.TransactionHash,
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	s.NoError(err)
@@ -120,7 +120,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_TokenDeploymen
 	s.Require().NoError(err)
 
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
-	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
+	s.Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 }
 
 func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2TokenDeployment() {
@@ -129,9 +129,8 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2Token
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Uniswap Token",
-		TokenSymbol:     "UNI",
+		Status:          models.TransactionStatusPending,
+		SessionId:       "test-uniswap-session-id",
 		CreatedAt:       time.Now(),
 	}
 
@@ -151,7 +150,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2Token
 	err = s.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2TokenDeployment,
 		deployment.TransactionHash,
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	s.NoError(err)
@@ -161,7 +160,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2Token
 	s.Require().NoError(err)
 
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
-	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
+	s.Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 }
 
 func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_NonexistentTransaction() {
@@ -180,7 +179,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_NonexistentTra
 	err := s.hook.OnTransactionConfirmed(
 		models.TransactionTypeTokenDeployment,
 		nonexistentTxHash,
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 
@@ -194,9 +193,8 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_EmptyContractA
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Test Token",
-		TokenSymbol:     "TST",
+		Status:          models.TransactionStatusPending,
+		SessionId:       "test-session-id",
 		CreatedAt:       time.Now(),
 	}
 
@@ -215,7 +213,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_EmptyContractA
 	err = s.hook.OnTransactionConfirmed(
 		models.TransactionTypeTokenDeployment,
 		deployment.TransactionHash,
-		"", // Empty contract address
+		nil, // Empty contract address
 		session,
 	)
 	s.NoError(err)
@@ -225,7 +223,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_EmptyContractA
 	s.Require().NoError(err)
 
 	s.Equal("", updatedDeployment.ContractAddress)
-	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
+	s.Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 }
 
 func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultipleRecords() {
@@ -236,18 +234,16 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: txHash,
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Test Token 1",
-		TokenSymbol:     "TST1",
+		Status:          models.TransactionStatusPending,
+		SessionId:       "test-session-id",
 		CreatedAt:       time.Now(),
 	}
 	deployment2 := &models.Deployment{
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: txHash,
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Test Token 2",
-		TokenSymbol:     "TST2",
+		Status:          models.TransactionStatusPending,
+		SessionId:       "test-session-id",
 		CreatedAt:       time.Now(),
 	}
 
@@ -269,7 +265,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 	err = s.hook.OnTransactionConfirmed(
 		models.TransactionTypeTokenDeployment,
 		txHash,
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	s.NoError(err)
@@ -282,13 +278,13 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 
 	for _, deployment := range updatedDeployments {
 		s.Equal(contractAddress, deployment.ContractAddress)
-		s.Equal(string(models.TransactionStatusConfirmed), deployment.Status)
+		s.Equal(models.TransactionStatusConfirmed, deployment.Status)
 	}
 }
 
 func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 	// Test constructor function
-	hook := NewTokenDeploymentHook(s.dbService.GetDB())
+	hook := NewTokenDeploymentHook(s.deploymentService)
 	s.NotNil(hook)
 
 	// Verify it implements the Hook interface
@@ -301,9 +297,8 @@ func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: "0x2222222222222222222222222222222222222222222222222222222222222222",
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Constructor Test Token",
-		TokenSymbol:     "CTT",
+		Status:          models.TransactionStatusPending,
+		SessionId:       "constructor-test-session",
 		CreatedAt:       time.Now(),
 	}
 
@@ -321,7 +316,7 @@ func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 	err = hook.OnTransactionConfirmed(
 		models.TransactionTypeTokenDeployment,
 		deployment.TransactionHash,
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	s.NoError(err)
@@ -330,7 +325,7 @@ func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 	updatedDeployment, err := s.deploymentService.GetDeploymentByTransactionHash(deployment.TransactionHash)
 	s.Require().NoError(err)
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
-	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
+	s.Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 }
 
 func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
@@ -339,9 +334,8 @@ func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
 		TemplateID:      1,
 		ChainID:         1,
 		TransactionHash: "0x3333333333333333333333333333333333333333333333333333333333333333",
-		Status:          string(models.TransactionStatusPending),
-		TokenName:       "Integrity Test Token",
-		TokenSymbol:     "ITT",
+		Status:          models.TransactionStatusPending,
+		SessionId:       "integrity-test-session",
 		CreatedAt:       time.Now(),
 	}
 
@@ -361,7 +355,7 @@ func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
 		err = s.hook.OnTransactionConfirmed(
 			models.TransactionTypeTokenDeployment,
 			deployment.TransactionHash,
-			contractAddress,
+			&contractAddress,
 			session,
 		)
 		s.NoError(err)
@@ -371,7 +365,7 @@ func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
 	updatedDeployment, err := s.deploymentService.GetDeploymentByTransactionHash(deployment.TransactionHash)
 	s.Require().NoError(err)
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
-	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
+	s.Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 }
 
 func TestTokenDeploymentHook(t *testing.T) {

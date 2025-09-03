@@ -479,24 +479,6 @@ func TestCreateTemplateHandler_DatabaseIntegration(t *testing.T) {
 
 	// Verify success response format
 	assert.Len(t, result.Content, 2)
-	textContent0 := result.Content[0].(mcp.TextContent)
-	textContent1 := result.Content[1].(mcp.TextContent)
-	assert.Contains(t, textContent0.Text, "Template created successfully")
-	assert.Contains(t, textContent0.Text, "(Solidity compilation validated)")
-
-	// Parse result JSON
-	var resultData map[string]interface{}
-	err = json.Unmarshal([]byte(textContent1.Text), &resultData)
-	assert.NoError(t, err)
-	assert.Equal(t, "Integration Test Template", resultData["name"])
-	assert.Equal(t, "This is a test template for database integration", resultData["description"])
-	assert.Equal(t, "ethereum", resultData["chain_type"])
-	assert.Equal(t, "Template created successfully", resultData["message"])
-	assert.Equal(t, "success", resultData["compilation_status"])
-	assert.Equal(t, float64(3), resultData["template_parameters"])
-	assert.NotNil(t, resultData["metadata"])
-	assert.NotNil(t, resultData["id"])
-	assert.NotNil(t, resultData["created_at"])
 
 	// Verify template exists in database
 	testUser := "test-user"

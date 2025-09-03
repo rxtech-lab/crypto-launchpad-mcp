@@ -1,8 +1,6 @@
 package services
 
 import (
-	"errors"
-
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"gorm.io/gorm"
 )
@@ -11,20 +9,12 @@ type LiquidityService interface {
 	// Liquidity Pool operations
 	CreateLiquidityPool(pool *models.LiquidityPool) (uint, error)
 	GetLiquidityPool(poolID uint) (*models.LiquidityPool, error)
-	GetLiquidityPoolByTokenAddress(tokenAddress string) (*models.LiquidityPool, error)
+	GetLiquidityPoolByTokenAddress(tokenAddressA string, tokenAddressB string) (*models.LiquidityPool, error)
 	UpdateLiquidityPoolStatus(poolID uint, status models.TransactionStatus, pairAddress, txHash string) error
 	UpdateLiquidityPoolPairAddress(poolID uint, pairAddress string) error
 	ListLiquidityPools(skip, limit int) ([]models.LiquidityPool, error)
 	ListLiquidityPoolsByUser(userID string, skip, limit int) ([]models.LiquidityPool, error)
-
-	// Liquidity Position operations
-	CreateLiquidityPosition(position *models.LiquidityPosition) (uint, error)
-	GetLiquidityPosition(positionID uint) (*models.LiquidityPosition, error)
-	GetLiquidityPositionsByPool(poolID uint) ([]models.LiquidityPosition, error)
-	GetLiquidityPositionsByUser(userAddress string) ([]models.LiquidityPosition, error)
-	GetLiquidityPositionsByUserID(userID string) ([]models.LiquidityPosition, error)
-	UpdateLiquidityPositionStatus(positionID uint, status models.TransactionStatus, txHash string) error
-	UpdateLiquidityPositionAmounts(positionID uint, liquidityAmount, token0Amount, token1Amount string) error
+	GetLiquidityPoolBySessionId(sessionId string) (*models.LiquidityPool, error)
 
 	// Swap operations
 	CreateSwapTransaction(swap *models.SwapTransaction) (uint, error)
@@ -42,6 +32,15 @@ func NewLiquidityService(db *gorm.DB) LiquidityService {
 }
 
 // Liquidity Pool operations
+// GetLiquidityPoolBySessionId implements LiquidityService.
+func (l *liquidityService) GetLiquidityPoolBySessionId(sessionId string) (*models.LiquidityPool, error) {
+	var pool models.LiquidityPool
+	err := l.db.Where("session_id = ?", sessionId).First(&pool).Error
+	if err != nil {
+		return nil, err
+	}
+	return &pool, nil
+}
 
 func (l *liquidityService) CreateLiquidityPool(pool *models.LiquidityPool) (uint, error) {
 	if pool.Status == "" {
@@ -64,9 +63,9 @@ func (l *liquidityService) GetLiquidityPool(poolID uint) (*models.LiquidityPool,
 	return &pool, nil
 }
 
-func (l *liquidityService) GetLiquidityPoolByTokenAddress(tokenAddress string) (*models.LiquidityPool, error) {
+func (l *liquidityService) GetLiquidityPoolByTokenAddress(tokenAddressA string, tokenAddressB string) (*models.LiquidityPool, error) {
 	var pool models.LiquidityPool
-	err := l.db.Where("token_address = ?", tokenAddress).First(&pool).Error
+	err := l.db.Where("token_address = ? OR token_address = ?", tokenAddressA, tokenAddressB).First(&pool).Error
 	if err != nil {
 		return nil, err
 	}
@@ -113,92 +112,6 @@ func (l *liquidityService) ListLiquidityPoolsByUser(userID string, skip, limit i
 		return nil, err
 	}
 	return pools, nil
-}
-
-// Liquidity Position operations
-
-func (l *liquidityService) CreateLiquidityPosition(position *models.LiquidityPosition) (uint, error) {
-	if position.Status == "" {
-		position.Status = models.TransactionStatusPending
-	}
-
-	err := l.db.Create(position).Error
-	if err != nil {
-		return 0, err
-	}
-	return position.ID, nil
-}
-
-func (l *liquidityService) GetLiquidityPosition(positionID uint) (*models.LiquidityPosition, error) {
-	var position models.LiquidityPosition
-	err := l.db.Preload("Pool").First(&position, positionID).Error
-	if err != nil {
-		return nil, err
-	}
-	return &position, nil
-}
-
-func (l *liquidityService) GetLiquidityPositionsByPool(poolID uint) ([]models.LiquidityPosition, error) {
-	var positions []models.LiquidityPosition
-	err := l.db.Where("pool_id = ?", poolID).Preload("Pool").Find(&positions).Error
-	if err != nil {
-		return nil, err
-	}
-	return positions, nil
-}
-
-func (l *liquidityService) GetLiquidityPositionsByUser(userAddress string) ([]models.LiquidityPosition, error) {
-	var positions []models.LiquidityPosition
-	err := l.db.Where("user_address = ?", userAddress).Preload("Pool").Find(&positions).Error
-	if err != nil {
-		return nil, err
-	}
-	return positions, nil
-}
-
-func (l *liquidityService) UpdateLiquidityPositionStatus(positionID uint, status models.TransactionStatus, txHash string) error {
-	updates := map[string]interface{}{
-		"status": status,
-	}
-
-	if txHash != "" {
-		updates["transaction_hash"] = txHash
-	}
-
-	return l.db.Model(&models.LiquidityPosition{}).
-		Where("id = ?", positionID).
-		Updates(updates).Error
-}
-
-func (l *liquidityService) UpdateLiquidityPositionAmounts(positionID uint, liquidityAmount, token0Amount, token1Amount string) error {
-	updates := map[string]interface{}{}
-
-	if liquidityAmount != "" {
-		updates["liquidity_amount"] = liquidityAmount
-	}
-	if token0Amount != "" {
-		updates["token0_amount"] = token0Amount
-	}
-	if token1Amount != "" {
-		updates["token1_amount"] = token1Amount
-	}
-
-	if len(updates) == 0 {
-		return errors.New("no amounts to update")
-	}
-
-	return l.db.Model(&models.LiquidityPosition{}).
-		Where("id = ?", positionID).
-		Updates(updates).Error
-}
-
-func (l *liquidityService) GetLiquidityPositionsByUserID(userID string) ([]models.LiquidityPosition, error) {
-	var positions []models.LiquidityPosition
-	err := l.db.Where("user_id = ?", userID).Preload("Pool").Find(&positions).Error
-	if err != nil {
-		return nil, err
-	}
-	return positions, nil
 }
 
 // Swap operations

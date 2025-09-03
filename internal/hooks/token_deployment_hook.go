@@ -3,11 +3,10 @@ package hooks
 import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
-	"gorm.io/gorm"
 )
 
 type TokenDeploymentHook struct {
-	db *gorm.DB
+	deploymentService services.DeploymentService
 }
 
 // CanHandle implements Hook.
@@ -17,14 +16,13 @@ func (t *TokenDeploymentHook) CanHandle(txType models.TransactionType) bool {
 }
 
 // OnTransactionConfirmed implements Hook.
-func (t *TokenDeploymentHook) OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress string, session models.TransactionSession) error {
+func (t *TokenDeploymentHook) OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress *string, session models.TransactionSession) error {
 	// Update the deployment record with the contract address and confirmed status
-	err := t.db.Model(&models.Deployment{}).
-		Where("transaction_hash = ?", txHash).
-		Updates(map[string]interface{}{
-			"contract_address": contractAddress,
-			"status":           string(models.TransactionStatusConfirmed),
-		}).Error
+	var address string
+	if contractAddress != nil {
+		address = *contractAddress
+	}
+	err := t.deploymentService.UpdateDeploymentStatusWithTxHashBySessionId(session.ID, models.TransactionStatusConfirmed, address, txHash)
 
 	if err != nil {
 		return err
@@ -33,8 +31,8 @@ func (t *TokenDeploymentHook) OnTransactionConfirmed(txType models.TransactionTy
 	return nil
 }
 
-func NewTokenDeploymentHook(db *gorm.DB) services.Hook {
+func NewTokenDeploymentHook(deploymentService services.DeploymentService) services.Hook {
 	return &TokenDeploymentHook{
-		db: db,
+		deploymentService: deploymentService,
 	}
 }

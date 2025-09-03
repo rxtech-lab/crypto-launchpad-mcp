@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useState } from "react";
+import { formatEther } from "ethers";
 import type { TransactionState, TransactionStatus } from "../types/wallet";
 
 interface UseTransactionProps {
@@ -110,8 +111,14 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
       try {
         const tx = {
           data: deployment.data,
-          value: deployment.value.length > 0 ? deployment.value : "0",
+          value:
+            deployment.value.length > 0 && deployment.value != "0"
+              ? formatEther(deployment.value)
+              : "0",
+          to: deployment.receiver ? deployment.receiver : undefined,
         };
+
+        console.log("Constructing transaction:", tx);
 
         const txResponse = await signTransaction(tx);
         const receipt = await txResponse.wait();

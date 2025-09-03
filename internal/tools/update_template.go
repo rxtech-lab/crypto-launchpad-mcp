@@ -127,12 +127,6 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 			updates = append(updates, "chain_type")
 		}
 
-		// Update contract name if provided
-		if args.ContractName != "" {
-			template.ContractName = args.ContractName
-			updates = append(updates, "contract_name")
-		}
-
 		// Update metadata if provided
 		if args.TemplateMetadata != "" {
 			template.Metadata = metadata

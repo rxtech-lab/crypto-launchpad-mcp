@@ -7,5 +7,5 @@ type Hook interface {
 	// CanHandle is used to check if the hook can handle the transaction type
 	CanHandle(txType models.TransactionType) bool
 	// OnTransactionConfirmed is called when a transaction is confirmed
-	OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress string, session models.TransactionSession) error
+	OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress *string, session models.TransactionSession) error
 }

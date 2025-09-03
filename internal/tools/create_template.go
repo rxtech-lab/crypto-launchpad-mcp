@@ -75,16 +75,13 @@ func (c *createTemplateTool) GetTool() mcp.Tool {
 func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Check if user is authenticated (optional for this tool, but log for audit)
-		var createdBy string
-		if user, ok := utils.GetAuthenticatedUser(ctx); ok {
-			createdBy = user.Sub
-			// Log the authenticated action for audit purposes
-			fmt.Printf("Template creation requested by user: %s (roles: %v)\n", user.Sub, user.Roles)
-		} else {
-			createdBy = "unauthenticated"
-			fmt.Println("Template creation requested by unauthenticated user")
+		var userId *string
+		user, _ := utils.GetAuthenticatedUser(ctx)
+		if user != nil {
+			userId = &user.Sub
 		}
+
+		// Parse and validate arguments
 
 		var args CreateTemplateArguments
 		if err := request.BindArguments(&args); err != nil {
@@ -153,10 +150,10 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 			Name:                 args.Name,
 			Description:          args.Description,
 			ChainType:            models.TransactionChainType(args.ChainType),
-			ContractName:         args.ContractName,
 			TemplateCode:         args.TemplateCode,
 			SampleTemplateValues: args.TemplateValues,
 			Metadata:             metadata,
+			UserId:               userId,
 		}
 
 		if err := c.templateService.CreateTemplate(template); err != nil {
@@ -170,8 +167,6 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 			"description": template.Description,
 			"chain_type":  template.ChainType,
 			"created_at":  template.CreatedAt,
-			"created_by":  createdBy,
-			"message":     "Template created successfully",
 		}
 
 		// Include metadata if provided
