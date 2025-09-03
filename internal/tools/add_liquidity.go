@@ -2,8 +2,11 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"strconv"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -29,6 +32,7 @@ type AddLiquidityArguments struct {
 	ETHAmount      string `json:"eth_amount" validate:"required"`
 	MinTokenAmount string `json:"min_token_amount" validate:"required"`
 	MinETHAmount   string `json:"min_eth_amount" validate:"required"`
+	OwnerAddress   string `json:"owner_address" validate:"required"`
 
 	// Optional fields
 	Metadata []models.TransactionMetadata `json:"metadata,omitempty"`
@@ -67,6 +71,10 @@ func (a *addLiquidityTool) GetTool() mcp.Tool {
 		mcp.WithString("min_eth_amount",
 			mcp.Required(),
 			mcp.Description("Minimum amount of ETH (slippage protection)"),
+		),
+		mcp.WithString("owner_address",
+			mcp.Required(),
+			mcp.Description("Address that will receive the liquidity pool tokens. Ask user to provide this address."),
 		),
 		mcp.WithArray("metadata",
 			mcp.Description("JSON array of metadata for the transaction (e.g., [{\"key\": \"Liquidity Action\", \"value\": \"Add Liquidity\"}]). Optional."),
@@ -178,25 +186,38 @@ func (a *addLiquidityTool) createEthereumAddLiquidity(ctx context.Context, args 
 	// Prepare enhanced metadata
 	enhancedMetadata := a.prepareMetadata(args.Metadata, pool, position, positionID, uniswapSettings.Version)
 
-	// Create transaction session
-	sessionID, err := a.createAddLiquidityTransactionSession(
-		activeChain,
-		pool,
-		uniswapDeployment,
-		args,
-		enhancedMetadata,
+	// Create transaction deployments for adding liquidity
+	transactionDeployments, err := a.createEthereumAddLiquidityTransactions(
+		uniswapDeployment.RouterAddress,
+		pool.TokenAddress,
+		uniswapDeployment.WETHAddress,
+		args.TokenAmount,
+		args.ETHAmount,
+		args.MinTokenAmount,
+		args.MinETHAmount,
+		args.OwnerAddress,
 	)
 	if err != nil {
-		// Position cleanup would need to be handled differently
-		// since DeleteLiquidityPosition doesn't exist in the service
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to create transaction session: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Error creating add liquidity transactions: %v", err)), nil
+	}
+
+	// Create transaction session with the add liquidity transactions
+	sessionID, err := a.txService.CreateTransactionSession(services.CreateTransactionSessionRequest{
+		TransactionDeployments: transactionDeployments,
+		ChainType:              models.TransactionChainTypeEthereum,
+		ChainID:                activeChain.ID,
+		Metadata:               enhancedMetadata,
+		UserID:                 userId,
+	})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Error creating transaction session: %v", err)), nil
 	}
 
 	// Return success with URL
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.NewTextContent(fmt.Sprintf("Transaction session created: %s", sessionID)),
-			mcp.NewTextContent("Please return the following url to the user:"),
+			mcp.NewTextContent("Please sign the add liquidity transactions in the URL"),
 			mcp.NewTextContent(fmt.Sprintf("http://localhost:%d/tx/%s", a.serverPort, sessionID)),
 		},
 	}, nil
@@ -252,76 +273,80 @@ func (a *addLiquidityTool) prepareMetadata(
 	return metadata
 }
 
-// createAddLiquidityTransactionSession creates a transaction session for adding liquidity
-func (a *addLiquidityTool) createAddLiquidityTransactionSession(
-	activeChain *models.Chain,
-	pool *models.LiquidityPool,
-	uniswapDeployment *models.UniswapDeployment,
-	args AddLiquidityArguments,
-	metadata []models.TransactionMetadata,
-) (string, error) {
-	// Create transaction deployment
-	// Note: The actual transaction data will be generated on the frontend
-	// since it requires user's wallet address and current blockchain state
-	tx := models.TransactionDeployment{
-		Title:       "Add Liquidity",
-		Description: fmt.Sprintf("Add liquidity to %s pool", pool.TokenAddress),
-		Value:       args.ETHAmount,                  // ETH amount to be sent with transaction
-		Receiver:    uniswapDeployment.RouterAddress, // Router is the receiver for add liquidity
-		Data:        "",                              // Will be populated on frontend with addLiquidityETH call
-	}
-
-	// Create transaction session
-	sessionID, err := a.txService.CreateTransactionSession(services.CreateTransactionSessionRequest{
-		TransactionDeployments: []models.TransactionDeployment{tx},
-		ChainType:              models.TransactionChainTypeEthereum,
-		ChainID:                activeChain.ID,
-		Metadata:               metadata,
-	})
-
+// createEthereumAddLiquidityTransactions creates the necessary transactions to add liquidity to an existing Uniswap pool.
+// It includes approve transactions for both tokens and the add liquidity transaction.
+// routerAddress is the address of the Uniswap router contract
+// tokenAddress is the address of the token in the pool
+// wethAddress is the address of WETH
+// tokenAmount is the amount of tokens to add to the pool
+// ethAmount is the amount of ETH to add to the pool (converted to WETH)
+// minTokenAmount is the minimum amount of tokens (slippage protection)
+// minETHAmount is the minimum amount of ETH (slippage protection)
+// ownerAddress is the address that will receive the liquidity pool tokens
+func (a *addLiquidityTool) createEthereumAddLiquidityTransactions(routerAddress, tokenAddress, wethAddress, tokenAmount, ethAmount, minTokenAmount, minETHAmount, ownerAddress string) ([]models.TransactionDeployment, error) {
+	// Get Uniswap V2 contracts to extract Router ABI
+	v2Contracts, err := utils.FetchUniswapV2Contracts()
 	if err != nil {
-		return "", fmt.Errorf("failed to create transaction session: %w", err)
+		return nil, fmt.Errorf("failed to fetch Uniswap V2 contracts: %w", err)
 	}
 
-	return sessionID, nil
-}
+	// Get Router ABI
+	routerAbi, err := json.Marshal(v2Contracts.Router.ABI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal Router ABI: %w", err)
+	}
 
-// createEthereumAddLiquidityTransaction creates a transaction for adding liquidity with proper data
-// This is an alternative implementation that generates the transaction data server-side
-// (Currently not used, but available for future enhancement)
-func (a *addLiquidityTool) createEthereumAddLiquidityTransaction(
-	activeChain *models.Chain,
-	pool *models.LiquidityPool,
-	uniswapDeployment *models.UniswapDeployment,
-	args AddLiquidityArguments,
-	metadata []models.TransactionMetadata,
-	userAddress string, // Would need to be passed from frontend
-	deadline string, // Unix timestamp for deadline
-) (string, error) {
-	// This would use the router ABI to encode the addLiquidityETH function call
-	// Example structure (would need actual router ABI):
-	/*
-		routerABI := `[{"name":"addLiquidityETH","inputs":[...],"outputs":[...],"type":"function"}]`
+	// Standard ERC20 ABI for approve function
+	erc20ABI := `[{"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"value","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"}]`
 
-		txData, err := a.evmService.GetTransactionData(services.GetTransactionDataArgs{
-			ContractAddress: uniswapDeployment.RouterAddress,
-			FunctionName:    "addLiquidityETH",
-			FunctionArgs: []any{
-				pool.TokenAddress,  // token
-				args.TokenAmount,   // amountTokenDesired
-				args.MinTokenAmount,// amountTokenMin
-				args.MinETHAmount,  // amountETHMin
-				userAddress,        // to
-				deadline,           // deadline
-			},
-			Abi:         routerABI,
-			Value:       args.ETHAmount,
-			Title:       "Add Liquidity",
-			Description: fmt.Sprintf("Add liquidity to %s pool", pool.TokenAddress),
-		})
-	*/
+	// MaxUint256 for unlimited approval
+	maxUint256 := new(big.Int)
+	maxUint256.SetString("115792089237316195423570985008687907853269984665640564039457584007913129639935", 10)
 
-	// For now, return a placeholder as the actual implementation
-	// requires the router ABI and is handled on the frontend
-	return "", fmt.Errorf("server-side transaction data generation not yet implemented")
+	// Calculate deadline (10 minutes from now)
+	deadline := time.Now().Unix() + 600
+
+	var transactionDeployments []models.TransactionDeployment
+
+	// Transaction 1: Approve Token for Router
+	approveTokenTx, err := a.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
+		ContractAddress: tokenAddress,
+		FunctionName:    "approve",
+		FunctionArgs:    []any{routerAddress, maxUint256.String()},
+		Abi:             erc20ABI,
+		Value:           "0",
+		Title:           "Approve Token for Router",
+		Description:     fmt.Sprintf("Approve unlimited token spending for Uniswap Router at %s", routerAddress),
+		TransactionType: models.TransactionTypeRegular,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token approval transaction: %w", err)
+	}
+	transactionDeployments = append(transactionDeployments, approveTokenTx)
+
+	// Transaction 2: Add Liquidity ETH (this handles WETH conversion internally)
+	// addLiquidityETH(address token, uint amountTokenDesired, uint amountTokenMin, uint amountETHMin, address to, uint deadline) payable
+	addLiquidityETHTx, err := a.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
+		ContractAddress: routerAddress,
+		FunctionName:    "addLiquidityETH",
+		FunctionArgs: []any{
+			tokenAddress,                // token
+			tokenAmount,                 // amountTokenDesired
+			minTokenAmount,              // amountTokenMin (slippage protection)
+			minETHAmount,                // amountETHMin (slippage protection)
+			ownerAddress,                // to (address that will receive the LP tokens)
+			fmt.Sprintf("%d", deadline), // deadline
+		},
+		Abi:             string(routerAbi),
+		Value:           ethAmount, // ETH amount to send with transaction
+		Title:           "Add Liquidity to Pool",
+		Description:     fmt.Sprintf("Add liquidity to the token/%s pool", "ETH"),
+		TransactionType: models.TransactionTypeAddLiquidity,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create add liquidity transaction: %w", err)
+	}
+	transactionDeployments = append(transactionDeployments, addLiquidityETHTx)
+
+	return transactionDeployments, nil
 }
