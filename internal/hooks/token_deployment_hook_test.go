@@ -110,7 +110,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_TokenDeploymen
 	err = s.hook.OnTransactionConfirmed(
 		models.TransactionTypeTokenDeployment,
 		deployment.TransactionHash,
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	s.NoError(err)
@@ -150,7 +150,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2Token
 	err = s.hook.OnTransactionConfirmed(
 		models.TransactionTypeUniswapV2TokenDeployment,
 		deployment.TransactionHash,
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	s.NoError(err)
@@ -179,7 +179,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_NonexistentTra
 	err := s.hook.OnTransactionConfirmed(
 		models.TransactionTypeTokenDeployment,
 		nonexistentTxHash,
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 
@@ -213,7 +213,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_EmptyContractA
 	err = s.hook.OnTransactionConfirmed(
 		models.TransactionTypeTokenDeployment,
 		deployment.TransactionHash,
-		"", // Empty contract address
+		nil, // Empty contract address
 		session,
 	)
 	s.NoError(err)
@@ -265,7 +265,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 	err = s.hook.OnTransactionConfirmed(
 		models.TransactionTypeTokenDeployment,
 		txHash,
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	s.NoError(err)
@@ -316,7 +316,7 @@ func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 	err = hook.OnTransactionConfirmed(
 		models.TransactionTypeTokenDeployment,
 		deployment.TransactionHash,
-		contractAddress,
+		&contractAddress,
 		session,
 	)
 	s.NoError(err)
@@ -355,7 +355,7 @@ func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
 		err = s.hook.OnTransactionConfirmed(
 			models.TransactionTypeTokenDeployment,
 			deployment.TransactionHash,
-			contractAddress,
+			&contractAddress,
 			session,
 		)
 		s.NoError(err)

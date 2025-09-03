@@ -99,24 +99,9 @@ type LiquidityPool struct {
 	Status          TransactionStatus `gorm:"default:pending" json:"status"` // pending, models.TransactionStatusConfirmed, failed
 	CreatedAt       time.Time         `json:"created_at"`
 	UpdatedAt       time.Time         `json:"updated_at"`
-}
 
-// LiquidityPosition represents user liquidity positions
-type LiquidityPosition struct {
-	ID              uint              `gorm:"primaryKey" json:"id"`
-	UserID          *string           `gorm:"index;type:varchar(255)" json:"user_id,omitempty"`
-	PoolID          uint              `gorm:"not null" json:"pool_id"`
-	UserAddress     string            `gorm:"not null" json:"user_address"`
-	LiquidityAmount string            `gorm:"not null" json:"liquidity_amount"`
-	Token0Amount    string            `gorm:"not null" json:"token0_amount"`
-	Token1Amount    string            `gorm:"not null" json:"token1_amount"`
-	TransactionHash string            `gorm:"not null" json:"transaction_hash"`
-	Action          string            `gorm:"not null" json:"action"`        // add, remove
-	Status          TransactionStatus `gorm:"default:pending" json:"status"` // pending, models.TransactionStatusConfirmed, failed
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
-
-	Pool LiquidityPool `gorm:"foreignKey:PoolID" json:"pool,omitempty"`
+	SessionId string             `gorm:"index" json:"session_id"`
+	Session   TransactionSession `gorm:"foreignKey:SessionId;references:ID" json:"session,omitempty"`
 }
 
 // SwapTransaction represents historical swap data

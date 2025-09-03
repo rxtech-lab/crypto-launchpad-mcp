@@ -122,7 +122,7 @@ func (a *addLiquidityTool) GetHandler() server.ToolHandlerFunc {
 
 func (a *addLiquidityTool) createEthereumAddLiquidity(ctx context.Context, args AddLiquidityArguments, activeChain *models.Chain) (*mcp.CallToolResult, error) {
 	// Check if pool exists
-	pool, err := a.liquidityService.GetLiquidityPoolByTokenAddress(args.TokenAddress)
+	pool, err := a.liquidityService.GetLiquidityPoolByTokenAddress(args.TokenAddress, "")
 	if err != nil {
 		return mcp.NewToolResultError("Liquidity pool not found. Please create a pool first using create_liquidity_pool tool"), nil
 	}
@@ -151,7 +151,7 @@ func (a *addLiquidityTool) createEthereumAddLiquidity(ctx context.Context, args 
 	}
 
 	// Verify Uniswap settings exist
-	uniswapSettings, err := a.uniswapService.GetActiveUniswapDeployment(userId, *chain)
+	_, err = a.uniswapService.GetActiveUniswapDeployment(userId, *chain)
 	if err != nil {
 		return mcp.NewToolResultError("No Uniswap version selected. Please use set_uniswap_version tool first"), nil
 	}
@@ -167,24 +167,8 @@ func (a *addLiquidityTool) createEthereumAddLiquidity(ctx context.Context, args 
 		return mcp.NewToolResultError("Uniswap router address not found. Please ensure Uniswap deployment is completed"), nil
 	}
 
-	// Create liquidity position record
-	// User address will be set when wallet connects on the web interface
-	position := &models.LiquidityPosition{
-		PoolID:       pool.ID,
-		UserAddress:  "", // Will be populated when wallet connects
-		Token0Amount: args.TokenAmount,
-		Token1Amount: args.ETHAmount,
-		Action:       "add",
-		Status:       models.TransactionStatusPending,
-	}
-
-	positionID, err := a.liquidityService.CreateLiquidityPosition(position)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to create liquidity position record: %v", err)), nil
-	}
-
 	// Prepare enhanced metadata
-	enhancedMetadata := a.prepareMetadata(args.Metadata, pool, position, positionID, uniswapSettings.Version)
+	enhancedMetadata := a.prepareMetadata(args.Metadata, pool)
 
 	// Create transaction deployments for adding liquidity
 	transactionDeployments, err := a.createEthereumAddLiquidityTransactions(
@@ -227,19 +211,12 @@ func (a *addLiquidityTool) createEthereumAddLiquidity(ctx context.Context, args 
 func (a *addLiquidityTool) prepareMetadata(
 	userMetadata []models.TransactionMetadata,
 	pool *models.LiquidityPool,
-	position *models.LiquidityPosition,
-	positionID uint,
-	uniswapVersion string,
 ) []models.TransactionMetadata {
 	// StartStdioServer with user-provided metadata
 	metadata := append([]models.TransactionMetadata{}, userMetadata...)
 
 	// Add position and pool information
 	metadata = append(metadata,
-		models.TransactionMetadata{
-			Key:   "position_id",
-			Value: strconv.FormatUint(uint64(positionID), 10),
-		},
 		models.TransactionMetadata{
 			Key:   "pool_id",
 			Value: strconv.FormatUint(uint64(pool.ID), 10),
@@ -249,24 +226,12 @@ func (a *addLiquidityTool) prepareMetadata(
 			Value: pool.PairAddress,
 		},
 		models.TransactionMetadata{
-			Key:   "uniswap_version",
-			Value: uniswapVersion,
-		},
-		models.TransactionMetadata{
 			Key:   "action",
 			Value: "add_liquidity",
 		},
 		models.TransactionMetadata{
 			Key:   "token_address",
 			Value: pool.TokenAddress,
-		},
-		models.TransactionMetadata{
-			Key:   "token0_amount",
-			Value: position.Token0Amount,
-		},
-		models.TransactionMetadata{
-			Key:   "token1_amount",
-			Value: position.Token1Amount,
 		},
 	)
 

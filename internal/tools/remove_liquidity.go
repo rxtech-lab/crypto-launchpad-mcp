@@ -86,7 +86,7 @@ func NewRemoveLiquidityTool(chainService services.ChainService, liquidityService
 		}
 
 		// Check if pool exists
-		pool, err := liquidityService.GetLiquidityPoolByTokenAddress(tokenAddress)
+		pool, err := liquidityService.GetLiquidityPoolByTokenAddress(tokenAddress, "")
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
@@ -120,34 +120,14 @@ func NewRemoveLiquidityTool(chainService services.ChainService, liquidityService
 			}, nil
 		}
 
-		// Create liquidity position record
-		position := &models.LiquidityPosition{
-			PoolID:          pool.ID,
-			UserAddress:     userAddress,
-			LiquidityAmount: liquidityAmount,
-			Action:          "remove",
-			Status:          "pending",
-		}
-
-		if _, err := liquidityService.CreateLiquidityPosition(position); err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error creating liquidity position record: %v", err)),
-				},
-			}, nil
-		}
-
 		// Prepare transaction data for signing
 		transactionData := map[string]interface{}{
-			"position_id":      position.ID,
 			"pool_id":          pool.ID,
 			"token_address":    tokenAddress,
 			"liquidity_amount": liquidityAmount,
 			"min_token_amount": minTokenAmount,
 			"min_eth_amount":   minETHAmount,
 			"user_address":     userAddress,
-			"uniswap_version":  uniswapSettings.Version,
 			"chain_type":       activeChain.ChainType,
 			"chain_id":         activeChain.NetworkID,
 			"rpc":              activeChain.RPC,
@@ -187,7 +167,6 @@ func NewRemoveLiquidityTool(chainService services.ChainService, liquidityService
 		signingURL := fmt.Sprintf("http://localhost:%d/liquidity/remove/%s", serverPort, sessionID)
 
 		result := map[string]interface{}{
-			"position_id":      position.ID,
 			"session_id":       sessionID,
 			"signing_url":      signingURL,
 			"token_address":    tokenAddress,

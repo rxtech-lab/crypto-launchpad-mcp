@@ -118,9 +118,6 @@ func (s *MCPServer) InitializeTools(dbService services.DBService, serverPort int
 	getSwapQuoteTool, getSwapQuoteHandler := tools.NewGetSwapQuoteTool(chainService, liquidityService, uniswapService)
 	srv.AddTool(getSwapQuoteTool, getSwapQuoteHandler)
 
-	monitorPoolTool, monitorPoolHandler := tools.NewMonitorPoolTool(chainService, liquidityService, deploymentService)
-	srv.AddTool(monitorPoolTool, monitorPoolHandler)
-
 	// Balance Query Tools
 	queryBalanceTool, queryBalanceHandler := tools.NewQueryBalanceTool(chainService, txService, serverPort)
 	srv.AddTool(queryBalanceTool, queryBalanceHandler)

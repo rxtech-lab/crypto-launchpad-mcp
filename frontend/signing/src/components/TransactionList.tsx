@@ -1,14 +1,7 @@
-import {
-  CheckCircle2,
-  Clock,
-  Copy,
-  Layers,
-  Loader2,
-  XCircle,
-} from "lucide-react";
-import { useState } from "react";
+import { CheckCircle2, Clock, Layers, Loader2, XCircle } from "lucide-react";
 import type { TransactionDeployment, TransactionStatus } from "../types/wallet";
 import { formatEther } from "../utils/ethereum";
+import { AddressDisplay } from "./AddressDisplay";
 
 interface TransactionListProps {
   transactions: TransactionDeployment[];
@@ -25,17 +18,6 @@ export function TransactionList({
   isExecuting,
   deployedContracts,
 }: TransactionListProps) {
-  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedAddress(text);
-      setTimeout(() => setCopiedAddress(null), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
   const getStatusIcon = (
     status: TransactionStatus | undefined,
     index: number
@@ -134,6 +116,14 @@ export function TransactionList({
                     {tx.description}
                   </p>
                 )}
+                {tx.receiver && (
+                  <AddressDisplay
+                    address={tx.receiver}
+                    label="To:"
+                    className="mt-2"
+                    testId={`transaction-receiver-${index}`}
+                  />
+                )}
                 {status === "pending" && (
                   <p className="text-xs text-blue-600 mt-1">
                     Please confirm in your wallet...
@@ -160,32 +150,12 @@ export function TransactionList({
             {/* Show deployed contract address if available */}
             {status === "confirmed" && deployedContract && (
               <div className="mt-3 pt-3 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">
-                    Contract Address:
-                  </span>
-                  <div className="flex items-center space-x-2">
-                    <code
-                      data-testid={`deployed-contract-address-${index}`}
-                      className="text-xs font-mono bg-gray-100 px-2 py-1 rounded"
-                    >
-                      {deployedContract.address.slice(0, 6)}...
-                      {deployedContract.address.slice(-4)}
-                    </code>
-                    <button
-                      data-testid={`copy-address-button-${index}`}
-                      onClick={() => copyToClipboard(deployedContract.address)}
-                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                      title="Copy address"
-                    >
-                      {copiedAddress === deployedContract.address ? (
-                        <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <Copy className="h-3 w-3 text-gray-500" />
-                      )}
-                    </button>
-                  </div>
-                </div>
+                <AddressDisplay
+                  address={deployedContract.address}
+                  label="Contract Address:"
+                  compact={true}
+                  testId={`deployed-contract-address-${index}`}
+                />
               </div>
             )}
           </div>

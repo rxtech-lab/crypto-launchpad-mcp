@@ -24,8 +24,8 @@ var (
 func configureAndStartServer(dbService services.DBService, port int) (*api.APIServer, int, error) {
 	// Initialize services and hooks
 	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, deploymentService := server.InitializeServices(dbService.GetDB())
-	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService, uniswapService, deploymentService)
-	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
+	tokenDeploymentHook, uniswapDeploymentHook, liquidityHook := server.InitializeHooks(dbService.GetDB(), hookService, uniswapService, deploymentService, liquidityService)
+	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook, liquidityHook)
 
 	// Initialize API server (HTTP server for transaction signing) - NO AUTHENTICATION
 	apiServer := api.NewAPIServer(dbService, txService, hookService, chainService)

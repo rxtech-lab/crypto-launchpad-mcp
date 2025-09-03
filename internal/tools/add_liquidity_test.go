@@ -606,9 +606,6 @@ func (suite *AddLiquidityTestSuite) setupInitialLiquidityOnChain() {
 func (suite *AddLiquidityTestSuite) cleanupTestData() {
 	// Clean up transaction sessions
 	suite.db.GetDB().Where("1 = 1").Delete(&models.TransactionSession{})
-
-	// Clean up liquidity positions
-	suite.db.GetDB().Where("1 = 1").Delete(&models.LiquidityPosition{})
 }
 
 // executeTransaction is a helper method to execute a transaction on the blockchain
@@ -817,15 +814,6 @@ func (suite *AddLiquidityTestSuite) TestAddLiquiditySuccess() {
 	suite.NotNil(session)
 	suite.Equal(models.TransactionStatusPending, session.TransactionStatus)
 	suite.Len(session.TransactionDeployments, 2) // Token approval + Add liquidity ETH
-
-	// Verify liquidity position was created
-	positions, err := suite.liquidityService.GetLiquidityPositionsByPool(suite.liquidityPool.ID)
-	suite.NoError(err)
-	suite.Len(positions, 1)
-	suite.Equal("50000000000000000000", positions[0].Token0Amount)
-	suite.Equal("500000000000000000", positions[0].Token1Amount)
-	suite.Equal("add", positions[0].Action)
-	suite.Equal(models.TransactionStatusPending, positions[0].Status)
 
 	// Execute the add liquidity transactions on blockchain
 	suite.T().Log("Executing add liquidity transactions on blockchain...")

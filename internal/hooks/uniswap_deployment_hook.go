@@ -21,7 +21,7 @@ func (u *UniswapDeploymentHook) CanHandle(txType models.TransactionType) bool {
 }
 
 // OnTransactionConfirmed implements Hook.
-func (u *UniswapDeploymentHook) OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress string, session models.TransactionSession) error {
+func (u *UniswapDeploymentHook) OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress *string, session models.TransactionSession) error {
 	currentDeployment, err := u.uniswapService.GetUniswapDeploymentByChain(session.ChainID)
 	if err != nil {
 		return err
@@ -33,15 +33,15 @@ func (u *UniswapDeploymentHook) OnTransactionConfirmed(txType models.Transaction
 
 	switch txType {
 	case models.TransactionTypeUniswapV2TokenDeployment:
-		if err := u.uniswapService.UpdateWETHAddress(currentDeployment.ID, contractAddress); err != nil {
+		if err := u.uniswapService.UpdateWETHAddress(currentDeployment.ID, *contractAddress); err != nil {
 			return err
 		}
 	case models.TransactionTypeUniswapV2FactoryDeployment:
-		if err := u.uniswapService.UpdateFactoryAddress(currentDeployment.ID, contractAddress); err != nil {
+		if err := u.uniswapService.UpdateFactoryAddress(currentDeployment.ID, *contractAddress); err != nil {
 			return err
 		}
 	case models.TransactionTypeUniswapV2RouterDeployment:
-		if err := u.uniswapService.UpdateRouterAddress(currentDeployment.ID, contractAddress); err != nil {
+		if err := u.uniswapService.UpdateRouterAddress(currentDeployment.ID, *contractAddress); err != nil {
 			return err
 		}
 	}

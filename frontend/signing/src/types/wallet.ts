@@ -21,6 +21,7 @@ export interface TransactionDeployment {
   description: string;
   data: string;
   value: string;
+  receiver?: string; // Added to track receiver address
   contractAddress?: string; // Added to track deployed contract address
   transactionHash?: string; // Added to track transaction hash
 }

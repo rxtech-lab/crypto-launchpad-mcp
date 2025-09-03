@@ -95,7 +95,7 @@ func NewGetSwapQuoteTool(chainService services.ChainService, liquidityService se
 				Content: []mcp.Content{
 					mcp.NewTextContent("Error: "),
 					mcp.NewTextContent("No Uniswap version selected. Please use set_uniswap_version tool first"),
-				},
+				},	
 			}, nil
 		}
 
@@ -112,7 +112,7 @@ func NewGetSwapQuoteTool(chainService services.ChainService, liquidityService se
 		}
 
 		// Get pool information
-		pool, err := liquidityService.GetLiquidityPoolByTokenAddress(poolToken)
+		pool, err := liquidityService.GetLiquidityPoolByTokenAddress(poolToken, "")
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{

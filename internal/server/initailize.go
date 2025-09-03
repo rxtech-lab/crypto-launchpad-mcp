@@ -21,18 +21,18 @@ func InitializeServices(db *gorm.DB) (services.EvmService, services.TransactionS
 	return evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, deploymentService
 }
 
-func InitializeHooks(db *gorm.DB, hookService services.HookService, uniswapService services.UniswapService, deploymentService services.DeploymentService) (services.Hook, services.Hook) {
+func InitializeHooks(db *gorm.DB, hookService services.HookService, uniswapService services.UniswapService, deploymentService services.DeploymentService, liquidityService services.LiquidityService) (services.Hook, services.Hook, services.Hook) {
 	tokenDeploymentHook := hooks.NewTokenDeploymentHook(deploymentService)
 	uniswapDeploymentHook := hooks.NewUniswapDeploymentHook(db, uniswapService)
+	liquidityHook := hooks.NewLiquidityPoolHook(db, liquidityService)
 
-	return tokenDeploymentHook, uniswapDeploymentHook
+	return tokenDeploymentHook, uniswapDeploymentHook, liquidityHook
 }
 
-func RegisterHooks(hookService services.HookService, tokenDeploymentHook services.Hook, uniswapDeploymentHook services.Hook) {
-	if err := hookService.AddHook(tokenDeploymentHook); err != nil {
-		log.Fatal("Failed to register token deployment hook:", err)
-	}
-	if err := hookService.AddHook(uniswapDeploymentHook); err != nil {
-		log.Fatal("Failed to register uniswap deployment hook:", err)
+func RegisterHooks(hookService services.HookService, hooks ...services.Hook) {
+	for _, hook := range hooks {
+		if err := hookService.AddHook(hook); err != nil {
+			log.Fatal("Failed to register hook:", err)
+		}
 	}
 }

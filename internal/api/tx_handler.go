@@ -171,7 +171,7 @@ func (s *APIServer) handleTransactionAPI(c *fiber.Ctx) error {
 		})
 	}
 	// use hook
-	if err := s.hookService.OnTransactionConfirmed(deployment.TransactionType, body.TransactionHash, *body.ContractAddress, *session); err != nil {
+	if err := s.hookService.OnTransactionConfirmed(deployment.TransactionType, body.TransactionHash, body.ContractAddress, *session); err != nil {
 		log.Printf("Error on transaction confirmed: %v", err)
 	}
 	// Return the session data as JSON
