@@ -33,3 +33,14 @@ type GetTransactionDataArgs struct {
 	Title           string `validate:"required"`
 	Description     string `validate:"required"`
 }
+
+type GetContractFunctionCallTransactionArgs struct {
+	ContractAddress string                 `validate:"required,eth_addr"`
+	FunctionName    string                 `validate:"required"`
+	FunctionArgs    []any                  `validate:"required"`
+	Abi             string                 `validate:"required"`
+	Value           string                 `validate:"omitempty,number"` // Optional value, defaults to "0"
+	Title           string                 `validate:"required"`
+	Description     string                 `validate:"required"`
+	TransactionType models.TransactionType `validate:"required"`
+}
