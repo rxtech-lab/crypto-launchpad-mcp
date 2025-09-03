@@ -47,7 +47,6 @@ type CreateLiquidityPoolTestSuite struct {
 	ethClient         *ethclient.Client
 	tool              *createLiquidityPoolTool
 	chain             *models.Chain
-	uniswapSettings   *models.UniswapSettings
 	uniswapDeployment *models.UniswapDeployment
 	testAccount       *bind.TransactOpts
 	testAddress       common.Address
@@ -59,12 +58,11 @@ type CreateLiquidityPoolTestSuite struct {
 	routerContract  *DeployedContract
 
 	// Services
-	evmService             services.EvmService
-	txService              services.TransactionService
-	liquidityService       services.LiquidityService
-	uniswapService         services.UniswapService
-	chainService           services.ChainService
-	uniswapSettingsService services.UniswapSettingsService
+	evmService       services.EvmService
+	txService        services.TransactionService
+	liquidityService services.LiquidityService
+	uniswapService   services.UniswapService
+	chainService     services.ChainService
 }
 
 func (suite *CreateLiquidityPoolTestSuite) SetupSuite() {
@@ -91,7 +89,6 @@ func (suite *CreateLiquidityPoolTestSuite) SetupSuite() {
 	suite.liquidityService = services.NewLiquidityService(db.GetDB())
 	suite.uniswapService = services.NewUniswapService(db.GetDB())
 	suite.chainService = services.NewChainService(db.GetDB())
-	suite.uniswapSettingsService = services.NewUniswapSettingsService(db.GetDB())
 
 	// Initialize tool
 	suite.tool = NewCreateLiquidityPoolTool(
@@ -101,12 +98,10 @@ func (suite *CreateLiquidityPoolTestSuite) SetupSuite() {
 		suite.txService,
 		suite.liquidityService,
 		suite.uniswapService,
-		suite.uniswapSettingsService,
 	)
 
 	// Setup test data
 	suite.setupTestChain()
-	suite.setupUniswapSettings()
 
 	// Deploy contracts
 	suite.deployContracts()
@@ -183,14 +178,6 @@ func (suite *CreateLiquidityPoolTestSuite) setupTestChain() {
 	err := suite.chainService.CreateChain(chain)
 	suite.Require().NoError(err)
 	suite.chain = chain
-}
-
-func (suite *CreateLiquidityPoolTestSuite) setupUniswapSettings() {
-	err := suite.uniswapSettingsService.SetUniswapVersion("v2")
-	suite.Require().NoError(err)
-
-	suite.uniswapSettings, err = suite.uniswapSettingsService.GetActiveUniswapSettings()
-	suite.Require().NoError(err)
 }
 
 func (suite *CreateLiquidityPoolTestSuite) deployContracts() {
@@ -450,7 +437,7 @@ func (suite *CreateLiquidityPoolTestSuite) setupUniswapDeployment() {
 		DeployerAddress: suite.testAddress.Hex(),
 	}
 
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Update with addresses
@@ -704,44 +691,13 @@ func (suite *CreateLiquidityPoolTestSuite) TestHandlerNoActiveChain() {
 	suite.Require().NoError(err)
 }
 
-func (suite *CreateLiquidityPoolTestSuite) TestHandlerNoUniswapSettings() {
-	// Deactivate all Uniswap settings by directly updating the database
-	err := suite.db.GetDB().Model(&models.UniswapSettings{}).Where("is_active = ?", true).Update("is_active", false).Error
-	suite.Require().NoError(err)
-
-	request := mcp.CallToolRequest{
-		Params: mcp.CallToolParams{
-			Arguments: map[string]interface{}{
-				"token_address":        suite.testToken.Address.Hex(),
-				"initial_token_amount": "1000000000000000000",
-				"initial_eth_amount":   "1000000000000000000",
-			},
-		},
-	}
-
-	handler := suite.tool.GetHandler()
-	result, err := handler(context.Background(), request)
-
-	suite.NoError(err)
-	suite.NotNil(result)
-	suite.True(result.IsError)
-
-	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
-		suite.Contains(textContent.Text, "No Uniswap version selected. Please use set_uniswap_version tool first")
-	}
-
-	// Reactivate original settings
-	err = suite.uniswapSettingsService.SetUniswapVersion(suite.uniswapSettings.Version)
-	suite.Require().NoError(err)
-}
-
 func (suite *CreateLiquidityPoolTestSuite) TestHandlerMissingWETH() {
 	// First, delete the existing deployment
 	err := suite.uniswapService.DeleteUniswapDeployment(suite.uniswapDeployment.ID)
 	suite.Require().NoError(err)
 
 	// Create a new Uniswap deployment without WETH address
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Only set factory and router, but not WETH

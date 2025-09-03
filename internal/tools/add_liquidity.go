@@ -10,16 +10,16 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 type addLiquidityTool struct {
-	chainService           services.ChainService
-	evmService             services.EvmService
-	txService              services.TransactionService
-	liquidityService       services.LiquidityService
-	uniswapService         services.UniswapService
-	uniswapSettingsService services.UniswapSettingsService
-	serverPort             int
+	chainService     services.ChainService
+	evmService       services.EvmService
+	txService        services.TransactionService
+	liquidityService services.LiquidityService
+	uniswapService   services.UniswapService
+	serverPort       int
 }
 
 type AddLiquidityArguments struct {
@@ -34,15 +34,14 @@ type AddLiquidityArguments struct {
 	Metadata []models.TransactionMetadata `json:"metadata,omitempty"`
 }
 
-func NewAddLiquidityTool(chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService, liquidityService services.LiquidityService, uniswapService services.UniswapService, uniswapSettingsService services.UniswapSettingsService) *addLiquidityTool {
+func NewAddLiquidityTool(chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService, liquidityService services.LiquidityService, uniswapService services.UniswapService) *addLiquidityTool {
 	return &addLiquidityTool{
-		chainService:           chainService,
-		evmService:             evmService,
-		txService:              txService,
-		liquidityService:       liquidityService,
-		uniswapService:         uniswapService,
-		uniswapSettingsService: uniswapSettingsService,
-		serverPort:             serverPort,
+		chainService:     chainService,
+		evmService:       evmService,
+		txService:        txService,
+		liquidityService: liquidityService,
+		uniswapService:   uniswapService,
+		serverPort:       serverPort,
 	}
 }
 
@@ -130,8 +129,21 @@ func (a *addLiquidityTool) createEthereumAddLiquidity(ctx context.Context, args 
 		return mcp.NewToolResultError("Liquidity pool does not have a pair address. Please ensure the pool was created successfully"), nil
 	}
 
+	// Get the active Uniswap settings
+	user, _ := utils.GetAuthenticatedUser(ctx)
+	var userId *string
+	if user != nil {
+		userId = &user.Sub
+	}
+
+	// get active chain
+	chain, err := a.chainService.GetActiveChain()
+	if err != nil {
+		return mcp.NewToolResultError("Unable to get active chain. Is there any chain selected?"), nil
+	}
+
 	// Verify Uniswap settings exist
-	uniswapSettings, err := a.uniswapSettingsService.GetActiveUniswapSettings()
+	uniswapSettings, err := a.uniswapService.GetActiveUniswapDeployment(userId, *chain)
 	if err != nil {
 		return mcp.NewToolResultError("No Uniswap version selected. Please use set_uniswap_version tool first"), nil
 	}

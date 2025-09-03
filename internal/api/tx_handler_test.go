@@ -133,7 +133,6 @@ contract SimpleToken {
 		Name:         "SimpleToken",
 		Description:  "A simple token contract for testing",
 		ChainType:    models.TransactionChainTypeEthereum,
-		ContractName: "SimpleToken",
 		TemplateCode: contractCode,
 	}
 

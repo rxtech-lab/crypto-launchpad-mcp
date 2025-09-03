@@ -66,7 +66,6 @@ func (s *TokenDeploymentHookTestSuite) setupTestData() {
 		Name:         "Test ERC20",
 		Description:  "Test ERC20 token template",
 		ChainType:    "ethereum",
-		ContractName: "TestToken",
 		TemplateCode: `pragma solidity ^0.8.0; contract TestToken { constructor(string memory name) {} }`,
 		Metadata:     models.JSON{"name": ""},
 	}

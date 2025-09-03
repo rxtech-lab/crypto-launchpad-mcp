@@ -66,7 +66,7 @@ func (suite *RemoveUniswapDeploymentTestSuite) cleanupTestData() {
 }
 
 func (suite *RemoveUniswapDeploymentTestSuite) createTestDeployment(chainID uint, version string) uint {
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(chainID, version)
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(chainID, version, nil)
 	suite.Require().NoError(err)
 	return deploymentID
 }
@@ -308,7 +308,7 @@ func (suite *RemoveUniswapDeploymentTestSuite) TestDatabaseIntegration() {
 	suite.Require().NoError(err)
 
 	// Create test deployment using service
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(testChain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(testChain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Verify it exists

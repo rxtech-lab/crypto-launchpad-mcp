@@ -10,9 +10,10 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
+	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-func NewSwapTokensTool(chainService services.ChainService, liquidityService services.LiquidityService, uniswapSettingsService services.UniswapSettingsService, txService services.TransactionService, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
+func NewSwapTokensTool(chainService services.ChainService, liquidityService services.LiquidityService, uniswapService services.UniswapService, txService services.TransactionService, serverPort int) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("swap_tokens",
 		mcp.WithDescription("Execute token swaps via Uniswap with signing interface. Generates a URL where users can connect wallet and sign the swap transaction."),
 		mcp.WithString("from_token",
@@ -93,9 +94,21 @@ func NewSwapTokensTool(chainService services.ChainService, liquidityService serv
 				},
 			}, nil
 		}
+		// Get the active Uniswap settings
+		user, _ := utils.GetAuthenticatedUser(ctx)
+		var userId *string
+		if user != nil {
+			userId = &user.Sub
+		}
+
+		// get active chain
+		chain, err := chainService.GetActiveChain()
+		if err != nil {
+			return mcp.NewToolResultError("Unable to get active chain. Is there any chain selected?"), nil
+		}
 
 		// Get active Uniswap settings
-		uniswapSettings, err := uniswapSettingsService.GetActiveUniswapSettings()
+		uniswapSettings, err := uniswapService.GetActiveUniswapDeployment(userId, *chain)
 		if err != nil {
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{

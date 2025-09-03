@@ -36,7 +36,6 @@ func TestDeploymentService(t *testing.T) {
 	template := &models.Template{
 		Name:         "Test Template",
 		ChainType:    models.TransactionChainTypeEthereum,
-		ContractName: "TestContract",
 		TemplateCode: "pragma solidity ^0.8.0;",
 	}
 	err = db.Create(template).Error

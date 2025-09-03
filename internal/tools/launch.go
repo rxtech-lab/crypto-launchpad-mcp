@@ -32,6 +32,7 @@ type LaunchArguments struct {
 	ConstructorArgs []any                        `json:"constructor_args,omitempty"`
 	Value           string                       `json:"value,omitempty"`
 	Metadata        []models.TransactionMetadata `json:"metadata,omitempty"`
+	ContractName    string                       `json:"contract_name,omitempty"`
 }
 
 func NewLaunchTool(templateService services.TemplateService, chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService, deploymentService services.DeploymentService) *launchTool {
@@ -60,11 +61,16 @@ func (l *launchTool) GetTool() mcp.Tool {
 			"constructor_args",
 			mcp.Description("JSON array of constructor arguments for contract deployment (e.g., [\"arg1\", 123, true]). Optional. Please provide this if the template requires constructor arguments."),
 			mcp.Items(map[string]interface{}{
-				"type": "any",
+				"type":        "any",
+				"description": "Constructor argument, don't do the math in the argument, provide the final value (e.g., for uint256 value of 1 ETH, provide 1000000000000000000)",
 			}),
 		),
 		mcp.WithString("value",
 			mcp.Description("ETH value to send with the deployment transaction in wei (e.g., \"1000000000000000000\" for 1 ETH). Optional, defaults to \"0\"."),
+		),
+		mcp.WithString("contract_name",
+			mcp.Required(),
+			mcp.Description("Name of the contract to deploy. Optional, if not provided will use the contract name from the template. If the template's contract name is rendered from template values, then this is the rendered name."),
 		),
 		mcp.WithArray("metadata",
 			mcp.Description("JSON array of metadata for the transaction (e.g., [{\"title\": \"Deploy MyToken\", \"description\": \"Deploy ERC20 token\"}]). Optional."),
@@ -133,7 +139,12 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to render contract template: %v", err)), nil
 			}
 
-			sessionID, err := l.createEvmContractDeploymentTransaction(activeChain, args.Metadata, renderedContract, template.ContractName, args.ConstructorArgs, args.Value, "Deploy Contract", "Deploy contract to the active chain", template.ID, args.TemplateValues)
+			user, _ := utils.GetAuthenticatedUser(ctx)
+			var userId *string
+			if user != nil {
+				userId = &user.Sub
+			}
+			sessionID, err := l.createEvmContractDeploymentTransaction(activeChain, args.Metadata, renderedContract, args.ContractName, args.ConstructorArgs, args.Value, "Deploy Contract", "Deploy contract to the active chain", template.ID, args.TemplateValues, userId)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to create contract deployment transaction: %v", err)), nil
 			}
@@ -180,7 +191,7 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 // value is the value of the transaction that needs to be sent. 0 means no value is needed.
 // title is the title of the transaction
 // description is the description of the transaction
-func (l *launchTool) createEvmContractDeploymentTransaction(activeChain *models.Chain, metadata []models.TransactionMetadata, renderedContract string, contractName string, args []any, value string, title string, description string, templateId uint, templateValues models.JSON) (string, error) {
+func (l *launchTool) createEvmContractDeploymentTransaction(activeChain *models.Chain, metadata []models.TransactionMetadata, renderedContract string, contractName string, args []any, value string, title string, description string, templateId uint, templateValues models.JSON, userId *string) (string, error) {
 	tx, err := l.evmService.GetContractDeploymentTransactionWithContractCode(services.ContractDeploymentWithContractCodeTransactionArgs{
 		ContractCode:    renderedContract,
 		ContractName:    contractName,
@@ -214,6 +225,7 @@ func (l *launchTool) createEvmContractDeploymentTransaction(activeChain *models.
 			Status:         models.TransactionStatusPending,
 			TemplateValues: templateValues,
 			SessionId:      sessionID,
+			UserID:         userId,
 		},
 	)
 

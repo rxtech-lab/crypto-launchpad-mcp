@@ -23,7 +23,7 @@ var (
 
 func configureAndStartServer(dbService services.DBService, port int) (*api.APIServer, int, error) {
 	// Initialize services and hooks
-	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, uniswapSettingsService, deploymentService := server.InitializeServices(dbService.GetDB())
+	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, deploymentService := server.InitializeServices(dbService.GetDB())
 	tokenDeploymentHook, uniswapDeploymentHook := server.InitializeHooks(dbService.GetDB(), hookService, uniswapService, deploymentService)
 	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook)
 
@@ -45,7 +45,7 @@ func configureAndStartServer(dbService services.DBService, port int) (*api.APISe
 	}
 
 	// Now initialize MCP server with the actual port
-	mcpServer := mcp.NewMCPServer(dbService, startedPort, evmService, txService, uniswapService, liquidityService, chainService, templateService, uniswapSettingsService, deploymentService)
+	mcpServer := mcp.NewMCPServer(dbService, startedPort, evmService, txService, uniswapService, liquidityService, chainService, templateService, deploymentService)
 	apiServer.SetMCPServer(mcpServer)
 
 	return apiServer, startedPort, nil

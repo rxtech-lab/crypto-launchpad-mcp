@@ -62,21 +62,6 @@ type Chain struct {
 }
 
 // Template represents smart contract templates by chain type
-type Template struct {
-	ID          uint                 `gorm:"primaryKey" json:"id"`
-	Name        string               `gorm:"not null" json:"name"`
-	Description string               `json:"description"`
-	ChainType   TransactionChainType `gorm:"not null" json:"chain_type"` // ethereum, solana
-	// ContractName is the name of the contract to be deployed.
-	// Sometimes the template code contains multiple contracts, so we need to specify the name of the contract to be deployed.
-	ContractName         string         `gorm:"not null" json:"contract_name"`
-	TemplateCode         string         `gorm:"type:text;not null" json:"template_code"`
-	Metadata             JSON           `gorm:"type:text" json:"metadata"` // Template parameter definitions (key: empty value pairs)
-	SampleTemplateValues JSON           `gorm:"type:text" json:"sample_template_values"`
-	CreatedAt            time.Time      `json:"created_at"`
-	UpdatedAt            time.Time      `json:"updated_at"`
-	DeletedAt            gorm.DeletedAt `gorm:"index" json:"-"`
-}
 
 // Deployment represents deployed token contracts
 type Deployment struct {
@@ -96,21 +81,6 @@ type Deployment struct {
 	Template Template           `gorm:"foreignKey:TemplateID" json:"template,omitempty"`
 	Chain    Chain              `gorm:"foreignKey:ChainID;references:ID" json:"chain,omitempty"`
 	Session  TransactionSession `gorm:"foreignKey:SessionId;references:ID" json:"session,omitempty"`
-}
-
-// UniswapSettings represents Uniswap version and configuration
-type UniswapSettings struct {
-	ID              uint      `gorm:"primaryKey" json:"id"`
-	Version         string    `gorm:"not null" json:"version"` // v2, v3, v4
-	RouterAddress   string    `json:"router_address"`          // Uniswap router contract address
-	FactoryAddress  string    `json:"factory_address"`         // Uniswap factory contract address
-	WETHAddress     string    `json:"weth_address"`            // WETH contract address
-	QuoterAddress   string    `json:"quoter_address"`          // v3/v4 quoter contract address (optional)
-	PositionManager string    `json:"position_manager"`        // v3/v4 position manager address (optional)
-	SwapRouter02    string    `json:"swap_router02"`           // v3/v4 SwapRouter02 address (optional)
-	IsActive        bool      `gorm:"default:false" json:"is_active"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // LiquidityPool represents created pool information

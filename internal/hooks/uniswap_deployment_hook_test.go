@@ -81,7 +81,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestCanHandle() {
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_WETHDeployment() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -113,7 +113,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_WETHDepl
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_FactoryDeployment() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -145,7 +145,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_FactoryD
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_RouterDeployment() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -177,7 +177,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_RouterDe
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddressesSet() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -241,7 +241,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddre
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_AllAddressesSetDifferentOrder() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session
@@ -315,7 +315,7 @@ func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_NoDeploy
 
 func (suite *UniswapDeploymentHookTestSuite) TestOnTransactionConfirmed_ServiceError() {
 	// Create a Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Create transaction session

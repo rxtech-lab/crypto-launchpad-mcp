@@ -14,17 +14,16 @@ import (
 
 type AddLiquidityToolTestSuite struct {
 	suite.Suite
-	dbService              services.DBService
-	tool                   *addLiquidityTool
-	liquidityService       services.LiquidityService
-	uniswapService         services.UniswapService
-	txService              services.TransactionService
-	evmService             services.EvmService
-	chainService           services.ChainService
-	uniswapSettingsService services.UniswapSettingsService
-	chain                  *models.Chain
-	pool                   *models.LiquidityPool
-	uniswapDeployment      *models.UniswapDeployment
+	dbService         services.DBService
+	tool              *addLiquidityTool
+	liquidityService  services.LiquidityService
+	uniswapService    services.UniswapService
+	txService         services.TransactionService
+	evmService        services.EvmService
+	chainService      services.ChainService
+	chain             *models.Chain
+	pool              *models.LiquidityPool
+	uniswapDeployment *models.UniswapDeployment
 }
 
 func (suite *AddLiquidityToolTestSuite) SetupSuite() {
@@ -39,7 +38,6 @@ func (suite *AddLiquidityToolTestSuite) SetupSuite() {
 	suite.liquidityService = services.NewLiquidityService(dbService.GetDB())
 	suite.uniswapService = services.NewUniswapService(dbService.GetDB())
 	suite.chainService = services.NewChainService(dbService.GetDB())
-	suite.uniswapSettingsService = services.NewUniswapSettingsService(dbService.GetDB())
 
 	// Initialize tool
 	suite.tool = NewAddLiquidityTool(
@@ -49,12 +47,10 @@ func (suite *AddLiquidityToolTestSuite) SetupSuite() {
 		suite.txService,
 		suite.liquidityService,
 		suite.uniswapService,
-		suite.uniswapSettingsService,
 	)
 
 	// Setup test data
 	suite.setupTestChain()
-	suite.setupUniswapSettings()
 	suite.setupUniswapDeployment()
 	suite.setupTestPool()
 }
@@ -84,14 +80,9 @@ func (suite *AddLiquidityToolTestSuite) setupTestChain() {
 	suite.chain = chain
 }
 
-func (suite *AddLiquidityToolTestSuite) setupUniswapSettings() {
-	err := suite.uniswapSettingsService.SetUniswapVersion("v2")
-	suite.Require().NoError(err)
-}
-
 func (suite *AddLiquidityToolTestSuite) setupUniswapDeployment() {
 	// Create Uniswap deployment
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Update with addresses
@@ -355,7 +346,7 @@ func (suite *AddLiquidityToolTestSuite) TestHandlerNoRouterAddress() {
 	err := suite.uniswapService.DeleteUniswapDeployment(suite.uniswapDeployment.ID)
 	suite.Require().NoError(err)
 
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Only set WETH and Factory, but not Router

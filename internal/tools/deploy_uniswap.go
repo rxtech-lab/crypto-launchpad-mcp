@@ -85,6 +85,12 @@ func (d *deployUniswapTool) GetHandler() server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
+		user, _ := utils.GetAuthenticatedUser(ctx)
+		var userId *string
+		if user != nil {
+			userId = &user.Sub
+		}
+
 		// Get active chain configuration
 		activeChain, err := d.chainService.GetActiveChain()
 		if err != nil {
@@ -119,7 +125,7 @@ func (d *deployUniswapTool) GetHandler() server.ToolHandlerFunc {
 
 		switch args.Version {
 		case "v2":
-			return d.createUniswapV2DeploymentSession(activeChain, args.DeployRouter, args.Metadata)
+			return d.createUniswapV2DeploymentSession(activeChain, args.DeployRouter, args.Metadata, userId)
 		default:
 			return mcp.NewToolResultError(fmt.Sprintf("Unsupported version: %s", args.Version)), nil
 		}
@@ -127,7 +133,7 @@ func (d *deployUniswapTool) GetHandler() server.ToolHandlerFunc {
 }
 
 // createUniswapV2DeploymentSession creates a transaction session for Uniswap V2 deployment
-func (d *deployUniswapTool) createUniswapV2DeploymentSession(activeChain *models.Chain, deployRouter *bool, metadata []models.TransactionMetadata) (*mcp.CallToolResult, error) {
+func (d *deployUniswapTool) createUniswapV2DeploymentSession(activeChain *models.Chain, deployRouter *bool, metadata []models.TransactionMetadata, userId *string) (*mcp.CallToolResult, error) {
 	// Get or create Uniswap deployment record
 	existingDeployment, err := d.uniswapService.GetUniswapDeploymentByChain(activeChain.ID)
 	var uniswapDeployment *models.UniswapDeployment
@@ -138,7 +144,7 @@ func (d *deployUniswapTool) createUniswapV2DeploymentSession(activeChain *models
 			Version: "v2",
 			Status:  "pending",
 		}
-		createdDeploymentId, createErr := d.uniswapService.CreateUniswapDeployment(activeChain.ID, "v2")
+		createdDeploymentId, createErr := d.uniswapService.CreateUniswapDeployment(activeChain.ID, "v2", userId)
 		if createErr != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error creating Uniswap deployment record: %v", createErr)), nil
 		}
@@ -194,6 +200,7 @@ func (d *deployUniswapTool) createUniswapV2DeploymentSession(activeChain *models
 		ChainType:              models.TransactionChainTypeEthereum,
 		ChainID:                activeChain.ID,
 		Metadata:               enhancedMetadata,
+		UserID:                 userId,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to create transaction session: %v", err)), nil

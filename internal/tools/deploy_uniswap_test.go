@@ -231,7 +231,7 @@ func (suite *DeployUniswapToolTestSuite) TestHandlerWETHFactoryDeploymentTransac
 
 func (suite *DeployUniswapToolTestSuite) TestHandlerRouterDeploymentTransactionType() {
 	// First, create infrastructure deployment to get WETH and Factory addresses
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	// Update with mock addresses (simulating successful infrastructure deployment)
@@ -415,7 +415,7 @@ func (suite *DeployUniswapToolTestSuite) TestHandlerRouterWithoutInfrastructure(
 
 func (suite *DeployUniswapToolTestSuite) TestHandlerDuplicateInfrastructureDeployment() {
 	// First, create and mark infrastructure as deployed
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	err = suite.uniswapService.UpdateWETHAddress(deploymentID, "0x1234567890123456789012345678901234567890")
@@ -446,7 +446,7 @@ func (suite *DeployUniswapToolTestSuite) TestHandlerDuplicateInfrastructureDeplo
 
 func (suite *DeployUniswapToolTestSuite) TestHandlerDuplicateRouterDeployment() {
 	// First, create infrastructure and router
-	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2")
+	deploymentID, err := suite.uniswapService.CreateUniswapDeployment(suite.chain.ID, "v2", nil)
 	suite.Require().NoError(err)
 
 	err = suite.uniswapService.UpdateWETHAddress(deploymentID, "0x1234567890123456789012345678901234567890")

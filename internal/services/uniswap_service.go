@@ -12,8 +12,7 @@ type UniswapService interface {
 	GetUniswapDeployment(deploymentID uint) (*models.UniswapDeployment, error)
 	GetUniswapDeploymentByChain(chainID uint) (*models.UniswapDeployment, error)
 	GetUniswapDeploymentByChainString(chainType, chainID string) (*models.UniswapDeployment, error)
-	CreateUniswapDeployment(chainID uint, version string) (uint, error)
-	CreateUniswapDeploymentWithUser(chainID uint, version string, userID *string) (uint, error)
+	CreateUniswapDeployment(chainID uint, version string, userId *string) (uint, error)
 	UpdateFactoryAddress(deploymentID uint, factoryAddress string) error
 	UpdateRouterAddress(deploymentID uint, routerAddress string) error
 	UpdateWETHAddress(deploymentID uint, wethAddress string) error
@@ -23,6 +22,7 @@ type UniswapService interface {
 	ListUniswapDeploymentsByUser(userID string, skip, limit int) ([]models.UniswapDeployment, error)
 	DeleteUniswapDeployment(deploymentID uint) error
 	DeleteUniswapDeployments(deploymentIDs []uint) error
+	GetActiveUniswapDeployment(userId *string, chain models.Chain) (*models.UniswapDeployment, error)
 }
 
 type uniswapService struct {
@@ -65,8 +65,8 @@ func NewUniswapService(db *gorm.DB) UniswapService {
 	return &uniswapService{db: db}
 }
 
-func (u *uniswapService) CreateUniswapDeployment(chainID uint, version string) (uint, error) {
-	return u.CreateUniswapDeploymentWithUser(chainID, version, nil)
+func (u *uniswapService) CreateUniswapDeployment(chainID uint, version string, userId *string) (uint, error) {
+	return u.CreateUniswapDeploymentWithUser(chainID, version, userId)
 }
 
 func (u *uniswapService) CreateUniswapDeploymentWithUser(chainID uint, version string, userID *string) (uint, error) {
@@ -168,5 +168,21 @@ func (u *uniswapService) GetUniswapDeploymentByChainString(chainType, chainID st
 		return nil, err
 	}
 
+	return &deployment, nil
+}
+
+func (u *uniswapService) GetActiveUniswapDeployment(userId *string, chain models.Chain) (*models.UniswapDeployment, error) {
+	var deployment models.UniswapDeployment
+	query := u.db.Where("chain_id = ?", chain.ID)
+
+	// Add user filter if userId is provided
+	if userId != nil {
+		query = query.Where("user_id = ?", *userId)
+	}
+
+	err := query.First(&deployment).Error
+	if err != nil {
+		return nil, err
+	}
 	return &deployment, nil
 }

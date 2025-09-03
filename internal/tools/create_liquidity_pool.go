@@ -14,13 +14,12 @@ import (
 )
 
 type createLiquidityPoolTool struct {
-	chainService           services.ChainService
-	evmService             services.EvmService
-	txService              services.TransactionService
-	liquidityService       services.LiquidityService
-	uniswapService         services.UniswapService
-	uniswapSettingsService services.UniswapSettingsService
-	serverPort             int
+	chainService     services.ChainService
+	evmService       services.EvmService
+	txService        services.TransactionService
+	liquidityService services.LiquidityService
+	uniswapService   services.UniswapService
+	serverPort       int
 }
 
 type CreateLiquidityPoolArguments struct {
@@ -33,15 +32,14 @@ type CreateLiquidityPoolArguments struct {
 	Metadata []models.TransactionMetadata `json:"metadata,omitempty"`
 }
 
-func NewCreateLiquidityPoolTool(chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService, liquidityService services.LiquidityService, uniswapService services.UniswapService, uniswapSettingsService services.UniswapSettingsService) *createLiquidityPoolTool {
+func NewCreateLiquidityPoolTool(chainService services.ChainService, serverPort int, evmService services.EvmService, txService services.TransactionService, liquidityService services.LiquidityService, uniswapService services.UniswapService) *createLiquidityPoolTool {
 	return &createLiquidityPoolTool{
-		chainService:           chainService,
-		evmService:             evmService,
-		txService:              txService,
-		liquidityService:       liquidityService,
-		uniswapService:         uniswapService,
-		uniswapSettingsService: uniswapSettingsService,
-		serverPort:             serverPort,
+		chainService:     chainService,
+		evmService:       evmService,
+		txService:        txService,
+		liquidityService: liquidityService,
+		uniswapService:   uniswapService,
+		serverPort:       serverPort,
 	}
 }
 
@@ -104,8 +102,20 @@ func (c *createLiquidityPoolTool) GetHandler() server.ToolHandlerFunc {
 }
 
 func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Context, args CreateLiquidityPoolArguments, activeChain *models.Chain) (*mcp.CallToolResult, error) {
+	// Get the active Uniswap settings
+	user, _ := utils.GetAuthenticatedUser(ctx)
+	var userId *string
+	if user != nil {
+		userId = &user.Sub
+	}
+
+	// get active chain
+	chain, err := c.chainService.GetActiveChain()
+	if err != nil {
+		return mcp.NewToolResultError("Unable to get active chain. Is there any chain selected?"), nil
+	}
 	// Get active Uniswap settings
-	uniswapSettings, err := c.uniswapSettingsService.GetActiveUniswapSettings()
+	uniswapSettings, err := c.uniswapService.GetActiveUniswapDeployment(userId, *chain)
 	if err != nil {
 		return mcp.NewToolResultError("No Uniswap version selected. Please use set_uniswap_version tool first"), nil
 	}
