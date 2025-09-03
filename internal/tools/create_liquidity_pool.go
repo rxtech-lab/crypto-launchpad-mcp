@@ -24,8 +24,6 @@ type createLiquidityPoolTool struct {
 	serverPort       int
 }
 
-const ETH_TOKEN_ADDRESS = "eth"
-
 type CreateLiquidityPoolArguments struct {
 	// Required fields
 	Token0Address       string `json:"token0_address" validate:"required"`
@@ -54,11 +52,11 @@ func (c *createLiquidityPoolTool) GetTool() mcp.Tool {
 		mcp.WithDescription("Create new Uniswap liquidity pool with signing interface. Supports both ETH-to-Token pairs (using addLiquidityETH) and Token-to-Token pairs (using addLiquidity). Generates a URL where users can connect wallet and sign the pool creation transaction."),
 		mcp.WithString("token0_address",
 			mcp.Required(),
-			mcp.Description(fmt.Sprintf("Address of the first token in the pair. Use %s address for ETH pairs.", ETH_TOKEN_ADDRESS)),
+			mcp.Description(fmt.Sprintf("Address of the first token in the pair. Use %s address for ETH pairs.", services.ETH_TOKEN_ADDRESS)),
 		),
 		mcp.WithString("token1_address",
 			mcp.Required(),
-			mcp.Description(fmt.Sprintf("Address of the second token in the pair. Use %s address for ETH pairs.", ETH_TOKEN_ADDRESS)),
+			mcp.Description(fmt.Sprintf("Address of the second token in the pair. Use %s address for ETH pairs.", services.ETH_TOKEN_ADDRESS)),
 		),
 		mcp.WithString("initial_token0_amount",
 			mcp.Required(),
@@ -151,7 +149,7 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 	}
 
 	// Determine pair type: ETH pair or Token pair
-	isETHPair := args.Token0Address == ETH_TOKEN_ADDRESS || args.Token1Address == ETH_TOKEN_ADDRESS
+	isETHPair := args.Token0Address == services.ETH_TOKEN_ADDRESS || args.Token1Address == services.ETH_TOKEN_ADDRESS
 	// make sure not all of the token addresses are the same
 	if args.Token0Address == args.Token1Address {
 		return mcp.NewToolResultError("Token0 and Token1 addresses cannot be the same"), nil
@@ -180,7 +178,7 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 		nonEthTokenAddress := args.Token0Address
 		nonEthTokenAmount := args.InitialToken0Amount
 		ethTokenAmount := args.InitialToken1Amount
-		if args.Token0Address == ETH_TOKEN_ADDRESS {
+		if args.Token0Address == services.ETH_TOKEN_ADDRESS {
 			nonEthTokenAddress = args.Token1Address
 			nonEthTokenAmount = args.InitialToken1Amount
 			ethTokenAmount = args.InitialToken0Amount
@@ -209,12 +207,12 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 	}
 
 	enhancedMetadata := append(args.Metadata, models.TransactionMetadata{
-		Key:   "token0_address",
+		Key:   services.METADATA_TOKEN0_ADDRESS,
 		Value: args.Token0Address,
 	})
 
 	enhancedMetadata = append(enhancedMetadata, models.TransactionMetadata{
-		Key:   "token1_address",
+		Key:   services.METADATA_TOKEN1_ADDRESS,
 		Value: args.Token1Address,
 	})
 

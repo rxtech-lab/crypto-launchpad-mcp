@@ -52,16 +52,18 @@ type CreateLiquidityPoolTestSuite struct {
 
 	// Deployed contracts
 	testToken       *DeployedContract
+	testToken2      *DeployedContract
 	weth9Contract   *DeployedContract
 	factoryContract *DeployedContract
 	routerContract  *DeployedContract
 
 	// Services
-	evmService       services.EvmService
-	txService        services.TransactionService
-	liquidityService services.LiquidityService
-	uniswapService   services.UniswapService
-	chainService     services.ChainService
+	evmService             services.EvmService
+	txService              services.TransactionService
+	liquidityService       services.LiquidityService
+	uniswapService         services.UniswapService
+	chainService           services.ChainService
+	uniswapContractService services.UniswapContractService
 }
 
 func (suite *CreateLiquidityPoolTestSuite) SetupSuite() {
@@ -88,6 +90,7 @@ func (suite *CreateLiquidityPoolTestSuite) SetupSuite() {
 	suite.liquidityService = services.NewLiquidityService(db.GetDB())
 	suite.uniswapService = services.NewUniswapService(db.GetDB())
 	suite.chainService = services.NewChainService(db.GetDB())
+	suite.uniswapContractService = services.NewUniswapContractService(suite.uniswapService)
 
 	// Initialize tool
 	suite.tool = NewCreateLiquidityPoolTool(
@@ -191,6 +194,12 @@ func (suite *CreateLiquidityPoolTestSuite) deployContracts() {
 	suite.Require().NoError(err)
 	suite.testToken = testToken
 	suite.T().Logf("✓ Deployed TestToken at %s", testToken.Address.Hex())
+
+	// Deploy second OpenZeppelin-based test token
+	testToken2, err := suite.deployOpenZeppelinToken("TestToken2", "TEST2", big.NewInt(1000000))
+	suite.Require().NoError(err)
+	suite.testToken2 = testToken2
+	suite.T().Logf("✓ Deployed TestToken2 at %s", testToken2.Address.Hex())
 
 	// Deploy WETH9 from embedded artifact
 	weth9, err := suite.deployWETH9()
@@ -500,7 +509,7 @@ func (suite *CreateLiquidityPoolTestSuite) TestCreateLiquidityPoolWithEth() {
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
 				"token0_address":        suite.testToken.Address.Hex(),
-				"token1_address":        ETH_TOKEN_ADDRESS,
+				"token1_address":        services.ETH_TOKEN_ADDRESS,
 				"initial_token0_amount": "1000000000000000000000", // 1000 tokens
 				"initial_token1_amount": "500000000000000000",     // 0.5 ETH
 				"owner_address":         suite.testAddress.Hex(),
@@ -548,18 +557,17 @@ func (suite *CreateLiquidityPoolTestSuite) TestCreateLiquidityPoolWithEth() {
 	}
 
 	// Check if pair was created
-	var pairAddress common.Address
-	err = suite.factoryContract.BoundContract.Call(nil, &[]any{&pairAddress}, "getPair", suite.testToken.Address, suite.weth9Contract.Address)
-	suite.NoError(err)
-	suite.NotEqual(common.Address{}, pairAddress, "Pair should be created")
-	suite.T().Logf("✓ Pair created at: %s", pairAddress.Hex())
 
 	// Verify liquidity pool has correct token balances
 	suite.T().Log("Verifying liquidity pool balances...")
+	pairAddress, err := suite.uniswapContractService.GetPairAddress(suite.testToken.Address.Hex(), suite.weth9Contract.Address.Hex(), suite.chain)
+	suite.NoError(err)
+	suite.NotEqual("", pairAddress, "Pair should be created")
+	suite.T().Logf("✓ Pair created at: %s", pairAddress)
 
 	// Check token balance in the pair contract
 	var tokenBalance *big.Int
-	err = suite.testToken.BoundContract.Call(nil, &[]any{&tokenBalance}, "balanceOf", pairAddress)
+	err = suite.testToken.BoundContract.Call(nil, &[]any{&tokenBalance}, "balanceOf", common.HexToAddress(pairAddress))
 	suite.NoError(err)
 	expectedTokenAmount := new(big.Int)
 	expectedTokenAmount.SetString("1000000000000000000000", 10) // 1000 tokens
@@ -571,7 +579,7 @@ func (suite *CreateLiquidityPoolTestSuite) TestCreateLiquidityPoolWithEth() {
 	pairABI := `[{"constant":true,"inputs":[{"name":"","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"type":"function"}]`
 	parsedPairABI, err := abi.JSON(strings.NewReader(pairABI))
 	suite.NoError(err)
-	pairContract := bind.NewBoundContract(pairAddress, parsedPairABI, suite.ethClient, suite.ethClient, suite.ethClient)
+	pairContract := bind.NewBoundContract(common.HexToAddress(pairAddress), parsedPairABI, suite.ethClient, suite.ethClient, suite.ethClient)
 
 	// Check LP token balance of owner
 	var lpBalance *big.Int
@@ -588,6 +596,114 @@ func (suite *CreateLiquidityPoolTestSuite) TestCreateLiquidityPoolWithEth() {
 	suite.T().Logf("✓ Total LP token supply: %s", totalLPSupply.String())
 
 	suite.T().Log("✓ All blockchain operations and balance verifications completed successfully")
+}
+
+// Create a liquidity pool to swap between two tokens (no ETH involved)
+func (suite *CreateLiquidityPoolTestSuite) TestCreateLiquidityPoolWithTokenToToken() {
+	// Create liquidity pool via tool (Token-to-Token pair)
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: map[string]interface{}{
+				"token0_address":        suite.testToken.Address.Hex(),
+				"token1_address":        suite.testToken2.Address.Hex(),
+				"initial_token0_amount": "1000000000000000000000", // 1000 tokens
+				"initial_token1_amount": "2000000000000000000000", // 2000 tokens
+				"owner_address":         suite.testAddress.Hex(),
+			},
+		},
+	}
+
+	// Check the balance of both test tokens
+	var token0Balance, token1Balance *big.Int
+	err := suite.testToken.BoundContract.Call(nil, &[]interface{}{&token0Balance}, "balanceOf", suite.testAddress)
+	suite.NoError(err)
+	suite.True(token0Balance.Cmp(big.NewInt(0)) > 0, "Test token balance should be > 0")
+	suite.T().Logf("✓ Test token balance: %s", token0Balance.String())
+
+	err = suite.testToken2.BoundContract.Call(nil, &[]interface{}{&token1Balance}, "balanceOf", suite.testAddress)
+	suite.NoError(err)
+	suite.True(token1Balance.Cmp(big.NewInt(0)) > 0, "Test token2 balance should be > 0")
+	suite.T().Logf("✓ Test token2 balance: %s", token1Balance.String())
+
+	handler := suite.tool.GetHandler()
+	result, err := handler(context.Background(), request)
+
+	suite.NoError(err)
+	suite.NotNil(result)
+	suite.False(result.IsError)
+
+	// Extract session ID
+	var sessionIDContent string
+	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
+		sessionIDContent = textContent.Text
+	}
+	sessionID := strings.TrimPrefix(sessionIDContent, "Transaction session created: ")
+
+	// Get transaction session and deployments
+	session, err := suite.txService.GetTransactionSession(sessionID)
+	suite.NoError(err)
+	suite.Len(session.TransactionDeployments, 3) // Token-to-token pairs have 3 transactions (2 approvals + 1 addLiquidity)
+
+	// Execute transactions in order
+	suite.T().Log("Executing blockchain transactions...")
+
+	// Execute each transaction
+	for i, deployment := range session.TransactionDeployments {
+		suite.T().Logf("Executing transaction %d: %s", i+1, deployment.Title)
+
+		txReceipt, err := suite.executeTransaction(deployment.Data, deployment.Value, deployment.Receiver)
+		suite.NoError(err)
+		suite.Equal(uint64(1), txReceipt.Status, "Transaction %d should succeed", i+1)
+		suite.T().Logf("✓ Transaction %d successful", i+1)
+	}
+
+	// Check if pair was created
+	suite.T().Log("Verifying liquidity pool balances...")
+	pairAddress, err := suite.uniswapContractService.GetPairAddress(suite.testToken.Address.Hex(), suite.testToken2.Address.Hex(), suite.chain)
+	suite.NoError(err)
+	suite.NotEqual("", pairAddress, "Pair should be created")
+	suite.T().Logf("✓ Pair created at: %s", pairAddress)
+
+	// Check token0 balance in the pair contract
+	var pairToken0Balance *big.Int
+	err = suite.testToken.BoundContract.Call(nil, &[]any{&pairToken0Balance}, "balanceOf", common.HexToAddress(pairAddress))
+	suite.NoError(err)
+	expectedToken0Amount := new(big.Int)
+	expectedToken0Amount.SetString("1000000000000000000000", 10) // 1000 tokens
+	suite.Equal(expectedToken0Amount, pairToken0Balance, "Pair should have correct token0 balance")
+	suite.T().Logf("✓ Token0 balance in pair: %s (expected: %s)", pairToken0Balance.String(), expectedToken0Amount.String())
+
+	// Check token1 balance in the pair contract
+	var pairToken1Balance *big.Int
+	err = suite.testToken2.BoundContract.Call(nil, &[]any{&pairToken1Balance}, "balanceOf", common.HexToAddress(pairAddress))
+	suite.NoError(err)
+	expectedToken1Amount := new(big.Int)
+	expectedToken1Amount.SetString("2000000000000000000000", 10) // 2000 tokens
+	suite.Equal(expectedToken1Amount, pairToken1Balance, "Pair should have correct token1 balance")
+	suite.T().Logf("✓ Token1 balance in pair: %s (expected: %s)", pairToken1Balance.String(), expectedToken1Amount.String())
+
+	// Verify LP tokens were minted to the owner
+	// We need to create a bound contract for the pair to check LP balance
+	pairABI := `[{"constant":true,"inputs":[{"name":"","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"type":"function"}]`
+	parsedPairABI, err := abi.JSON(strings.NewReader(pairABI))
+	suite.NoError(err)
+	pairContract := bind.NewBoundContract(common.HexToAddress(pairAddress), parsedPairABI, suite.ethClient, suite.ethClient, suite.ethClient)
+
+	// Check LP token balance of owner
+	var lpBalance *big.Int
+	err = pairContract.Call(nil, &[]interface{}{&lpBalance}, "balanceOf", suite.testAddress)
+	suite.NoError(err)
+	suite.True(lpBalance.Cmp(big.NewInt(0)) > 0, "Owner should have LP tokens")
+	suite.T().Logf("✓ LP token balance for owner: %s", lpBalance.String())
+
+	// Check total LP supply
+	var totalLPSupply *big.Int
+	err = pairContract.Call(nil, &[]interface{}{&totalLPSupply}, "totalSupply")
+	suite.NoError(err)
+	suite.True(totalLPSupply.Cmp(big.NewInt(0)) > 0, "Total LP supply should be > 0")
+	suite.T().Logf("✓ Total LP token supply: %s", totalLPSupply.String())
+
+	suite.T().Log("✓ All token-to-token liquidity pool operations and balance verifications completed successfully")
 }
 
 // executeTransaction is a helper method to execute a transaction on the blockchain

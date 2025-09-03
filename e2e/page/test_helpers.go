@@ -109,6 +109,7 @@ func NewChromedpTestSetup(t *testing.T) *ChromedpTestSetup {
 		chromedp.Flag("disable-web-security", true),
 		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("disable-features", "VizDisplayCompositor"),
+		chromedp.Flag("incognito", true),
 		chromedp.WindowSize(1280, 720),
 	)
 

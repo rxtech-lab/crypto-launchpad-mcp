@@ -18,7 +18,11 @@ func (t *TokenDeploymentHook) CanHandle(txType models.TransactionType) bool {
 // OnTransactionConfirmed implements Hook.
 func (t *TokenDeploymentHook) OnTransactionConfirmed(txType models.TransactionType, txHash string, contractAddress *string, session models.TransactionSession) error {
 	// Update the deployment record with the contract address and confirmed status
-	err := t.deploymentService.UpdateDeploymentStatusWithTxHashBySessionId(session.ID, models.TransactionStatusConfirmed, *contractAddress, txHash)
+	var address string
+	if contractAddress != nil {
+		address = *contractAddress
+	}
+	err := t.deploymentService.UpdateDeploymentStatusWithTxHashBySessionId(session.ID, models.TransactionStatusConfirmed, address, txHash)
 
 	if err != nil {
 		return err

@@ -57,14 +57,6 @@ test:
 test-coverage:
 	go test -v -p 1 -race -coverprofile=coverage.out -covermode=atomic ./...
 
-# Upload coverage to codecov (requires CODECOV_TOKEN)
-test-coverage-upload: test-coverage
-	@if command -v codecov >/dev/null 2>&1; then \
-		codecov -f coverage.out; \
-	else \
-		curl -s https://codecov.io/bash | bash -s -- -f coverage.out; \
-	fi
-
 # Run the MCP server directly (no build)
 run:
 	go run ./cmd/stdio/main.go

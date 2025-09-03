@@ -112,8 +112,10 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
         const tx = {
           data: deployment.data,
           value:
-            deployment.value.length > 0 ? formatEther(deployment.value) : "0",
-          to: deployment.receiver,
+            deployment.value.length > 0 && deployment.value != "0"
+              ? formatEther(deployment.value)
+              : "0",
+          to: deployment.receiver ? deployment.receiver : undefined,
         };
 
         console.log("Constructing transaction:", tx);

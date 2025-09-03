@@ -32,8 +32,8 @@ func configureAndStartServer(db *gorm.DB, port int) (*api.APIServer, int, error)
 	}
 
 	// Initialize services and hooks
-	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, deploymentService := server.InitializeServices(dbService.GetDB())
-	tokenDeploymentHook, uniswapDeploymentHook, liquidityHook := server.InitializeHooks(dbService.GetDB(), hookService, uniswapService, deploymentService, liquidityService)
+	evmService, txService, uniswapService, liquidityService, hookService, chainService, templateService, deploymentService, uniswapContractService := server.InitializeServices(dbService.GetDB())
+	tokenDeploymentHook, uniswapDeploymentHook, liquidityHook := server.InitializeHooks(dbService.GetDB(), hookService, uniswapService, deploymentService, liquidityService, uniswapContractService, chainService)
 	server.RegisterHooks(hookService, tokenDeploymentHook, uniswapDeploymentHook, liquidityHook)
 
 	// Initialize MCP server
