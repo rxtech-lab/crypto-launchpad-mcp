@@ -37,7 +37,7 @@ type TestSetup struct {
 	DBService         services.DBService
 	ChainService      services.ChainService
 	TemplateService   services.TemplateService
-	DeploymentService *services.DeploymentService
+	DeploymentService services.DeploymentService
 	UniswapService    services.UniswapService
 	EthClient         *ethclient.Client
 	TxService         services.TransactionService
@@ -554,11 +554,13 @@ func (s *ChromedpTestSetup) CreateTokenDeploymentSession(templateID uint) (strin
 
 	// First create the deployment record
 	deployment := &models.Deployment{
-		TemplateID:  templateID,
-		ChainID:     chain.ID,
-		TokenName:   "Test Token",
-		TokenSymbol: "TEST",
-		Status:      "pending",
+		TemplateID: templateID,
+		ChainID:    chain.ID,
+		TemplateValues: models.JSON{
+			"TokenName":   "Test Token",
+			"TokenSymbol": "TEST",
+		},
+		Status: models.TransactionStatusPending,
 	}
 
 	err = s.TestSetup.DeploymentService.CreateDeployment(deployment)

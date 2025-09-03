@@ -39,7 +39,7 @@ type TxHandlerTestSuite struct {
 	ethClient         *ethclient.Client
 	chain             *models.Chain
 	template          *models.Template
-	deploymentService *services.DeploymentService
+	deploymentService services.DeploymentService
 	chainService      services.ChainService
 	templateService   services.TemplateService
 }
@@ -173,7 +173,7 @@ func (suite *TxHandlerTestSuite) createTestSession() string {
 		ChainID:         suite.chain.ID,
 		ContractAddress: "",
 		TransactionHash: "",
-		Status:          string(models.TransactionStatusPending),
+		Status:          models.TransactionStatusPending,
 		TemplateValues: models.JSON{
 			"name":   "TestToken",
 			"symbol": "TEST",
@@ -536,7 +536,7 @@ func (suite *TxHandlerTestSuite) TestHandleTransactionAPI_PartialConfirmation() 
 		ChainID:         suite.chain.ID,
 		ContractAddress: "",
 		TransactionHash: "",
-		Status:          string(models.TransactionStatusPending),
+		Status:          models.TransactionStatusPending,
 		TemplateValues: models.JSON{
 			"name":   "TestToken",
 			"symbol": "TEST",

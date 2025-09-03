@@ -54,8 +54,11 @@ func (suite *LaunchToolTestSuite) SetupSuite() {
 	err = suite.verifyEthereumConnection()
 	suite.Require().NoError(err)
 
+	// Initialize deployment service
+	deploymentService := services.NewDeploymentService(suite.db.GetDB())
+
 	// Initialize launch tool
-	suite.launchTool = NewLaunchTool(suite.templateService, suite.chainService, TEST_SERVER_PORT, evmService, txService)
+	suite.launchTool = NewLaunchTool(suite.templateService, suite.chainService, TEST_SERVER_PORT, evmService, txService, deploymentService)
 
 	// Setup test data
 	suite.setupTestChain()
@@ -724,6 +727,8 @@ contract TestContract {
 		"0",
 		"Deploy TestContract",
 		"Deploy a test contract",
+		suite.template.ID,
+		models.JSON{},
 	)
 
 	suite.NoError(err)

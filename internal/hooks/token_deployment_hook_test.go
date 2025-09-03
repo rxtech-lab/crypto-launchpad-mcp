@@ -91,6 +91,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_TokenDeploymen
 		ChainID:         1,
 		TransactionHash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 		Status:          models.TransactionStatusPending,
+		SessionId:       "test-session-id",
 		CreatedAt:       time.Now(),
 	}
 
@@ -120,7 +121,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_TokenDeploymen
 	s.Require().NoError(err)
 
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
-	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
+	s.Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 }
 
 func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2TokenDeployment() {
@@ -130,6 +131,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2Token
 		ChainID:         1,
 		TransactionHash: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
 		Status:          models.TransactionStatusPending,
+		SessionId:       "test-uniswap-session-id",
 		CreatedAt:       time.Now(),
 	}
 
@@ -159,7 +161,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UniswapV2Token
 	s.Require().NoError(err)
 
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
-	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
+	s.Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 }
 
 func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_NonexistentTransaction() {
@@ -193,6 +195,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_EmptyContractA
 		ChainID:         1,
 		TransactionHash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 		Status:          models.TransactionStatusPending,
+		SessionId:       "test-session-id",
 		CreatedAt:       time.Now(),
 	}
 
@@ -221,7 +224,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_EmptyContractA
 	s.Require().NoError(err)
 
 	s.Equal("", updatedDeployment.ContractAddress)
-	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
+	s.Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 }
 
 func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultipleRecords() {
@@ -233,6 +236,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 		ChainID:         1,
 		TransactionHash: txHash,
 		Status:          models.TransactionStatusPending,
+		SessionId:       "test-session-id",
 		CreatedAt:       time.Now(),
 	}
 	deployment2 := &models.Deployment{
@@ -240,6 +244,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 		ChainID:         1,
 		TransactionHash: txHash,
 		Status:          models.TransactionStatusPending,
+		SessionId:       "test-session-id",
 		CreatedAt:       time.Now(),
 	}
 
@@ -274,7 +279,7 @@ func (s *TokenDeploymentHookTestSuite) TestOnTransactionConfirmed_UpdateMultiple
 
 	for _, deployment := range updatedDeployments {
 		s.Equal(contractAddress, deployment.ContractAddress)
-		s.Equal(string(models.TransactionStatusConfirmed), deployment.Status)
+		s.Equal(models.TransactionStatusConfirmed, deployment.Status)
 	}
 }
 
@@ -294,6 +299,7 @@ func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 		ChainID:         1,
 		TransactionHash: "0x2222222222222222222222222222222222222222222222222222222222222222",
 		Status:          models.TransactionStatusPending,
+		SessionId:       "constructor-test-session",
 		CreatedAt:       time.Now(),
 	}
 
@@ -320,7 +326,7 @@ func (s *TokenDeploymentHookTestSuite) TestNewTokenDeploymentHook() {
 	updatedDeployment, err := s.deploymentService.GetDeploymentByTransactionHash(deployment.TransactionHash)
 	s.Require().NoError(err)
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
-	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
+	s.Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 }
 
 func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
@@ -330,6 +336,7 @@ func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
 		ChainID:         1,
 		TransactionHash: "0x3333333333333333333333333333333333333333333333333333333333333333",
 		Status:          models.TransactionStatusPending,
+		SessionId:       "integrity-test-session",
 		CreatedAt:       time.Now(),
 	}
 
@@ -359,7 +366,7 @@ func (s *TokenDeploymentHookTestSuite) TestDatabaseTransactionIntegrity() {
 	updatedDeployment, err := s.deploymentService.GetDeploymentByTransactionHash(deployment.TransactionHash)
 	s.Require().NoError(err)
 	s.Equal(contractAddress, updatedDeployment.ContractAddress)
-	s.Equal(string(models.TransactionStatusConfirmed), updatedDeployment.Status)
+	s.Equal(models.TransactionStatusConfirmed, updatedDeployment.Status)
 }
 
 func TestTokenDeploymentHook(t *testing.T) {
