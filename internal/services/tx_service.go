@@ -32,6 +32,7 @@ type CreateTransactionSessionRequest struct {
 	ChainType              models.TransactionChainType    `json:"chain_type"`
 	ChainID                uint                           `json:"chain_id"`
 	UserID                 *string                        `json:"user_id,omitempty"`
+	Balances               map[string]*string             `json:"balances,omitempty"`
 }
 
 func NewTransactionService(db *gorm.DB) TransactionService {
@@ -58,6 +59,7 @@ func (s *transactionService) CreateTransactionSessionWithUser(req CreateTransact
 		TransactionStatus:      models.TransactionStatusPending,
 		TransactionChainType:   models.TransactionChainType(req.ChainType),
 		TransactionDeployments: req.TransactionDeployments,
+		Balances:               req.Balances,
 		ChainID:                req.ChainID,
 		CreatedAt:              time.Now(),
 		UpdatedAt:              time.Now(),

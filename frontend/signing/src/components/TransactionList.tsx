@@ -193,7 +193,11 @@ export function TransactionList({
                     {tx.description && (
                       <p
                         title={tx.description}
-                        className="text-sm text-gray-600 mt-1 overflow-hidden whitespace-nowrap text-ellipsis"
+                        className="text-sm text-gray-600 mt-1 break-all overflow-hidden hyphens-auto"
+                        style={{
+                          wordBreak: "break-all",
+                          overflowWrap: "anywhere",
+                        }}
                       >
                         {tx.description}
                       </p>

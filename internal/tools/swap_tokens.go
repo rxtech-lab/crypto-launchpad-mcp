@@ -219,12 +219,20 @@ func (s *swapTokensTool) createSwapTransaction(ctx context.Context, args SwapTok
 	})
 
 	// Create transaction session
+	balances := map[string]*string{}
+	if !isFromETH {
+		balances[args.FromToken] = nil
+	}
+	if !isToETH {
+		balances[args.ToToken] = nil
+	}
 	sessionID, err := s.txService.CreateTransactionSession(services.CreateTransactionSessionRequest{
 		TransactionDeployments: transactionDeployments,
 		ChainType:              models.TransactionChainTypeEthereum,
 		ChainID:                activeChain.ID,
 		Metadata:               enhancedMetadata,
 		UserID:                 userId,
+		Balances:               balances,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Error creating transaction session: %v", err)), nil

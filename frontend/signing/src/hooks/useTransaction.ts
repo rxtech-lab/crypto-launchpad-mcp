@@ -1,13 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useState } from "react";
-import { formatEther } from "ethers";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { formatEther, BrowserProvider } from "ethers";
 import type { TransactionState, TransactionStatus } from "../types/wallet";
 
 interface UseTransactionProps {
   sessionId?: string;
+  walletProvider?: any;
+  account?: string | null;
 }
 
-export function useTransaction({ sessionId }: UseTransactionProps = {}) {
+export function useTransaction({ sessionId, walletProvider, account }: UseTransactionProps = {}) {
   const [state, setState] = useState<TransactionState>({
     session: null,
     transactionStatuses: new Map(),
@@ -20,6 +22,9 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
   const [deployedContracts, setDeployedContracts] = useState<
     Map<number, { address: string; txHash: string }>
   >(new Map());
+
+  // Balance refresh interval ref
+  const balanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load session data from meta tag or API
   const loadSession = useCallback(async () => {
@@ -78,6 +83,86 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
       }
     }
   }, [sessionId]);
+
+  // Fetch balances for all tokens in the session
+  const fetchBalances = useCallback(async () => {
+    if (!state.session || !walletProvider || !account) {
+      return;
+    }
+
+    try {
+      const provider = new BrowserProvider(walletProvider);
+      const updatedBalances: Record<string, string | null> = {};
+
+      // Fetch balances for each token address in the session
+      for (const [address, currentBalance] of Object.entries(state.session.balances)) {
+        try {
+          if (!address || address === "0x0" || address.toLowerCase() === "0x0000000000000000000000000000000000000000") {
+            // Native token balance (ETH)
+            const balance = await provider.getBalance(account);
+            updatedBalances[address] = balance.toString();
+          } else {
+            // ERC-20 token balance - use basic ERC-20 balanceOf call
+            const tokenContract = {
+              address: address,
+              abi: ["function balanceOf(address) view returns (uint256)"]
+            };
+            
+            // Create contract instance and call balanceOf
+            const contract = new (await import("ethers")).Contract(
+              tokenContract.address, 
+              tokenContract.abi, 
+              provider
+            );
+            const balance = await contract.balanceOf(account);
+            updatedBalances[address] = balance.toString();
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch balance for ${address}:`, error);
+          updatedBalances[address] = currentBalance; // Keep existing balance on error
+        }
+      }
+
+      // Update session with new balances
+      setState(prev => ({
+        ...prev,
+        session: prev.session ? {
+          ...prev.session,
+          balances: updatedBalances
+        } : null
+      }));
+
+    } catch (error) {
+      console.error("Failed to fetch balances:", error);
+    }
+  }, [state.session, walletProvider, account]);
+
+  // Setup balance refresh interval (every 10 seconds)
+  useEffect(() => {
+    // Clear existing interval
+    if (balanceIntervalRef.current) {
+      clearInterval(balanceIntervalRef.current);
+    }
+
+    // Only start interval if we have session, wallet, and account
+    if (state.session && walletProvider && account) {
+      // Fetch balances immediately
+      fetchBalances();
+
+      // Setup interval for every 10 seconds
+      balanceIntervalRef.current = setInterval(() => {
+        fetchBalances();
+      }, 10000);
+    }
+
+    // Cleanup on unmount or dependency changes
+    return () => {
+      if (balanceIntervalRef.current) {
+        clearInterval(balanceIntervalRef.current);
+        balanceIntervalRef.current = null;
+      }
+    };
+  }, [fetchBalances, state.session, walletProvider, account]);
 
   // Update transaction status
   const updateTransactionStatus = useCallback(
@@ -139,6 +224,7 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
             return newMap;
           });
         }
+        
         // Update session status on backend
         if (state.session.id) {
           await fetch(`/api/tx/${state.session.id}/transaction/${index}`, {
@@ -150,6 +236,13 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
               contractAddress: receipt.contractAddress,
             }),
           });
+        }
+
+        // Refresh balances after successful transaction
+        if (receipt.status === 1) {
+          setTimeout(() => {
+            fetchBalances();
+          }, 2000); // Wait 2 seconds for blockchain to update
         }
 
         return receipt;
@@ -216,6 +309,7 @@ export function useTransaction({ sessionId }: UseTransactionProps = {}) {
     updateTransactionStatus,
     executeTransaction,
     executeAllTransactions,
+    fetchBalances,
     reset,
   };
 }

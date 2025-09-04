@@ -71,3 +71,37 @@ export function truncateHash(hash: string, length: number = 10): string {
     hash.length - length
   )}`;
 }
+
+export function formatTokenBalance(value: string, decimals: number = 18): string {
+  try {
+    // Convert token units to decimal by dividing by 10^decimals
+    const tokenValue = BigInt(value);
+    const divisor = BigInt(10) ** BigInt(decimals);
+    
+    // Handle the division with proper decimal places
+    const integerPart = tokenValue / divisor;
+    const fractionalPart = tokenValue % divisor;
+    
+    if (fractionalPart === BigInt(0)) {
+      return integerPart.toString();
+    }
+    
+    // Convert fractional part to decimal string
+    const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
+    const decimalValue = Number(integerPart) + Number(`0.${fractionalStr}`);
+    
+    // Format with appropriate precision
+    if (decimalValue === 0) return "0";
+    if (decimalValue < 0.000001) return "<0.000001";
+    
+    // Show more precision for smaller amounts, less for larger amounts
+    let precision = 6;
+    if (decimalValue >= 1000) precision = 2;
+    else if (decimalValue >= 1) precision = 4;
+    
+    return decimalValue.toFixed(precision).replace(/\.?0+$/, "");
+  } catch (error) {
+    console.error("Error formatting token balance:", error);
+    return value;
+  }
+}

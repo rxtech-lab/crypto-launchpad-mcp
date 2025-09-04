@@ -1,6 +1,7 @@
 import { Activity, CheckCircle, Wallet, LogOut } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import "./App.css";
+import { BalanceDisplay } from "./components/BalanceDisplay";
 import { ErrorDisplay } from "./components/ErrorDisplay";
 import { HorizontalStepper } from "./components/HorizontalStepper";
 import { MetadataDisplay } from "./components/MetadataDisplay";
@@ -12,7 +13,10 @@ import { useWallet } from "./hooks/useWallet";
 
 function App() {
   const wallet = useWallet();
-  const transaction = useTransaction();
+  const transaction = useTransaction({
+    walletProvider: wallet.selectedProvider?.provider,
+    account: wallet.account,
+  });
 
   const handleSignTransactions = useCallback(async () => {
     if (!wallet.isConnected) {
@@ -293,10 +297,10 @@ function App() {
           </p>
         </header>
 
-        {/* Main Card */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          {/* Wallet Status Bar - Only show when connected */}
-          {wallet.isConnected && wallet.account && (
+        {/* Sticky Header Section */}
+        {wallet.isConnected && wallet.account && (
+          <div className="sticky top-0 z-50 bg-white rounded-t-lg border border-gray-200 shadow-sm">
+            {/* Wallet Status Bar */}
             <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -321,8 +325,27 @@ function App() {
                 </div>
               </div>
             </div>
-          )}
 
+            {/* Balance Display */}
+            {transaction.session?.balances &&
+              Object.keys(transaction.session.balances).length > 0 && (
+                <BalanceDisplay
+                  balances={transaction.session.balances}
+                  chainId={wallet.chainId}
+                  onRefresh={transaction.fetchBalances}
+                />
+              )}
+          </div>
+        )}
+
+        {/* Main Card */}
+        <div
+          className={`bg-white border border-gray-200 ${
+            wallet.isConnected && wallet.account
+              ? "rounded-b-lg border-t-0"
+              : "rounded-lg"
+          }`}
+        >
           {/* Stepper */}
           <div className="px-6 py-4 border-b border-gray-200">
             <HorizontalStepper steps={steps} currentStep={currentStep} />

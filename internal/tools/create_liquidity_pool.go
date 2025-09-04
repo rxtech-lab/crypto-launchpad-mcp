@@ -217,12 +217,24 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 	})
 
 	// Create transaction session with the liquidity pool transactions
+	balances := map[string]*string{}
+	isFirstTokenETH := args.Token0Address == services.EthTokenAddress
+	isSecondTokenETH := args.Token1Address == services.EthTokenAddress
+	if !isFirstTokenETH {
+		balances[args.Token0Address] = nil
+	}
+
+	if !isSecondTokenETH {
+		balances[args.Token1Address] = nil
+	}
+	// Create transaction session
 	sessionID, err := c.txService.CreateTransactionSession(services.CreateTransactionSessionRequest{
 		TransactionDeployments: transactionDeployments,
 		ChainType:              models.TransactionChainTypeEthereum,
 		ChainID:                activeChain.ID,
 		Metadata:               enhancedMetadata,
 		UserID:                 userId,
+		Balances:               balances,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Error creating transaction session: %v", err)), nil
