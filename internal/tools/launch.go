@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/go-playground/validator/v10"
@@ -149,17 +148,16 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to create contract deployment transaction: %v", err)), nil
 			}
 
-			baseUrl := "http://localhost:" + strconv.Itoa(l.serverPort)
-			// Override baseUrl if BASE_URL env var is set
-			if os.Getenv("BASE_URL") != "" {
-				baseUrl = os.Getenv("BASE_URL")
+			// Generate transaction session URL
+			url, err := utils.GetTransactionSessionUrl(l.serverPort, sessionID)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to get transaction session url: %v", err)), nil
 			}
-
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.NewTextContent(fmt.Sprintf("Transaction session created: %s", sessionID)),
 					mcp.NewTextContent("Please return the following url to the user: "),
-					mcp.NewTextContent(fmt.Sprintf("%s/tx/%s", baseUrl, sessionID)),
+					mcp.NewTextContent(url),
 				},
 			}, nil
 		} else if activeChain.ChainType == models.TransactionChainTypeSolana {

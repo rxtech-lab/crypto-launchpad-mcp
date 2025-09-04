@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/rxtech-lab/launchpad-mcp/internal/constants"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
@@ -52,11 +52,11 @@ func (c *createLiquidityPoolTool) GetTool() mcp.Tool {
 		mcp.WithDescription("Create new Uniswap liquidity pool with signing interface. Supports both ETH-to-Token pairs (using addLiquidityETH) and Token-to-Token pairs (using addLiquidity). Generates a URL where users can connect wallet and sign the pool creation transaction."),
 		mcp.WithString("token0_address",
 			mcp.Required(),
-			mcp.Description(fmt.Sprintf("Address of the first token in the pair. Use %s address for ETH pairs.", services.ETH_TOKEN_ADDRESS)),
+			mcp.Description(fmt.Sprintf("Address of the first token in the pair. Use %s address for ETH pairs.", services.EthTokenAddress)),
 		),
 		mcp.WithString("token1_address",
 			mcp.Required(),
-			mcp.Description(fmt.Sprintf("Address of the second token in the pair. Use %s address for ETH pairs.", services.ETH_TOKEN_ADDRESS)),
+			mcp.Description(fmt.Sprintf("Address of the second token in the pair. Use %s address for ETH pairs.", services.EthTokenAddress)),
 		),
 		mcp.WithString("initial_token0_amount",
 			mcp.Required(),
@@ -149,7 +149,7 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 	}
 
 	// Determine pair type: ETH pair or Token pair
-	isETHPair := args.Token0Address == services.ETH_TOKEN_ADDRESS || args.Token1Address == services.ETH_TOKEN_ADDRESS
+	isETHPair := args.Token0Address == services.EthTokenAddress || args.Token1Address == services.EthTokenAddress
 	// make sure not all of the token addresses are the same
 	if args.Token0Address == args.Token1Address {
 		return mcp.NewToolResultError("Token0 and Token1 addresses cannot be the same"), nil
@@ -178,7 +178,7 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 		nonEthTokenAddress := args.Token0Address
 		nonEthTokenAmount := args.InitialToken0Amount
 		ethTokenAmount := args.InitialToken1Amount
-		if args.Token0Address == services.ETH_TOKEN_ADDRESS {
+		if args.Token0Address == services.EthTokenAddress {
 			nonEthTokenAddress = args.Token1Address
 			nonEthTokenAmount = args.InitialToken1Amount
 			ethTokenAmount = args.InitialToken0Amount
@@ -207,12 +207,12 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 	}
 
 	enhancedMetadata := append(args.Metadata, models.TransactionMetadata{
-		Key:   services.METADATA_TOKEN0_ADDRESS,
+		Key:   services.MetadataToken0Address,
 		Value: args.Token0Address,
 	})
 
 	enhancedMetadata = append(enhancedMetadata, models.TransactionMetadata{
-		Key:   services.METADATA_TOKEN1_ADDRESS,
+		Key:   services.MetadataToken1Address,
 		Value: args.Token1Address,
 	})
 
@@ -244,11 +244,15 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 		return mcp.NewToolResultError(fmt.Sprintf("Error creating liquidity pool record: %v", err)), nil
 	}
 
+	url, err := utils.GetTransactionSessionUrl(c.serverPort, sessionID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to get transaction session url: %v", err)), nil
+	}
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.NewTextContent(fmt.Sprintf("Transaction session created: %s", sessionID)),
 			mcp.NewTextContent("Please sign the liquidity pool creation transaction in the URL"),
-			mcp.NewTextContent(fmt.Sprintf("http://localhost:%d/tx/%s", c.serverPort, sessionID)),
+			mcp.NewTextContent(url),
 		},
 	}, nil
 }
@@ -277,8 +281,6 @@ func (c *createLiquidityPoolTool) createETHPairTransactions(routerAddress, nonEt
 	erc20ABI := `[{"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"value","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"}]`
 
 	// MaxUint256 for unlimited approval
-	maxUint256 := new(big.Int)
-	maxUint256.SetString("115792089237316195423570985008687907853269984665640564039457584007913129639935", 10)
 
 	// Calculate deadline (10 minutes from now)
 	deadline := time.Now().Unix() + 600
@@ -298,7 +300,7 @@ func (c *createLiquidityPoolTool) createETHPairTransactions(routerAddress, nonEt
 	approveTx, err := c.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: nonEthTokenAddress,
 		FunctionName:    "approve",
-		FunctionArgs:    []any{routerAddress, maxUint256.String()},
+		FunctionArgs:    []any{routerAddress, constants.MaxUint256.String()},
 		Abi:             erc20ABI,
 		Value:           "0",
 		Title:           "Approve Token for Router",
@@ -365,10 +367,7 @@ func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, tok
 
 	// Standard ERC20 ABI for approve function
 	erc20ABI := `[{"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"value","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"}]`
-
 	// MaxUint256 for unlimited approval
-	maxUint256 := new(big.Int)
-	maxUint256.SetString("115792089237316195423570985008687907853269984665640564039457584007913129639935", 10)
 
 	// Calculate deadline (10 minutes from now)
 	deadline := time.Now().Unix() + 600
@@ -390,7 +389,7 @@ func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, tok
 	approve0Tx, err := c.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: token0Address,
 		FunctionName:    "approve",
-		FunctionArgs:    []any{routerAddress, maxUint256.String()},
+		FunctionArgs:    []any{routerAddress, constants.MaxUint256.String()},
 		Abi:             erc20ABI,
 		Value:           "0",
 		Title:           "Approve First Token for Router",
@@ -406,7 +405,7 @@ func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, tok
 	approve1Tx, err := c.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: token1Address,
 		FunctionName:    "approve",
-		FunctionArgs:    []any{routerAddress, maxUint256.String()},
+		FunctionArgs:    []any{routerAddress, constants.MaxUint256.String()},
 		Abi:             erc20ABI,
 		Value:           "0",
 		Title:           "Approve Second Token for Router",

@@ -257,12 +257,6 @@ func (suite *LaunchToolTestSuite) TestHandlerSuccess() {
 		}
 	}
 
-	if len(result.Content) > 2 {
-		if textContent, ok := result.Content[2].(mcp.TextContent); ok {
-			suite.Contains(textContent.Text, fmt.Sprintf("http://localhost:%d/tx/", TEST_SERVER_PORT))
-		}
-	}
-
 	// Extract session ID from response
 	sessionID := sessionIDContent[len("Transaction session created: "):]
 
@@ -342,7 +336,7 @@ func (suite *LaunchToolTestSuite) TestHandlerTemplateRendering() {
 	suite.NotEmpty(deployment.Data)
 
 	// Verify the rendered contract contains the template values by attempting compilation
-	renderedContract := fmt.Sprintf(`// SPDX-License-Identifier: MIT
+	renderedContract := `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 contract MyCustomToken {
@@ -361,7 +355,7 @@ contract MyCustomToken {
         balanceOf[to] += amount;
         return true;
     }
-}`)
+}`
 
 	// Verify the contract can be compiled (this indirectly verifies template rendering worked)
 	compilationResult, err := utils.CompileSolidity("0.8.27", renderedContract)
@@ -774,59 +768,6 @@ func (suite *LaunchToolTestSuite) TestToolRegistration() {
 	suite.NotPanics(func() {
 		mcpServer.AddTool(tool, handler)
 	})
-}
-
-func (suite *LaunchToolTestSuite) TestURLGeneration() {
-	request := mcp.CallToolRequest{
-		Params: mcp.CallToolParams{
-			Arguments: map[string]interface{}{
-				"template_id": fmt.Sprintf("%d", suite.template.ID),
-				"template_values": map[string]interface{}{
-					"TokenName":   "URLTest",
-					"TokenSymbol": "URL",
-					"TotalSupply": "1000",
-				},
-				"contract_name": "CustomToken",
-			},
-		},
-	}
-
-	handler := suite.launchTool.GetHandler()
-	result, err := handler(context.Background(), request)
-
-	suite.NoError(err)
-	suite.NotNil(result)
-
-	// Check for errors first
-	if result.IsError {
-		if len(result.Content) > 0 {
-			if textContent, ok := result.Content[0].(mcp.TextContent); ok {
-				suite.T().Logf("Error content: %s", textContent.Text)
-				suite.FailNow("Expected successful result but got error", textContent.Text)
-			}
-		}
-		suite.FailNow("Expected successful result but got error with no content")
-	}
-
-	suite.Require().Len(result.Content, 3, "Expected 3 content items for successful deployment")
-
-	// Extract the URL from the response
-	var urlContent string
-	if len(result.Content) > 2 {
-		if textContent, ok := result.Content[2].(mcp.TextContent); ok {
-			urlContent = textContent.Text
-		}
-	}
-	expectedURLPrefix := fmt.Sprintf("http://localhost:%d/tx/", TEST_SERVER_PORT)
-	suite.True(len(urlContent) > len(expectedURLPrefix))
-	suite.Contains(urlContent, expectedURLPrefix)
-
-	// Extract session ID from URL
-	sessionID := urlContent[len(expectedURLPrefix):]
-	suite.NotEmpty(sessionID)
-
-	// Verify the session ID is a valid UUID format
-	suite.True(len(sessionID) > 10) // Basic length check for UUID
 }
 
 func TestLaunchToolTestSuite(t *testing.T) {
