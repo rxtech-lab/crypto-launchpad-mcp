@@ -244,11 +244,15 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 		return mcp.NewToolResultError(fmt.Sprintf("Error creating liquidity pool record: %v", err)), nil
 	}
 
+	url, err := utils.GetTransactionSessionUrl(c.serverPort, sessionID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to get transaction session url: %v", err)), nil
+	}
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.NewTextContent(fmt.Sprintf("Transaction session created: %s", sessionID)),
 			mcp.NewTextContent("Please sign the liquidity pool creation transaction in the URL"),
-			mcp.NewTextContent(fmt.Sprintf("http://localhost:%d/tx/%s", c.serverPort, sessionID)),
+			mcp.NewTextContent(url),
 		},
 	}, nil
 }

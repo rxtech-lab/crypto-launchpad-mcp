@@ -247,11 +247,15 @@ func (s *swapTokensTool) createSwapTransaction(ctx context.Context, args SwapTok
 		return mcp.NewToolResultError(fmt.Sprintf("Error creating swap record: %v", err)), nil
 	}
 
+	url, err := utils.GetTransactionSessionUrl(s.serverPort, sessionID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to get transaction session url: %v", err)), nil
+	}
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.NewTextContent(fmt.Sprintf("Swap transaction session created: %s", sessionID)),
 			mcp.NewTextContent("Please sign the swap transaction in the URL"),
-			mcp.NewTextContent(fmt.Sprintf("http://localhost:%d/tx/%s", s.serverPort, sessionID)),
+			mcp.NewTextContent(url),
 		},
 	}, nil
 }

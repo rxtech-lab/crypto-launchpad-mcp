@@ -800,10 +800,6 @@ func (suite *AddLiquidityTestSuite) TestAddLiquiditySuccess() {
 		suite.Contains(textContent.Text, "Please sign the add liquidity transactions")
 	}
 
-	if textContent, ok := result.Content[2].(mcp.TextContent); ok {
-		suite.Contains(textContent.Text, fmt.Sprintf("http://localhost:%d/tx/", ADD_LIQ_TEST_SERVER_PORT))
-	}
-
 	// Extract session ID and verify
 	sessionID := strings.TrimPrefix(sessionIDContent, "Transaction session created: ")
 	suite.NotEmpty(sessionID)

@@ -197,12 +197,17 @@ func (a *addLiquidityTool) createEthereumAddLiquidity(ctx context.Context, args 
 		return mcp.NewToolResultError(fmt.Sprintf("Error creating transaction session: %v", err)), nil
 	}
 
+	url, err := utils.GetTransactionSessionUrl(a.serverPort, sessionID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to get transaction session url: %v", err)), nil
+	}
+
 	// Return success with URL
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.NewTextContent(fmt.Sprintf("Transaction session created: %s", sessionID)),
 			mcp.NewTextContent("Please sign the add liquidity transactions in the URL"),
-			mcp.NewTextContent(fmt.Sprintf("http://localhost:%d/tx/%s", a.serverPort, sessionID)),
+			mcp.NewTextContent(url),
 		},
 	}, nil
 }
