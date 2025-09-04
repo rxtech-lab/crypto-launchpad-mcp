@@ -46,10 +46,23 @@ type TransactionDeployment struct {
 	Data string `gorm:"type:text" json:"data"`
 	// Value is the value of the transaction for wallet to sign (e.g. 100 WEI)
 	Value string `gorm:"not null" json:"value"`
+	// ContractCode is the full contract code to be deployed for wallet to sign (if applicable)
+	ContractCode *string `gorm:"type:text" json:"contractCode"`
+	// ContractAddress is the address of the contract deployed for wallet to sign (if applicable)
+	ContractAddress *string `gorm:"type:text" json:"contractAddress"`
+	// RawContractArguments is the raw contract arguments object used for singing. Only used for display purpose
+	RawContractArguments *string `gorm:"type:text" json:"rawContractArguments"`
+	// ShowBalanceAfterDeployment is the flag to show the balance after the deployment
+	// default is false, if true, the balance will be shown after the deployment
+	ShowBalanceAfterDeployment bool `gorm:"default:false" json:"showBalanceAfterDeployment"`
+	// ShowBalanceBeforeDeployment is the flag to show the balance before the deployment
+	// default is false, if true, the balance will be shown before the deployment.
+	// Please also provide the contract address for this flag to be true
+	ShowBalanceBeforeDeployment bool `gorm:"default:false" json:"ShowBalanceBeforeDeployment"`
 	// Receiver is the receiver of the transaction for wallet to sign (e.g. 0x1234567890123456789012345678901234567890)
 	Receiver        string            `gorm:"not null" json:"receiver"`
 	Status          TransactionStatus `gorm:"default:pending" json:"status"`
-	TransactionType TransactionType   `gorm:"not null" json:"transaction_type"`
+	TransactionType TransactionType   `gorm:"not null" json:"transactionType"`
 }
 
 // TransactionSession represents signing session management
@@ -59,6 +72,9 @@ type TransactionSession struct {
 	Metadata             []TransactionMetadata `gorm:"serializer:json" json:"metadata"`
 	TransactionStatus    TransactionStatus     `gorm:"default:pending" json:"status"`
 	TransactionChainType TransactionChainType  `gorm:"not null" json:"chain_type"`
+	// Balances is the list of tokens balance used for display purpose
+	// Key is the token address, Value is the optional balance
+	Balances map[string]*string `gorm:"serializer:json" json:"balances"`
 
 	// TransactionDeployments are list of the transactions that needs to be signed
 	TransactionDeployments []TransactionDeployment `gorm:"serializer:json" json:"transaction_deployments"`

@@ -7,10 +7,6 @@ import (
 )
 
 func GetTransactionSessionUrl(serverPort int, sessionId string) (string, error) {
-	hostName, err := os.Hostname()
-	if err != nil {
-		return "", fmt.Errorf("failed to get hostname: %w", err)
-	}
 
 	// Override baseUrl if BASE_URL env var is set
 	if os.Getenv("BASE_URL") != "" {
@@ -22,6 +18,6 @@ func GetTransactionSessionUrl(serverPort int, sessionId string) (string, error) 
 		return fmt.Sprintf("%s/tx/%d/%s", baseUrl, port, sessionId), nil
 	}
 
-	url := fmt.Sprintf("http://%s:%d/tx/%s", hostName, serverPort, sessionId)
+	url := fmt.Sprintf("http://localhost:%d/tx/%s", serverPort, sessionId)
 	return url, nil
 }

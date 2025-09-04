@@ -217,12 +217,24 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 	})
 
 	// Create transaction session with the liquidity pool transactions
+	balances := map[string]*string{}
+	isFirstTokenETH := args.Token0Address == services.EthTokenAddress
+	isSecondTokenETH := args.Token1Address == services.EthTokenAddress
+	if !isFirstTokenETH {
+		balances[args.Token0Address] = nil
+	}
+
+	if !isSecondTokenETH {
+		balances[args.Token1Address] = nil
+	}
+	// Create transaction session
 	sessionID, err := c.txService.CreateTransactionSession(services.CreateTransactionSessionRequest{
 		TransactionDeployments: transactionDeployments,
 		ChainType:              models.TransactionChainTypeEthereum,
 		ChainID:                activeChain.ID,
 		Metadata:               enhancedMetadata,
 		UserID:                 userId,
+		Balances:               balances,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Error creating transaction session: %v", err)), nil
@@ -402,10 +414,11 @@ func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, tok
 	transactionDeployments = append(transactionDeployments, approve0Tx)
 
 	// Transaction 2: Approve Token1 for Router
+	functionArgs := []any{routerAddress, constants.MaxUint256.String()}
 	approve1Tx, err := c.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: token1Address,
 		FunctionName:    "approve",
-		FunctionArgs:    []any{routerAddress, constants.MaxUint256.String()},
+		FunctionArgs:    functionArgs,
 		Abi:             erc20ABI,
 		Value:           "0",
 		Title:           "Approve Second Token for Router",
@@ -415,6 +428,14 @@ func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, tok
 	if err != nil {
 		return nil, fmt.Errorf("failed to create second token approval transaction: %w", err)
 	}
+	functionArgsString, err := utils.EncodeFunctionArgsToStringMapWithStringABI("approve", functionArgs, erc20ABI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal raw contract arguments: %w", err)
+	}
+
+	approve1Tx.ShowBalanceBeforeDeployment = true
+	approve1Tx.ContractAddress = &token1Address
+	approve1Tx.RawContractArguments = &functionArgsString
 	transactionDeployments = append(transactionDeployments, approve1Tx)
 
 	// Calculate minimum amounts with 1% slippage protection
@@ -425,19 +446,20 @@ func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, tok
 
 	// Transaction 3: Add Liquidity for Token Pair
 	// addLiquidity(address tokenA, address tokenB, uint amountADesired, uint amountBDesired, uint amountAMin, uint amountBMin, address to, uint deadline)
+	addLiquidityFunctionArgs := []any{
+		token0Address,               // tokenA
+		token1Address,               // tokenB
+		token0Amount,                // amountADesired
+		token1Amount,                // amountBDesired
+		minAmount0,                  // amountAMin (1% slippage protection)
+		minAmount1,                  // amountBMin (1% slippage protection)
+		ownerAddress,                // to (address that will receive the LP tokens)
+		fmt.Sprintf("%d", deadline), // deadline
+	}
 	addLiquidityTx, err := c.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: routerAddress,
 		FunctionName:    "addLiquidity",
-		FunctionArgs: []any{
-			token0Address,               // tokenA
-			token1Address,               // tokenB
-			token0Amount,                // amountADesired
-			token1Amount,                // amountBDesired
-			minAmount0,                  // amountAMin (1% slippage protection)
-			minAmount1,                  // amountBMin (1% slippage protection)
-			ownerAddress,                // to (address that will receive the LP tokens)
-			fmt.Sprintf("%d", deadline), // deadline
-		},
+		FunctionArgs:    addLiquidityFunctionArgs,
 		Abi:             string(routerAbi),
 		Value:           "0", // No ETH value for token-to-token pairs
 		Title:           "Add Token Liquidity to Pool",
@@ -447,6 +469,11 @@ func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, tok
 	if err != nil {
 		return nil, fmt.Errorf("failed to create add liquidity transaction: %w", err)
 	}
+	addLiquidityFunctionArgsString, err := utils.EncodeFunctionArgsToStringMapWithStringABI("addLiquidity", addLiquidityFunctionArgs, string(routerAbi))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal raw contract arguments: %w", err)
+	}
+	addLiquidityTx.RawContractArguments = &addLiquidityFunctionArgsString
 	transactionDeployments = append(transactionDeployments, addLiquidityTx)
 
 	return transactionDeployments, nil

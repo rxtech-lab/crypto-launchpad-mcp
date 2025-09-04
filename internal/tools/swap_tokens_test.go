@@ -567,9 +567,6 @@ func (suite *SwapTokensTestSuite) addLiquidityETH(tokenAddress common.Address, t
 func (suite *SwapTokensTestSuite) cleanupTestData() {
 	// Clean up transaction sessions
 	suite.db.GetDB().Where("1 = 1").Delete(&models.TransactionSession{})
-
-	// Clean up swap transactions
-	suite.db.GetDB().Where("1 = 1").Delete(&models.SwapTransaction{})
 }
 
 func (suite *SwapTokensTestSuite) executeTransaction(data, value, to string) (*types.Receipt, error) {

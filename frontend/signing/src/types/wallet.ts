@@ -22,8 +22,17 @@ export interface TransactionDeployment {
   data: string;
   value: string;
   receiver?: string; // Added to track receiver address
-  contractAddress?: string; // Added to track deployed contract address
   transactionHash?: string; // Added to track transaction hash
+  contractCode?: string; // Added to track contract code
+  contractAddress?: string; // Added to track contract address
+  rawContractArguments?: string; // Added to track raw contract arguments
+  showBalanceBeforeDeployment?: boolean; // Added to track if balance should be shown before deployment
+  showBalanceAfterDeployment?: boolean; // Added to track if balance should be shown after deployment
+  transactionType:
+    | "regular"
+    | "token_swap"
+    | "add_liquidity"
+    | "remove_liquidity"; // Added to track transaction type
 }
 
 export interface BlockchainNetwork {
@@ -42,6 +51,9 @@ export interface TransactionSession {
   chain_id: number;
   created_at: string;
   expires_at: string;
+  // balances where key is the contract address and value is the balance
+  // if the balance is null, it means that we need to fetch the balance from the blockchain
+  balances: Record<string, string | null>;
 }
 
 export type TransactionStatus = "waiting" | "pending" | "confirmed" | "failed";

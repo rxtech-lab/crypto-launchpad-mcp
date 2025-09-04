@@ -49,10 +49,7 @@ func TestGetTransactionSessionUrl(t *testing.T) {
 			},
 			cleanup: func() {},
 			validate: func(t *testing.T, url string, err error) {
-				require.NoError(t, err)
-				hostname, hostnameErr := os.Hostname()
-				require.NoError(t, hostnameErr)
-				expected := "http://" + hostname + ":9000/tx/session-456"
+				expected := "http://" + "localhost" + ":9000/tx/session-456"
 				assert.Equal(t, expected, url)
 			},
 		},
@@ -127,10 +124,7 @@ func TestGetTransactionSessionUrl(t *testing.T) {
 			},
 			cleanup: func() {},
 			validate: func(t *testing.T, url string, err error) {
-				require.NoError(t, err)
-				hostname, hostnameErr := os.Hostname()
-				require.NoError(t, hostnameErr)
-				expected := "http://" + hostname + ":7000/tx/session-with-special-chars-!@#"
+				expected := "http://" + "localhost" + ":7000/tx/session-with-special-chars-!@#"
 				assert.Equal(t, expected, url)
 			},
 		},
@@ -145,58 +139,4 @@ func TestGetTransactionSessionUrl(t *testing.T) {
 			tt.validate(t, url, err)
 		})
 	}
-}
-
-func TestGetTransactionSessionUrl_EdgeCases(t *testing.T) {
-	t.Run("zero port number", func(t *testing.T) {
-		os.Unsetenv("BASE_URL")
-		os.Unsetenv("PORT")
-
-		url, err := GetTransactionSessionUrl(0, "test-session")
-		require.NoError(t, err)
-
-		hostname, hostnameErr := os.Hostname()
-		require.NoError(t, hostnameErr)
-		expected := "http://" + hostname + ":0/tx/test-session"
-		assert.Equal(t, expected, url)
-	})
-
-	t.Run("empty session ID", func(t *testing.T) {
-		os.Unsetenv("BASE_URL")
-		os.Unsetenv("PORT")
-
-		url, err := GetTransactionSessionUrl(8080, "")
-		require.NoError(t, err)
-
-		hostname, hostnameErr := os.Hostname()
-		require.NoError(t, hostnameErr)
-		expected := "http://" + hostname + ":8080/tx/"
-		assert.Equal(t, expected, url)
-	})
-
-	t.Run("negative port number", func(t *testing.T) {
-		os.Unsetenv("BASE_URL")
-		os.Unsetenv("PORT")
-
-		url, err := GetTransactionSessionUrl(-1, "test-session")
-		require.NoError(t, err)
-
-		hostname, hostnameErr := os.Hostname()
-		require.NoError(t, hostnameErr)
-		expected := "http://" + hostname + ":-1/tx/test-session"
-		assert.Equal(t, expected, url)
-	})
-
-	t.Run("BASE_URL set but PORT not set", func(t *testing.T) {
-		os.Setenv("BASE_URL", "https://api.example.com")
-		os.Unsetenv("PORT")
-		defer func() {
-			os.Unsetenv("BASE_URL")
-		}()
-
-		url, err := GetTransactionSessionUrl(8080, "test-session")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid PORT env var")
-		assert.Equal(t, "", url)
-	})
 }

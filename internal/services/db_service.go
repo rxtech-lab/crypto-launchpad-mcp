@@ -107,7 +107,6 @@ func (s *dbService) migrate() error {
 		&models.Deployment{},
 		&models.UniswapDeployment{},
 		&models.LiquidityPool{},
-		&models.SwapTransaction{},
 		&models.TransactionSession{},
 	)
 }

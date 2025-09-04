@@ -771,24 +771,5 @@ func (suite *LaunchToolTestSuite) TestToolRegistration() {
 }
 
 func TestLaunchToolTestSuite(t *testing.T) {
-	// Check if Ethereum testnet is available before running tests
-	client, err := ethclient.Dial(TEST_TESTNET_RPC)
-	if err != nil {
-		t.Skipf("Skipping launch tool tests: Ethereum testnet not available at %s. Run 'make e2e-network' to start testnet.", TEST_TESTNET_RPC)
-		return
-	}
-
-	// Verify network connectivity
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	networkID, err := client.NetworkID(ctx)
-	client.Close()
-
-	if err != nil || networkID.Cmp(big.NewInt(31337)) != 0 {
-		t.Skipf("Skipping launch tool tests: Cannot connect to anvil testnet at %s (network ID should be 31337). Run 'make e2e-network' to start testnet.", TEST_TESTNET_RPC)
-		return
-	}
-
 	suite.Run(t, new(LaunchToolTestSuite))
 }

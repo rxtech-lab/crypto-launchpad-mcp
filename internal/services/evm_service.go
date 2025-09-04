@@ -3,15 +3,17 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/go-playground/validator/v10"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
 type EvmService interface {
-	GetContractDeploymentTransactionWithContractCode(args ContractDeploymentWithContractCodeTransactionArgs) (models.TransactionDeployment, error)
-	GetContractDeploymentTransactionWithBytecodeAndAbi(args ContractDeploymentWithBytecodeAndAbiTransactionArgs) (models.TransactionDeployment, error)
+	GetContractDeploymentTransactionWithContractCode(args ContractDeploymentWithContractCodeTransactionArgs) (models.TransactionDeployment, abi.ABI, error)
+	GetContractDeploymentTransactionWithBytecodeAndAbi(args ContractDeploymentWithBytecodeAndAbiTransactionArgs) (models.TransactionDeployment, abi.ABI, error)
 	GetTransactionData(args GetTransactionDataArgs) (string, error)
 	GetContractFunctionCallTransaction(args GetContractFunctionCallTransactionArgs) (models.TransactionDeployment, error)
 }
@@ -26,15 +28,15 @@ func NewEvmService() EvmService {
 }
 
 // GetContractDeploymentTransactionWithContractCode returns a transaction deployment for a contract deployment with contract code
-func (s *evmService) GetContractDeploymentTransactionWithContractCode(args ContractDeploymentWithContractCodeTransactionArgs) (models.TransactionDeployment, error) {
+func (s *evmService) GetContractDeploymentTransactionWithContractCode(args ContractDeploymentWithContractCodeTransactionArgs) (models.TransactionDeployment, abi.ABI, error) {
 	err := s.validator.Struct(args)
 	if err != nil {
-		return models.TransactionDeployment{}, err
+		return models.TransactionDeployment{}, abi.ABI{}, err
 	}
 
-	txData, err := s.getContractDeploymentTransactionData(args.ContractName, args.ConstructorArgs, args.ContractCode)
+	txData, abiData, err := s.getContractDeploymentTransactionData(args.ContractName, args.ConstructorArgs, args.ContractCode)
 	if err != nil {
-		return models.TransactionDeployment{}, err
+		return models.TransactionDeployment{}, abi.ABI{}, err
 	}
 
 	return models.TransactionDeployment{
@@ -44,19 +46,19 @@ func (s *evmService) GetContractDeploymentTransactionWithContractCode(args Contr
 		Value:           args.Value,
 		Receiver:        args.Receiver,
 		TransactionType: args.TransactionType,
-	}, nil
+	}, abiData, nil
 }
 
 // GetContractDeploymentWithBytecodeAndAbi returns a transaction deployment for a contract deployment with bytecode and abi
-func (s *evmService) GetContractDeploymentTransactionWithBytecodeAndAbi(args ContractDeploymentWithBytecodeAndAbiTransactionArgs) (models.TransactionDeployment, error) {
+func (s *evmService) GetContractDeploymentTransactionWithBytecodeAndAbi(args ContractDeploymentWithBytecodeAndAbiTransactionArgs) (models.TransactionDeployment, abi.ABI, error) {
 	err := s.validator.Struct(args)
 	if err != nil {
-		return models.TransactionDeployment{}, err
+		return models.TransactionDeployment{}, abi.ABI{}, err
 	}
 
-	txData, err := s.getContractDeploymentTransactionDataWithBytecodeAndAbi(args.Abi, args.Bytecode, args.ConstructorArgs)
+	txData, abiData, err := s.getContractDeploymentTransactionDataWithBytecodeAndAbi(args.Abi, args.Bytecode, args.ConstructorArgs)
 	if err != nil {
-		return models.TransactionDeployment{}, err
+		return models.TransactionDeployment{}, abi.ABI{}, err
 	}
 
 	return models.TransactionDeployment{
@@ -66,7 +68,7 @@ func (s *evmService) GetContractDeploymentTransactionWithBytecodeAndAbi(args Con
 		Value:           args.Value,
 		Receiver:        args.Receiver,
 		TransactionType: args.TransactionType,
-	}, nil
+	}, abiData, nil
 }
 
 // GetTransactionData returns the transaction data interacting with a contract
@@ -106,46 +108,57 @@ func (s *evmService) GetContractFunctionCallTransaction(args GetContractFunction
 	}, nil
 }
 
-func (s *evmService) getContractDeploymentTransactionDataWithBytecodeAndAbi(abi string, bytecode string, constructorArgs []any) (string, error) {
+func (s *evmService) getContractDeploymentTransactionDataWithBytecodeAndAbi(abiString string, bytecode string, constructorArgs []any) (string, abi.ABI, error) {
 	// Encode constructor arguments if provided
-	encodedArgs, err := utils.EncodeContractConstructorArgs(abi, constructorArgs)
+	encodedArgs, err := utils.EncodeContractConstructorArgs(abiString, constructorArgs)
 	if err != nil {
-		return "", fmt.Errorf("failed to encode constructor arguments: %w", err)
+		return "", abi.ABI{}, fmt.Errorf("failed to encode constructor arguments: %w", err)
 	}
 
 	// Build deployment transaction data
 	txData := utils.BuildDeploymentTransactionData(bytecode, encodedArgs)
-	return txData, nil
+
+	parsedABI, err := abi.JSON(strings.NewReader(abiString))
+	if err != nil {
+		return "", abi.ABI{}, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+
+	return txData, parsedABI, nil
 }
 
-func (s *evmService) getContractDeploymentTransactionData(contractName string, constructorArgs []any, contractCode string) (string, error) {
+func (s *evmService) getContractDeploymentTransactionData(contractName string, constructorArgs []any, contractCode string) (string, abi.ABI, error) {
 	compilationResult, err := utils.CompileSolidity("0.8.27", contractCode)
 	if err != nil {
-		return "", err
+		return "", abi.ABI{}, err
 	}
 
 	bytecode, exists := compilationResult.Bytecode[contractName]
 	if !exists {
-		return "", fmt.Errorf("contract %s not found in compilation result", contractName)
+		return "", abi.ABI{}, fmt.Errorf("contract %s not found in compilation result", contractName)
 	}
 
 	abiData, exists := compilationResult.Abi[contractName]
 	if !exists {
-		return "", fmt.Errorf("ABI for contract %s not found", contractName)
+		return "", abi.ABI{}, fmt.Errorf("ABI for contract %s not found", contractName)
 	}
 
 	// Convert ABI to JSON string
 	abiBytes, err := json.Marshal(abiData)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal ABI: %w", err)
+		return "", abi.ABI{}, fmt.Errorf("failed to marshal ABI: %w", err)
 	}
 	abiJSON := string(abiBytes)
 
 	encodedArgs, err := utils.EncodeContractConstructorArgs(abiJSON, constructorArgs)
 	if err != nil {
-		return "", fmt.Errorf("failed to encode constructor arguments: %w", err)
+		return "", abi.ABI{}, fmt.Errorf("failed to encode constructor arguments: %w", err)
 	}
 
 	txData := utils.BuildDeploymentTransactionData(bytecode, encodedArgs)
-	return txData, nil
+
+	parsedABI, err := abi.JSON(strings.NewReader(abiJSON))
+	if err != nil {
+		return "", abi.ABI{}, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+	return txData, parsedABI, nil
 }

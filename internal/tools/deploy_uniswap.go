@@ -223,7 +223,7 @@ func (d *deployUniswapTool) createUniswapV2DeploymentSession(activeChain *models
 // createWETH9Deployment creates a transaction deployment for WETH9 contract
 func (d *deployUniswapTool) createWETH9Deployment(v2Contracts *utils.UniswapV2Contracts) (models.TransactionDeployment, error) {
 	wethAbi, _ := json.Marshal(v2Contracts.WETH9.ABI)
-	return d.evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(services.ContractDeploymentWithBytecodeAndAbiTransactionArgs{
+	tx, abiData, err := d.evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(services.ContractDeploymentWithBytecodeAndAbiTransactionArgs{
 		Abi:             string(wethAbi),
 		Bytecode:        v2Contracts.WETH9.Bytecode,
 		ConstructorArgs: []any{}, // WETH9 has no constructor args
@@ -233,36 +233,50 @@ func (d *deployUniswapTool) createWETH9Deployment(v2Contracts *utils.UniswapV2Co
 		Receiver:        "", // Empty for contract deployment
 		TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
 	})
+
+	functionArgs, err := utils.EncodeFunctionArgsToStringMap("constructor", []any{}, abiData)
+	tx.RawContractArguments = &functionArgs
+	return tx, err
 }
 
 // createFactoryDeployment creates a transaction deployment for UniswapV2Factory contract
 func (d *deployUniswapTool) createFactoryDeployment(v2Contracts *utils.UniswapV2Contracts) (models.TransactionDeployment, error) {
 	factoryAbi, _ := json.Marshal(v2Contracts.Factory.ABI)
+	args := []any{"0x0000000000000000000000000000000000000000"}
 	// Factory constructor requires feeToSetter address (use zero address as placeholder)
-	return d.evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(services.ContractDeploymentWithBytecodeAndAbiTransactionArgs{
+	tx, abiData, err := d.evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(services.ContractDeploymentWithBytecodeAndAbiTransactionArgs{
 		Abi:             string(factoryAbi),
 		Bytecode:        v2Contracts.Factory.Bytecode,
-		ConstructorArgs: []any{"0x0000000000000000000000000000000000000000"}, // feeToSetter address (placeholder)
+		ConstructorArgs: args, // feeToSetter address (placeholder)
 		Value:           "0",
 		Title:           "Deploy UniswapV2Factory",
 		Description:     "Deploy Uniswap V2 Factory contract",
 		Receiver:        "", // Empty for contract deployment
 		TransactionType: models.TransactionTypeUniswapV2FactoryDeployment,
 	})
+
+	functionArgs, err := utils.EncodeFunctionArgsToStringMap("constructor", args, abiData)
+	tx.RawContractArguments = &functionArgs
+	return tx, err
 }
 
 // createRouterDeployment creates a transaction deployment for UniswapV2Router02 contract
 func (d *deployUniswapTool) createRouterDeployment(v2Contracts *utils.UniswapV2Contracts, factoryAddress, wethAddress string) (models.TransactionDeployment, error) {
 	routerAbi, _ := json.Marshal(v2Contracts.Router.ABI)
+	args := []any{factoryAddress, wethAddress}
 	// Router constructor requires factory and WETH addresses
-	return d.evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(services.ContractDeploymentWithBytecodeAndAbiTransactionArgs{
+	tx, abiData, err := d.evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(services.ContractDeploymentWithBytecodeAndAbiTransactionArgs{
 		Abi:             string(routerAbi),
 		Bytecode:        v2Contracts.Router.Bytecode,
-		ConstructorArgs: []any{factoryAddress, wethAddress}, // Use actual deployed addresses
+		ConstructorArgs: args, // Use actual deployed addresses
 		Value:           "0",
 		Title:           "Deploy UniswapV2Router02",
 		Description:     "Deploy Uniswap V2 Router contract",
 		Receiver:        "", // Empty for contract deployment
 		TransactionType: models.TransactionTypeUniswapV2RouterDeployment,
 	})
+
+	functionArgs, err := utils.EncodeFunctionArgsToStringMap("constructor", args, abiData)
+	tx.RawContractArguments = &functionArgs
+	return tx, err
 }
