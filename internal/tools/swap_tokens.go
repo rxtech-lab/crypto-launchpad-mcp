@@ -230,23 +230,6 @@ func (s *swapTokensTool) createSwapTransaction(ctx context.Context, args SwapTok
 		return mcp.NewToolResultError(fmt.Sprintf("Error creating transaction session: %v", err)), nil
 	}
 
-	// Create swap transaction record
-	swapRecord := &models.SwapTransaction{
-		UserID:            userId,
-		UserAddress:       args.UserAddress,
-		FromToken:         args.FromToken,
-		ToToken:           args.ToToken,
-		FromAmount:        args.Amount,
-		ToAmount:          "0", // Will be updated after execution
-		SlippageTolerance: args.SlippageTolerance,
-		TransactionHash:   "", // Will be updated after execution
-		Status:            models.TransactionStatusPending,
-	}
-	_, err = s.liquidityService.CreateSwapTransaction(swapRecord)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Error creating swap record: %v", err)), nil
-	}
-
 	url, err := utils.GetTransactionSessionUrl(s.serverPort, sessionID)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to get transaction session url: %v", err)), nil
@@ -296,15 +279,11 @@ func (s *swapTokensTool) createETHToTokenSwap(routerAddress, wethAddress, toToke
 	}
 
 	// Create swap transaction
+	functionArgs := []any{minAmountOut, path, userAddress, fmt.Sprintf("%d", deadline)}
 	swapTx, err := s.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: routerAddress,
 		FunctionName:    "swapExactETHForTokens",
-		FunctionArgs: []any{
-			minAmountOut,                // amountOutMin
-			path,                        // path
-			userAddress,                 // to
-			fmt.Sprintf("%d", deadline), // deadline
-		},
+		FunctionArgs:    functionArgs,
 		Abi:             string(routerAbi),
 		Value:           amount, // ETH value to send
 		Title:           "Swap ETH for Tokens",
@@ -315,6 +294,11 @@ func (s *swapTokensTool) createETHToTokenSwap(routerAddress, wethAddress, toToke
 		return nil, fmt.Errorf("failed to create swap transaction: %w", err)
 	}
 
+	functionArgsString, err := utils.EncodeFunctionArgsToStringMapWithStringABI("swapExactETHForTokens", functionArgs, string(routerAbi))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal raw contract arguments: %w", err)
+	}
+	swapTx.RawContractArguments = &functionArgsString
 	return []models.TransactionDeployment{swapTx}, nil
 }
 
@@ -357,11 +341,12 @@ func (s *swapTokensTool) createTokenToETHSwap(routerAddress, wethAddress, fromTo
 
 	var transactionDeployments []models.TransactionDeployment
 
+	functionArgs := []any{routerAddress, constants.MaxUint256.String()}
 	// Transaction 1: Approve token for Router
 	approveTx, err := s.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: fromToken,
 		FunctionName:    "approve",
-		FunctionArgs:    []any{routerAddress, constants.MaxUint256.String()},
+		FunctionArgs:    functionArgs,
 		Abi:             erc20ABI,
 		Value:           "0",
 		Title:           "Approve Token for Swap",
@@ -371,19 +356,21 @@ func (s *swapTokensTool) createTokenToETHSwap(routerAddress, wethAddress, fromTo
 	if err != nil {
 		return nil, fmt.Errorf("failed to create approval transaction: %w", err)
 	}
+	functionArgsString, err := utils.EncodeFunctionArgsToStringMapWithStringABI("approve", functionArgs, erc20ABI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal raw contract arguments: %w", err)
+	}
+	approveTx.RawContractArguments = &functionArgsString
+	approveTx.ShowBalanceBeforeDeployment = true
+	approveTx.ContractAddress = &fromToken
 	transactionDeployments = append(transactionDeployments, approveTx)
 
 	// Transaction 2: Swap tokens for ETH
+	swapEthFunctionArgs := []any{amount, minAmountOut, path, userAddress, fmt.Sprintf("%d", deadline)}
 	swapTx, err := s.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: routerAddress,
 		FunctionName:    "swapExactTokensForETH",
-		FunctionArgs: []any{
-			amount,                      // amountIn
-			minAmountOut,                // amountOutMin
-			path,                        // path
-			userAddress,                 // to
-			fmt.Sprintf("%d", deadline), // deadline
-		},
+		FunctionArgs:    swapEthFunctionArgs,
 		Abi:             string(routerAbi),
 		Value:           "0",
 		Title:           "Swap Tokens for ETH",
@@ -393,6 +380,13 @@ func (s *swapTokensTool) createTokenToETHSwap(routerAddress, wethAddress, fromTo
 	if err != nil {
 		return nil, fmt.Errorf("failed to create swap transaction: %w", err)
 	}
+	swapEthFunctionArgsString, err := utils.EncodeFunctionArgsToStringMapWithStringABI("swapExactTokensForETH", swapEthFunctionArgs, string(routerAbi))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal raw contract arguments: %w", err)
+	}
+	swapTx.RawContractArguments = &swapEthFunctionArgsString
+	swapTx.ShowBalanceBeforeDeployment = true
+	swapTx.ContractAddress = &routerAddress
 	transactionDeployments = append(transactionDeployments, swapTx)
 
 	return transactionDeployments, nil
@@ -445,10 +439,11 @@ func (s *swapTokensTool) createTokenToTokenSwap(routerAddress, wethAddress, from
 	var transactionDeployments []models.TransactionDeployment
 
 	// Transaction 1: Approve fromToken for Router
+	functionArgs := []any{routerAddress, constants.MaxUint256.String()}
 	approveTx, err := s.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: fromToken,
 		FunctionName:    "approve",
-		FunctionArgs:    []any{routerAddress, constants.MaxUint256.String()},
+		FunctionArgs:    functionArgs,
 		Abi:             erc20ABI,
 		Value:           "0",
 		Title:           "Approve Token for Swap",
@@ -458,19 +453,21 @@ func (s *swapTokensTool) createTokenToTokenSwap(routerAddress, wethAddress, from
 	if err != nil {
 		return nil, fmt.Errorf("failed to create approval transaction: %w", err)
 	}
+	functionArgsString, err := utils.EncodeFunctionArgsToStringMapWithStringABI("approve", functionArgs, erc20ABI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal raw contract arguments: %w", err)
+	}
+	approveTx.RawContractArguments = &functionArgsString
+	approveTx.ShowBalanceBeforeDeployment = true
+	approveTx.ContractAddress = &fromToken
 	transactionDeployments = append(transactionDeployments, approveTx)
 
 	// Transaction 2: Swap tokens for tokens
+	swapTokensFunctionArgs := []any{amount, minAmountOut, path, userAddress, fmt.Sprintf("%d", deadline)}
 	swapTx, err := s.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: routerAddress,
 		FunctionName:    "swapExactTokensForTokens",
-		FunctionArgs: []any{
-			amount,                      // amountIn
-			minAmountOut,                // amountOutMin
-			path,                        // path
-			userAddress,                 // to
-			fmt.Sprintf("%d", deadline), // deadline
-		},
+		FunctionArgs:    swapTokensFunctionArgs,
 		Abi:             string(routerAbi),
 		Value:           "0",
 		Title:           "Swap Tokens",
@@ -480,6 +477,13 @@ func (s *swapTokensTool) createTokenToTokenSwap(routerAddress, wethAddress, from
 	if err != nil {
 		return nil, fmt.Errorf("failed to create swap transaction: %w", err)
 	}
+	swapTokensFunctionArgsString, err := utils.EncodeFunctionArgsToStringMapWithStringABI("swapExactTokensForTokens", swapTokensFunctionArgs, string(routerAbi))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal raw contract arguments: %w", err)
+	}
+	swapTx.RawContractArguments = &swapTokensFunctionArgsString
+	swapTx.ShowBalanceBeforeDeployment = true
+	swapTx.ContractAddress = &routerAddress
 	transactionDeployments = append(transactionDeployments, swapTx)
 
 	return transactionDeployments, nil

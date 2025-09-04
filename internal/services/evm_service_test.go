@@ -269,8 +269,9 @@ func TestGetContractDeploymentTransactionWithContractCode(t *testing.T) {
 		}
 
 		// Generate deployment transaction
-		deployment, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
+		deployment, abi, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
 		require.NoError(t, err)
+		require.Greater(t, len(abi.Methods), 0)
 
 		// Verify deployment data
 		assert.NotEmpty(t, deployment.Data)
@@ -312,7 +313,8 @@ func TestGetContractDeploymentTransactionWithContractCode(t *testing.T) {
 		}
 
 		// Generate deployment transaction
-		deployment, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
+		deployment, abi, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
+		require.Greater(t, len(abi.Methods), 0)
 		require.NoError(t, err)
 
 		// Send transaction to testnet
@@ -356,7 +358,7 @@ func TestGetContractDeploymentTransactionWithContractCode(t *testing.T) {
 			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
 		}
 
-		_, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
+		_, _, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "compilation errors")
 	})
@@ -368,7 +370,7 @@ func TestGetContractDeploymentTransactionWithContractCode(t *testing.T) {
 			ContractCode:    simpleERC20Contract,
 		}
 
-		_, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
+		_, _, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
 		assert.Error(t, err)
 	})
 }
@@ -399,7 +401,8 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 		}
 
 		// Generate deployment transaction
-		deployment, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
+		deployment, abi, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
+		require.Greater(t, len(abi.Methods), 0)
 		require.NoError(t, err)
 
 		// Verify deployment data
@@ -441,7 +444,8 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 		}
 
 		// Generate deployment transaction
-		deployment, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
+		deployment, abiData, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
+		require.Greater(t, len(abiData.Methods), 0)
 		require.NoError(t, err)
 
 		assert.NotEmpty(t, deployment.Data)
@@ -523,7 +527,8 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			TransactionType: models.TransactionTypeUniswapV2RouterDeployment,
 		}
 
-		weth9Deployment, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(weth9Args)
+		weth9Deployment, abiData, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(weth9Args)
+		require.Greater(t, len(abiData.Methods), 0)
 		require.NoError(t, err)
 
 		weth9TxHash, err := sendTransaction(client, privateKey, weth9Deployment.Data)
@@ -553,7 +558,8 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			TransactionType: models.TransactionTypeUniswapV2FactoryDeployment,
 		}
 
-		factoryDeployment, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(factoryArgs)
+		factoryDeployment, abiData, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(factoryArgs)
+		require.Greater(t, len(abiData.Methods), 0)
 		require.NoError(t, err)
 
 		factoryTxHash, err := sendTransaction(client, privateKey, factoryDeployment.Data)
@@ -584,7 +590,8 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 		}
 
 		// Generate deployment transaction
-		deployment, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
+		deployment, abiData, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
+		require.Greater(t, len(abiData.Methods), 0)
 		require.NoError(t, err)
 
 		assert.NotEmpty(t, deployment.Data)
@@ -686,7 +693,8 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 		}
 
 		// Generate deployment transaction
-		deployment, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
+		deployment, abiData, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
+		require.Greater(t, len(abiData.Methods), 0)
 		require.NoError(t, err)
 
 		// Send transaction to testnet
@@ -726,7 +734,7 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
 		}
 
-		_, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
+		_, _, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to encode constructor arguments")
 	})
@@ -740,7 +748,7 @@ func TestGetContractDeploymentTransactionWithBytecodeAndAbi(t *testing.T) {
 			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
 		}
 
-		_, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
+		_, _, err := evmService.GetContractDeploymentTransactionWithBytecodeAndAbi(args)
 		assert.Error(t, err)
 	})
 }

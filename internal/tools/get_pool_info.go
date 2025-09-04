@@ -57,37 +57,6 @@ func NewGetPoolInfoTool(chainService services.ChainService, liquidityService ser
 			}, nil
 		}
 
-		// Get recent swap transactions
-		swaps, err := liquidityService.ListSwapTransactionsByUser("", 0, 1000) // Get all swaps
-		if err != nil {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.NewTextContent("Error: "),
-					mcp.NewTextContent(fmt.Sprintf("Error getting swap transactions: %v", err)),
-				},
-			}, nil
-		}
-
-		// Filter swaps related to this token
-		var tokenSwaps []map[string]interface{}
-		for _, swap := range swaps {
-			if swap.FromToken == tokenAddress || swap.ToToken == tokenAddress {
-				if swap.Status == "confirmed" {
-					tokenSwaps = append(tokenSwaps, map[string]interface{}{
-						"id":                 swap.ID,
-						"from_token":         swap.FromToken,
-						"to_token":           swap.ToToken,
-						"from_amount":        swap.FromAmount,
-						"to_amount":          swap.ToAmount,
-						"slippage_tolerance": swap.SlippageTolerance,
-						"user_address":       swap.UserAddress,
-						"transaction_hash":   swap.TransactionHash,
-						"created_at":         swap.CreatedAt,
-					})
-				}
-			}
-		}
-
 		result := map[string]interface{}{
 			"pool_info": map[string]interface{}{
 				"id":              pool.ID,
@@ -101,10 +70,6 @@ func NewGetPoolInfoTool(chainService services.ChainService, liquidityService ser
 				"creator_address": pool.CreatorAddress,
 				"status":          pool.Status,
 				"created_at":      pool.CreatedAt,
-			},
-			"trading_activity": map[string]interface{}{
-				"total_swaps":  len(tokenSwaps),
-				"recent_swaps": tokenSwaps,
 			},
 			"chain_info": map[string]interface{}{
 				"chain_type": activeChain.ChainType,

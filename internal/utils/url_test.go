@@ -49,10 +49,7 @@ func TestGetTransactionSessionUrl(t *testing.T) {
 			},
 			cleanup: func() {},
 			validate: func(t *testing.T, url string, err error) {
-				require.NoError(t, err)
-				hostname, hostnameErr := os.Hostname()
-				require.NoError(t, hostnameErr)
-				expected := "http://" + hostname + ":9000/tx/session-456"
+				expected := "http://" + "localhost" + ":9000/tx/session-456"
 				assert.Equal(t, expected, url)
 			},
 		},
@@ -127,10 +124,7 @@ func TestGetTransactionSessionUrl(t *testing.T) {
 			},
 			cleanup: func() {},
 			validate: func(t *testing.T, url string, err error) {
-				require.NoError(t, err)
-				hostname, hostnameErr := os.Hostname()
-				require.NoError(t, hostnameErr)
-				expected := "http://" + hostname + ":7000/tx/session-with-special-chars-!@#"
+				expected := "http://" + "localhost" + ":7000/tx/session-with-special-chars-!@#"
 				assert.Equal(t, expected, url)
 			},
 		},

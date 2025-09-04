@@ -190,7 +190,7 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 // title is the title of the transaction
 // description is the description of the transaction
 func (l *launchTool) createEvmContractDeploymentTransaction(activeChain *models.Chain, metadata []models.TransactionMetadata, renderedContract string, contractName string, args []any, value string, title string, description string, templateId uint, templateValues models.JSON, userId *string) (string, error) {
-	tx, err := l.evmService.GetContractDeploymentTransactionWithContractCode(services.ContractDeploymentWithContractCodeTransactionArgs{
+	tx, abiData, err := l.evmService.GetContractDeploymentTransactionWithContractCode(services.ContractDeploymentWithContractCodeTransactionArgs{
 		ContractCode:    renderedContract,
 		ContractName:    contractName,
 		ConstructorArgs: args,
@@ -204,6 +204,10 @@ func (l *launchTool) createEvmContractDeploymentTransaction(activeChain *models.
 		return "", fmt.Errorf("failed to get contract deployment transaction: %w", err)
 	}
 
+	rawContractArgumentMap, err := utils.EncodeFunctionArgsToStringMap("constructor", args, abiData)
+	tx.ContractCode = &renderedContract
+	tx.RawContractArguments = &rawContractArgumentMap
+	tx.ShowBalanceAfterDeployment = true
 	sessionID, err := l.txService.CreateTransactionSession(services.CreateTransactionSessionRequest{
 		TransactionDeployments: []models.TransactionDeployment{tx},
 		ChainType:              models.TransactionChainTypeEthereum,

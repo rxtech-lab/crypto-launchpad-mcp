@@ -278,11 +278,12 @@ func (a *addLiquidityTool) createEthereumAddLiquidityTransactions(routerAddress,
 
 	var transactionDeployments []models.TransactionDeployment
 
+	functionArgs := []any{routerAddress, maxUint256.String()}
 	// Transaction 1: Approve Token for Router
 	approveTokenTx, err := a.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: tokenAddress,
 		FunctionName:    "approve",
-		FunctionArgs:    []any{routerAddress, maxUint256.String()},
+		FunctionArgs:    functionArgs,
 		Abi:             erc20ABI,
 		Value:           "0",
 		Title:           "Approve Token for Router",
@@ -292,6 +293,13 @@ func (a *addLiquidityTool) createEthereumAddLiquidityTransactions(routerAddress,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create token approval transaction: %w", err)
 	}
+	functionArgsString, err := utils.EncodeFunctionArgsToStringMapWithStringABI("approve", functionArgs, erc20ABI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal raw contract arguments: %w", err)
+	}
+	approveTokenTx.RawContractArguments = &functionArgsString
+	approveTokenTx.ShowBalanceBeforeDeployment = true
+	approveTokenTx.ContractAddress = &tokenAddress
 	transactionDeployments = append(transactionDeployments, approveTokenTx)
 
 	// Transaction 2: Add Liquidity ETH (this handles WETH conversion internally)
