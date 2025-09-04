@@ -108,8 +108,8 @@ func (s *MCPServer) InitializeTools(dbService services.DBService, serverPort int
 	srv.AddTool(removeLiquidityTool, removeLiquidityHandler)
 
 	// Trading Tools
-	swapTokensTool, swapTokensHandler := tools.NewSwapTokensTool(chainService, liquidityService, uniswapService, txService, serverPort)
-	srv.AddTool(swapTokensTool, swapTokensHandler)
+	swapTokensTool := tools.NewSwapTokensTool(chainService, liquidityService, uniswapService, txService, serverPort, evmService)
+	srv.AddTool(swapTokensTool.GetTool(), swapTokensTool.GetHandler())
 
 	// Read-only Information Tools
 	getPoolInfoTool, getPoolInfoHandler := tools.NewGetPoolInfoTool(chainService, liquidityService)
