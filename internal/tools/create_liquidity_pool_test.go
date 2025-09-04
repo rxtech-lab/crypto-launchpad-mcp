@@ -509,7 +509,7 @@ func (suite *CreateLiquidityPoolTestSuite) TestCreateLiquidityPoolWithEth() {
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
 				"token0_address":        suite.testToken.Address.Hex(),
-				"token1_address":        services.ETH_TOKEN_ADDRESS,
+				"token1_address":        services.EthTokenAddress,
 				"initial_token0_amount": "1000000000000000000000", // 1000 tokens
 				"initial_token1_amount": "500000000000000000",     // 0.5 ETH
 				"owner_address":         suite.testAddress.Hex(),

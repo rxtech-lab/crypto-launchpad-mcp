@@ -12,9 +12,9 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
 )
 
-const ETH_TOKEN_ADDRESS = "eth"
-const METADATA_TOKEN0_ADDRESS = "token0_address"
-const METADATA_TOKEN1_ADDRESS = "token1_address"
+const EthTokenAddress = "0x0000000000000000000000000000000000000000"
+const MetadataToken0Address = "token0_address"
+const MetadataToken1Address = "token1_address"
 
 type UniswapContractService interface {
 	GetPairAddress(token0Address, token1Address string, chain *models.Chain) (string, error)
@@ -67,7 +67,7 @@ func (u *uniswapContractService) GetPairAddress(token0Address, token1Address str
 
 // convertETHToWETH converts "eth" to WETH address
 func (u *uniswapContractService) convertETHToWETH(tokenAddress, wethAddress string) string {
-	if strings.ToLower(tokenAddress) == ETH_TOKEN_ADDRESS {
+	if strings.ToLower(tokenAddress) == EthTokenAddress {
 		return wethAddress
 	}
 	return tokenAddress

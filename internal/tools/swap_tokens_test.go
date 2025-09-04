@@ -483,8 +483,8 @@ func (suite *SwapTokensTestSuite) createETHTokenPool() {
 	suite.Require().NoError(err)
 
 	// Add liquidity ETH-Token1
-	tokenAmount := big.NewInt(0).Mul(big.NewInt(1000000), big.NewInt(1e18)) // 1 million tokens
-	ethAmount := big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))      // 1000 ETH
+	tokenAmount := big.NewInt(0).Mul(big.NewInt(100000), big.NewInt(1e18)) // 100K tokens
+	ethAmount := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18))      // 100 ETH
 
 	err = suite.addLiquidityETH(suite.testToken.Address, tokenAmount, ethAmount)
 	suite.Require().NoError(err)
@@ -498,8 +498,8 @@ func (suite *SwapTokensTestSuite) createTokenETHPool() {
 	suite.Require().NoError(err)
 
 	// Add liquidity Token2-ETH
-	tokenAmount := big.NewInt(0).Mul(big.NewInt(2000000), big.NewInt(1e18)) // 2 million tokens
-	ethAmount := big.NewInt(0).Mul(big.NewInt(500), big.NewInt(1e18))       // 500 ETH
+	tokenAmount := big.NewInt(0).Mul(big.NewInt(200000), big.NewInt(1e18)) // 200K tokens
+	ethAmount := big.NewInt(0).Mul(big.NewInt(50), big.NewInt(1e18))       // 50 ETH
 
 	err = suite.addLiquidityETH(suite.testToken2.Address, tokenAmount, ethAmount)
 	suite.Require().NoError(err)
@@ -677,7 +677,7 @@ func (suite *SwapTokensTestSuite) TestSwapETHForTokens() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"from_token":         services.ETH_TOKEN_ADDRESS,
+				"from_token":         services.EthTokenAddress,
 				"to_token":           suite.testToken.Address.Hex(),
 				"amount":             swapAmount.String(),
 				"slippage_tolerance": "1.0",
@@ -757,7 +757,7 @@ func (suite *SwapTokensTestSuite) TestSwapTokensForETH() {
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
 				"from_token":         suite.testToken2.Address.Hex(),
-				"to_token":           services.ETH_TOKEN_ADDRESS,
+				"to_token":           services.EthTokenAddress,
 				"amount":             swapAmount.String(),
 				"slippage_tolerance": "1.0",
 				"user_address":       suite.testAddress.Hex(),
@@ -897,7 +897,7 @@ func (suite *SwapTokensTestSuite) TestInvalidSwapParameters() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"from_token":         services.ETH_TOKEN_ADDRESS,
+				"from_token":         services.EthTokenAddress,
 				"to_token":           suite.testToken.Address.Hex(),
 				"amount":             "1000000000000000000",
 				"slippage_tolerance": "101", // Invalid: > 100%

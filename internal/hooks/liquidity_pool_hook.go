@@ -62,10 +62,10 @@ func (l *LiquidityPoolHook) getTokenAddressesFromSession(session models.Transact
 
 	// Extract from metadata
 	for _, meta := range session.Metadata {
-		if meta.Key == services.METADATA_TOKEN0_ADDRESS {
+		if meta.Key == services.MetadataToken0Address {
 			token0Address = meta.Value
 		}
-		if meta.Key == services.METADATA_TOKEN1_ADDRESS {
+		if meta.Key == services.MetadataToken1Address {
 			token1Address = meta.Value
 		}
 	}

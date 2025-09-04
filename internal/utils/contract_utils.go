@@ -158,6 +158,25 @@ func processArg(argType abi.Type, value any) (any, error) {
 		if !ok {
 			return nil, fmt.Errorf("expected array, got %T", value)
 		}
+
+		// For address arrays, create a typed slice to avoid ABI encoding issues
+		if argType.Elem.T == abi.AddressTy {
+			addresses := make([]common.Address, len(slice))
+			for i, elem := range slice {
+				processed, err := processArg(*argType.Elem, elem)
+				if err != nil {
+					return nil, fmt.Errorf("failed to process array element %d: %w", i, err)
+				}
+				if addr, ok := processed.(common.Address); ok {
+					addresses[i] = addr
+				} else {
+					return nil, fmt.Errorf("expected common.Address, got %T", processed)
+				}
+			}
+			return addresses, nil
+		}
+
+		// For other array types, keep the original logic
 		processedSlice := make([]any, len(slice))
 		for i, elem := range slice {
 			processed, err := processArg(*argType.Elem, elem)

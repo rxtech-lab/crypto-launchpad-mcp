@@ -342,7 +342,7 @@ func (suite *LaunchToolTestSuite) TestHandlerTemplateRendering() {
 	suite.NotEmpty(deployment.Data)
 
 	// Verify the rendered contract contains the template values by attempting compilation
-	renderedContract := fmt.Sprintf(`// SPDX-License-Identifier: MIT
+	renderedContract := `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 contract MyCustomToken {
@@ -361,7 +361,7 @@ contract MyCustomToken {
         balanceOf[to] += amount;
         return true;
     }
-}`)
+}`
 
 	// Verify the contract can be compiled (this indirectly verifies template rendering worked)
 	compilationResult, err := utils.CompileSolidity("0.8.27", renderedContract)
