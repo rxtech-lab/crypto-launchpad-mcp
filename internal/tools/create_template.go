@@ -30,6 +30,19 @@ type CreateTemplateArguments struct {
 	TemplateMetadata string `json:"template_metadata,omitempty"`
 }
 
+type CreateTemplateResult struct {
+	ID            uint                        `json:"id"`
+	Name          string                      `json:"name"`
+	Description   string                      `json:"description"`
+	ChainType     models.TransactionChainType `json:"chain_type"`
+	ContractNames []string                    `json:"contract_names"`
+}
+
+type CompilationResult struct {
+	Bytecode map[string]string `json:"bytecode"`
+	Abi      map[string]any    `json:"abi"`
+}
+
 func NewCreateTemplateTool(templateService services.TemplateService) *createTemplateTool {
 	return &createTemplateTool{
 		templateService: templateService,
@@ -154,6 +167,7 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 			SampleTemplateValues: args.TemplateValues,
 			Metadata:             metadata,
 			UserId:               userId,
+			Abi:                  compilationResult.Abi,
 		}
 
 		if err := c.templateService.CreateTemplate(template); err != nil {
@@ -161,29 +175,20 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 		}
 
 		// Prepare result
-		result := map[string]interface{}{
-			"id":          template.ID,
-			"name":        template.Name,
-			"description": template.Description,
-			"chain_type":  template.ChainType,
-			"created_at":  template.CreatedAt,
-		}
-
-		// Include metadata if provided
-		if len(metadata) > 0 {
-			result["metadata"] = metadata
-			result["template_parameters"] = len(metadata)
+		result := CreateTemplateResult{
+			ID:          template.ID,
+			Name:        template.Name,
+			Description: template.Description,
+			ChainType:   template.ChainType,
 		}
 
 		// Add compilation information for Ethereum
 		if compilationResult != nil {
-			result["compilation_status"] = "success"
-			result["compiled_contracts"] = len(compilationResult.Bytecode)
 			var contractNames []string
 			for contractName := range compilationResult.Bytecode {
 				contractNames = append(contractNames, contractName)
 			}
-			result["contract_names"] = contractNames
+			result.ContractNames = contractNames
 		}
 
 		// Format success message

@@ -24,12 +24,20 @@ type UpdateTemplateArguments struct {
 	TemplateID string `json:"template_id" validate:"required"`
 
 	// Optional fields
-	Description      string                 `json:"description,omitempty"`
-	ChainType        string                 `json:"chain_type,omitempty"`
-	ContractName     string                 `json:"contract_name,omitempty"`
-	TemplateCode     string                 `json:"template_code,omitempty"`
-	TemplateMetadata string                 `json:"template_metadata,omitempty"`
-	TemplateValues   map[string]interface{} `json:"template_values,omitempty"`
+	Description      string         `json:"description,omitempty"`
+	ChainType        string         `json:"chain_type,omitempty"`
+	ContractName     string         `json:"contract_name,omitempty"`
+	TemplateCode     string         `json:"template_code,omitempty"`
+	TemplateMetadata string         `json:"template_metadata,omitempty"`
+	TemplateValues   map[string]any `json:"template_values,omitempty"`
+}
+
+type UpdateTemplateResult struct {
+	ID            uint                        `json:"id"`
+	Name          string                      `json:"name"`
+	Description   string                      `json:"description"`
+	ChainType     models.TransactionChainType `json:"chain_type"`
+	ContractNames []string                    `json:"contract_names"`
 }
 
 func NewUpdateTemplateTool(templateService services.TemplateService) *updateTemplateTool {
@@ -138,6 +146,7 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 			updates = append(updates, "sample_template_values")
 		}
 
+		var compilationResult utils.CompilationResult
 		// Update template code if provided
 		if args.TemplateCode != "" {
 			// Use the current or new chain type for validation
@@ -147,7 +156,8 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 			}
 
 			// Validate template code using Solidity compiler for Ethereum
-			if validationChainType == "ethereum" {
+			switch validationChainType {
+			case "ethereum":
 				// For validation, use dummy values if TemplateValues not provided
 				templateValues := args.TemplateValues
 				renderedCode, err := utils.RenderContractTemplate(args.TemplateCode, templateValues)
@@ -156,12 +166,14 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 				}
 
 				// Use Solidity version 0.8.27 for validation
-				_, err = utils.CompileSolidity("0.8.27", renderedCode)
+				compilationResult, err = utils.CompileSolidity("0.8.27", renderedCode)
 				if err != nil {
 					return mcp.NewToolResultError(fmt.Sprintf("Solidity compilation failed: %v", err)), nil
 				}
-			} else if validationChainType == "solana" {
+				updates = append(updates, "abi")
+			default:
 				// Solana validation skipped - accept any template code
+				return mcp.NewToolResultError("Solana validation skipped"), nil
 			}
 
 			// Update the template code
@@ -180,21 +192,19 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 		}
 
 		// Prepare result with comprehensive information
-		result := map[string]interface{}{
-			"id":             template.ID,
-			"name":           template.Name,
-			"description":    template.Description,
-			"chain_type":     template.ChainType,
-			"updated_at":     template.UpdatedAt,
-			"updated_fields": updates,
-			"message":        fmt.Sprintf("Template updated successfully. Fields updated: %v", updates),
+		result := UpdateTemplateResult{
+			ID:          template.ID,
+			Name:        template.Name,
+			Description: template.Description,
+			ChainType:   template.ChainType,
 		}
 
-		// Add metadata information if updated
-		if args.TemplateMetadata != "" && len(metadata) > 0 {
-			result["metadata"] = metadata
-			result["template_parameters"] = len(metadata)
+		// Add compilation information for Ethereum
+		var contractNames []string
+		for contractName := range compilationResult.Abi {
+			contractNames = append(contractNames, contractName)
 		}
+		result.ContractNames = contractNames
 
 		// Format success message
 		successMessage := "Template updated successfully"

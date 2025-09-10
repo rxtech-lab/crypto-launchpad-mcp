@@ -127,7 +127,7 @@ func (s *evmService) getContractDeploymentTransactionDataWithBytecodeAndAbi(abiS
 }
 
 func (s *evmService) getContractDeploymentTransactionData(contractName string, constructorArgs []any, contractCode string) (string, abi.ABI, error) {
-	compilationResult, err := utils.CompileSolidity("0.8.27", contractCode)
+	compilationResult, err := utils.CompileSolidity("0.8.24", contractCode)
 	if err != nil {
 		return "", abi.ABI{}, err
 	}
