@@ -80,12 +80,19 @@ func (s *MCPServer) InitializeTools(dbService services.DBService, serverPort int
 	deleteTemplateTool, deleteTemplateHandler := tools.NewDeleteTemplateTool(templateService)
 	srv.AddTool(deleteTemplateTool, deleteTemplateHandler)
 
+	viewTemplateToolInstance := tools.NewViewTemplateTool(templateService, evmService)
+	srv.AddTool(viewTemplateToolInstance.GetTool(), viewTemplateToolInstance.GetHandler())
+
 	// Deployment Tools
 	launchTool := tools.NewLaunchTool(templateService, chainService, serverPort, evmService, txService, deploymentService)
 	srv.AddTool(launchTool.GetTool(), launchTool.GetHandler())
 
 	listDeploymentsTool, listDeploymentsHandler := tools.NewListDeploymentsTool(deploymentService)
 	srv.AddTool(listDeploymentsTool, listDeploymentsHandler)
+
+	// Function Call Tool
+	callFunctionTool := tools.NewCallFunctionTool(templateService, evmService, txService, chainService, deploymentService, serverPort)
+	srv.AddTool(callFunctionTool.GetTool(), callFunctionTool.GetHandler())
 
 	// Uniswap Deployment Tools
 	deployUniswapTool := tools.NewDeployUniswapTool(chainService, serverPort, evmService, txService, uniswapService)
@@ -170,7 +177,14 @@ func getToolInstructions(category string) string {
    Usage: Modify existing contract templates
 
 4. delete_template - Delete templates by ID(s)
-   Usage: Remove one or multiple templates (supports bulk deletion)`
+   Usage: Remove one or multiple templates (supports bulk deletion)
+
+5. view_template - View template details and ABI methods
+   Usage: View template information and optionally display contract ABI methods
+   Parameters:
+   - template_id (required): ID of the template to view
+   - show_abi_methods (optional): Display all available ABI methods
+   - abi_method (optional): Display details for a specific method by name`
 
 	case "deployment":
 		return `Deployment Tools:
@@ -179,7 +193,16 @@ func getToolInstructions(category string) string {
    Usage: Deploy contracts through a web interface that opens for wallet signing
 
 2. list_deployments - List all token deployments with filtering options
-   Usage: View all deployed contracts with status, addresses, and transaction details`
+   Usage: View all deployed contracts with status, addresses, and transaction details
+
+3. call_function - Call smart contract functions using deployment ID and ABI
+   Usage: Call functions on deployed contracts; read-only functions return results directly, state-changing functions create signing sessions
+   Parameters:
+   - deployment_id (required): ID of the deployment containing contract address and ABI
+   - function_name (required): Name of function to call from contract's ABI
+   - function_args (optional): Array of function arguments in ABI order
+   - value (optional): ETH value to send with call (default "0")
+   - metadata (optional): Transaction metadata for state-changing functions`
 
 	case "uniswap":
 		return `Uniswap Integration Tools:
@@ -227,22 +250,24 @@ func getToolInstructions(category string) string {
 	case "all":
 		return `Crypto Launchpad MCP Tools Overview:
 
-This MCP server provides 18 tools for managing cryptocurrency token deployments and Uniswap operations:
+This MCP server provides 20 tools for managing cryptocurrency token deployments and Uniswap operations:
 
 CHAIN MANAGEMENT (3 tools):
 - list_chains: List all configured blockchain chains
 - select_chain: Switch between blockchains by type or ID
 - set_chain: Configure RPC endpoints
 
-TEMPLATE MANAGEMENT (4 tools):
+TEMPLATE MANAGEMENT (5 tools):
 - list_template: Browse contract templates
 - create_template: Add new templates
 - update_template: Modify existing templates
 - delete_template: Delete templates by ID(s)
+- view_template: View template details and ABI methods
 
-DEPLOYMENT (2 tools):
+DEPLOYMENT (3 tools):
 - launch: Deploy contracts via web interface
 - list_deployments: View all deployed contracts
+- call_function: Call smart contract functions using deployment ID and ABI
 
 UNISWAP INTEGRATION (10 tools):
 - deploy_uniswap: Deploy Uniswap infrastructure contracts

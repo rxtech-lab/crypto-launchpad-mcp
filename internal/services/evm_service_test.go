@@ -950,3 +950,435 @@ func TestGetTransactionData(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+// TestGetAllAbiMethods tests the GetAllAbiMethods method
+func TestGetAllAbiMethods(t *testing.T) {
+	evmService := services.NewEvmService()
+
+	t.Run("Get all methods from WETH9 ABI", func(t *testing.T) {
+		weth9Artifact, err := contracts.GetWETH9Artifact()
+		require.NoError(t, err)
+
+		// Convert ABI directly to models.JSON
+		// The ABI from artifact should be the ABI array
+		abiArray, ok := weth9Artifact.ABI.([]interface{})
+		require.True(t, ok)
+
+		// Convert to models.JSON - this will represent the raw ABI array
+		abiJSONData := models.JSON(map[string]interface{}{
+			"abi": abiArray,
+		})
+
+		methods, err := evmService.GetAllAbiMethods(abiJSONData)
+		require.NoError(t, err)
+		require.NotEmpty(t, methods)
+
+		// WETH9 should have these methods: allowance, approve, balanceOf, decimals, deposit, name, symbol, totalSupply, transfer, transferFrom, withdraw
+		expectedMethods := []string{"allowance", "approve", "balanceOf", "decimals", "deposit", "name", "symbol", "totalSupply", "transfer", "transferFrom", "withdraw"}
+
+		// Create a map of actual method names for easier checking
+		actualMethods := make(map[string]bool)
+		for _, method := range methods {
+			actualMethods[method.Name] = true
+		}
+
+		// Verify all expected methods are present
+		for _, expectedMethod := range expectedMethods {
+			assert.True(t, actualMethods[expectedMethod], "Expected method %s not found", expectedMethod)
+		}
+
+		// Verify at least the expected number of methods
+		assert.GreaterOrEqual(t, len(methods), len(expectedMethods))
+	})
+
+	t.Run("Get all methods from UniswapV2Factory ABI", func(t *testing.T) {
+		factoryArtifact, err := contracts.GetFactoryArtifact()
+		require.NoError(t, err)
+
+		// Convert ABI directly to models.JSON
+		abiArray, ok := factoryArtifact.ABI.([]interface{})
+		require.True(t, ok)
+		abiJSONData := models.JSON(map[string]interface{}{
+			"abi": abiArray,
+		})
+
+		methods, err := evmService.GetAllAbiMethods(abiJSONData)
+		require.NoError(t, err)
+		require.NotEmpty(t, methods)
+
+		// Factory should have these key methods
+		expectedMethods := []string{"createPair", "feeTo", "feeToSetter", "getPair", "allPairs", "allPairsLength", "setFeeTo", "setFeeToSetter"}
+
+		actualMethods := make(map[string]bool)
+		for _, method := range methods {
+			actualMethods[method.Name] = true
+		}
+
+		for _, expectedMethod := range expectedMethods {
+			assert.True(t, actualMethods[expectedMethod], "Expected method %s not found", expectedMethod)
+		}
+	})
+
+	t.Run("Get all methods from UniswapV2Router ABI", func(t *testing.T) {
+		routerArtifact, err := contracts.GetRouterArtifact()
+		require.NoError(t, err)
+
+		// Convert ABI directly to models.JSON
+		abiArray, ok := routerArtifact.ABI.([]interface{})
+		require.True(t, ok)
+		abiJSONData := models.JSON(map[string]interface{}{
+			"abi": abiArray,
+		})
+
+		methods, err := evmService.GetAllAbiMethods(abiJSONData)
+		require.NoError(t, err)
+		require.NotEmpty(t, methods)
+
+		// Router should have these key methods
+		expectedMethods := []string{"WETH", "factory", "addLiquidity", "addLiquidityETH", "removeLiquidity", "removeLiquidityETH", "swapExactTokensForTokens", "swapTokensForExactTokens", "swapExactETHForTokens", "swapTokensForExactETH", "swapExactTokensForETH", "swapETHForExactTokens"}
+
+		actualMethods := make(map[string]bool)
+		for _, method := range methods {
+			actualMethods[method.Name] = true
+		}
+
+		for _, expectedMethod := range expectedMethods {
+			assert.True(t, actualMethods[expectedMethod], "Expected method %s not found", expectedMethod)
+		}
+	})
+
+	t.Run("Get all methods from SimpleToken ABI", func(t *testing.T) {
+		// Use the test SimpleToken contract
+		evmService := services.NewEvmService()
+
+		args := services.ContractDeploymentWithContractCodeTransactionArgs{
+			ContractName:    "SimpleToken",
+			ConstructorArgs: []any{"Test Token", "TEST", big.NewInt(1000000)},
+			ContractCode:    simpleERC20Contract,
+			Title:           "Deploy Test Token",
+			Description:     "Deploying a test ERC20 token",
+			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
+		}
+
+		_, abiData, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
+		require.NoError(t, err)
+
+		// Convert parsed go-ethereum ABI back to ABI array format
+		// Extract the methods from the parsed ABI and create a simple ABI array
+		abiArray := []map[string]interface{}{}
+		for _, method := range abiData.Methods {
+			inputs := []map[string]interface{}{}
+			for _, input := range method.Inputs {
+				inputs = append(inputs, map[string]interface{}{
+					"name": input.Name,
+					"type": input.Type.String(),
+				})
+			}
+			outputs := []map[string]interface{}{}
+			for _, output := range method.Outputs {
+				outputs = append(outputs, map[string]interface{}{
+					"name": output.Name,
+					"type": output.Type.String(),
+				})
+			}
+			abiArray = append(abiArray, map[string]interface{}{
+				"type":            "function",
+				"name":            method.Name,
+				"inputs":          inputs,
+				"outputs":         outputs,
+				"stateMutability": method.StateMutability,
+				"constant":        method.Constant,
+				"payable":         method.Payable,
+			})
+		}
+
+		abiJSON := models.JSON(map[string]interface{}{
+			"abi": abiArray,
+		})
+
+		methods, err := evmService.GetAllAbiMethods(abiJSON)
+		require.NoError(t, err)
+		require.NotEmpty(t, methods)
+
+		// SimpleToken should have these methods
+		expectedMethods := []string{"name", "symbol", "totalSupply", "balanceOf", "transfer"}
+
+		actualMethods := make(map[string]bool)
+		for _, method := range methods {
+			actualMethods[method.Name] = true
+		}
+
+		for _, expectedMethod := range expectedMethods {
+			assert.True(t, actualMethods[expectedMethod], "Expected method %s not found", expectedMethod)
+		}
+	})
+
+	t.Run("Invalid ABI JSON", func(t *testing.T) {
+		// Create invalid JSON
+		invalidJSON := models.JSON(map[string]interface{}{
+			"invalid": "structure",
+		})
+
+		_, err := evmService.GetAllAbiMethods(invalidJSON)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse ABI")
+	})
+
+	t.Run("Empty ABI", func(t *testing.T) {
+		emptyABI := models.JSON(map[string]interface{}{
+			"abi": []interface{}{},
+		})
+
+		methods, err := evmService.GetAllAbiMethods(emptyABI)
+		require.NoError(t, err)
+		assert.Empty(t, methods)
+	})
+}
+
+// TestGetAbiMethod tests the GetAbiMethod method
+func TestGetAbiMethod(t *testing.T) {
+	evmService := services.NewEvmService()
+
+	t.Run("Get specific method from WETH9 ABI", func(t *testing.T) {
+		weth9Artifact, err := contracts.GetWETH9Artifact()
+		require.NoError(t, err)
+
+		// Convert ABI directly to models.JSON
+		abiArray, ok := weth9Artifact.ABI.([]interface{})
+		require.True(t, ok)
+		abiJSONData := models.JSON(map[string]interface{}{
+			"abi": abiArray,
+		})
+
+		// Test getting the deposit method
+		depositMethod, err := evmService.GetAbiMethod(abiJSONData, "deposit")
+		require.NoError(t, err)
+
+		assert.Equal(t, "deposit", depositMethod.Name)
+		assert.Empty(t, depositMethod.Inputs)   // deposit takes no parameters
+		assert.Empty(t, depositMethod.Outputs)  // deposit returns nothing
+		assert.False(t, depositMethod.Constant) // deposit is not a view function
+		assert.True(t, depositMethod.Payable)   // deposit is payable
+
+		// Test getting the withdraw method
+		withdrawMethod, err := evmService.GetAbiMethod(abiJSONData, "withdraw")
+		require.NoError(t, err)
+
+		assert.Equal(t, "withdraw", withdrawMethod.Name)
+		assert.Len(t, withdrawMethod.Inputs, 1) // withdraw takes 1 parameter (amount)
+		assert.Equal(t, "uint256", withdrawMethod.Inputs[0].Type.String())
+		assert.Empty(t, withdrawMethod.Outputs)  // withdraw returns nothing
+		assert.False(t, withdrawMethod.Constant) // withdraw is not a view function
+		assert.False(t, withdrawMethod.Payable)  // withdraw is not payable
+
+		// Test getting a view method
+		balanceOfMethod, err := evmService.GetAbiMethod(abiJSONData, "balanceOf")
+		require.NoError(t, err)
+
+		assert.Equal(t, "balanceOf", balanceOfMethod.Name)
+		assert.Len(t, balanceOfMethod.Inputs, 1) // balanceOf takes 1 parameter (address)
+		assert.Equal(t, "address", balanceOfMethod.Inputs[0].Type.String())
+		assert.Len(t, balanceOfMethod.Outputs, 1) // balanceOf returns 1 value (uint256)
+		assert.Equal(t, "uint256", balanceOfMethod.Outputs[0].Type.String())
+		assert.True(t, balanceOfMethod.Constant) // balanceOf is a view function
+		assert.False(t, balanceOfMethod.Payable) // balanceOf is not payable
+	})
+
+	t.Run("Get specific method from UniswapV2Factory ABI", func(t *testing.T) {
+		factoryArtifact, err := contracts.GetFactoryArtifact()
+		require.NoError(t, err)
+
+		// Convert ABI directly to models.JSON
+		abiArray, ok := factoryArtifact.ABI.([]interface{})
+		require.True(t, ok)
+		abiJSONData := models.JSON(map[string]interface{}{
+			"abi": abiArray,
+		})
+
+		// Test getting the createPair method
+		createPairMethod, err := evmService.GetAbiMethod(abiJSONData, "createPair")
+		require.NoError(t, err)
+
+		assert.Equal(t, "createPair", createPairMethod.Name)
+		assert.Len(t, createPairMethod.Inputs, 2) // createPair takes 2 parameters (tokenA, tokenB)
+		assert.Equal(t, "address", createPairMethod.Inputs[0].Type.String())
+		assert.Equal(t, "address", createPairMethod.Inputs[1].Type.String())
+		assert.Len(t, createPairMethod.Outputs, 1) // createPair returns pair address
+		assert.Equal(t, "address", createPairMethod.Outputs[0].Type.String())
+		assert.False(t, createPairMethod.Constant) // createPair is not a view function
+		assert.False(t, createPairMethod.Payable)  // createPair is not payable
+
+		// Test getting a view method
+		getPairMethod, err := evmService.GetAbiMethod(abiJSONData, "getPair")
+		require.NoError(t, err)
+
+		assert.Equal(t, "getPair", getPairMethod.Name)
+		assert.Len(t, getPairMethod.Inputs, 2) // getPair takes 2 parameters (tokenA, tokenB)
+		assert.Equal(t, "address", getPairMethod.Inputs[0].Type.String())
+		assert.Equal(t, "address", getPairMethod.Inputs[1].Type.String())
+		assert.Len(t, getPairMethod.Outputs, 1) // getPair returns pair address
+		assert.Equal(t, "address", getPairMethod.Outputs[0].Type.String())
+		assert.True(t, getPairMethod.Constant) // getPair is a view function
+		assert.False(t, getPairMethod.Payable) // getPair is not payable
+	})
+
+	t.Run("Get specific method from UniswapV2Router ABI", func(t *testing.T) {
+		routerArtifact, err := contracts.GetRouterArtifact()
+		require.NoError(t, err)
+
+		// Convert ABI directly to models.JSON
+		abiArray, ok := routerArtifact.ABI.([]interface{})
+		require.True(t, ok)
+		abiJSONData := models.JSON(map[string]interface{}{
+			"abi": abiArray,
+		})
+
+		// Test getting the addLiquidity method
+		addLiquidityMethod, err := evmService.GetAbiMethod(abiJSONData, "addLiquidity")
+		require.NoError(t, err)
+
+		assert.Equal(t, "addLiquidity", addLiquidityMethod.Name)
+		assert.Len(t, addLiquidityMethod.Inputs, 8) // addLiquidity takes 8 parameters
+		// Verify some key parameter types
+		assert.Equal(t, "address", addLiquidityMethod.Inputs[0].Type.String()) // tokenA
+		assert.Equal(t, "address", addLiquidityMethod.Inputs[1].Type.String()) // tokenB
+		assert.Equal(t, "uint256", addLiquidityMethod.Inputs[2].Type.String()) // amountADesired
+		assert.Len(t, addLiquidityMethod.Outputs, 3)                           // returns amountA, amountB, liquidity
+		assert.False(t, addLiquidityMethod.Constant)                           // addLiquidity is not a view function
+		assert.False(t, addLiquidityMethod.Payable)                            // addLiquidity is not payable
+
+		// Test getting the swapExactTokensForTokens method
+		swapMethod, err := evmService.GetAbiMethod(abiJSONData, "swapExactTokensForTokens")
+		require.NoError(t, err)
+
+		assert.Equal(t, "swapExactTokensForTokens", swapMethod.Name)
+		assert.Len(t, swapMethod.Inputs, 5)                              // swapExactTokensForTokens takes 5 parameters
+		assert.Equal(t, "uint256", swapMethod.Inputs[0].Type.String())   // amountIn
+		assert.Equal(t, "uint256", swapMethod.Inputs[1].Type.String())   // amountOutMin
+		assert.Equal(t, "address[]", swapMethod.Inputs[2].Type.String()) // path
+		assert.Equal(t, "address", swapMethod.Inputs[3].Type.String())   // to
+		assert.Equal(t, "uint256", swapMethod.Inputs[4].Type.String())   // deadline
+		assert.Len(t, swapMethod.Outputs, 1)                             // returns amounts[]
+		assert.Equal(t, "uint256[]", swapMethod.Outputs[0].Type.String())
+		assert.False(t, swapMethod.Constant) // swap is not a view function
+		assert.False(t, swapMethod.Payable)  // this specific swap is not payable
+	})
+
+	t.Run("Get method from SimpleToken ABI", func(t *testing.T) {
+		evmService := services.NewEvmService()
+
+		args := services.ContractDeploymentWithContractCodeTransactionArgs{
+			ContractName:    "SimpleToken",
+			ConstructorArgs: []any{"Test Token", "TEST", big.NewInt(1000000)},
+			ContractCode:    simpleERC20Contract,
+			Title:           "Deploy Test Token",
+			Description:     "Deploying a test ERC20 token",
+			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
+		}
+
+		_, abiData, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
+		require.NoError(t, err)
+
+		// Convert parsed go-ethereum ABI back to ABI array format
+		// Extract the methods from the parsed ABI and create a simple ABI array
+		abiArray := []map[string]interface{}{}
+		for _, method := range abiData.Methods {
+			inputs := []map[string]interface{}{}
+			for _, input := range method.Inputs {
+				inputs = append(inputs, map[string]interface{}{
+					"name": input.Name,
+					"type": input.Type.String(),
+				})
+			}
+			outputs := []map[string]interface{}{}
+			for _, output := range method.Outputs {
+				outputs = append(outputs, map[string]interface{}{
+					"name": output.Name,
+					"type": output.Type.String(),
+				})
+			}
+			abiArray = append(abiArray, map[string]interface{}{
+				"type":            "function",
+				"name":            method.Name,
+				"inputs":          inputs,
+				"outputs":         outputs,
+				"stateMutability": method.StateMutability,
+				"constant":        method.Constant,
+				"payable":         method.Payable,
+			})
+		}
+
+		abiJSON := models.JSON(map[string]interface{}{
+			"abi": abiArray,
+		})
+
+		// Test getting the transfer method
+		transferMethod, err := evmService.GetAbiMethod(abiJSON, "transfer")
+		require.NoError(t, err)
+
+		assert.Equal(t, "transfer", transferMethod.Name)
+		assert.Len(t, transferMethod.Inputs, 2) // transfer takes 2 parameters (to, amount)
+		assert.Equal(t, "address", transferMethod.Inputs[0].Type.String())
+		assert.Equal(t, "uint256", transferMethod.Inputs[1].Type.String())
+		assert.Len(t, transferMethod.Outputs, 1) // transfer returns bool
+		assert.Equal(t, "bool", transferMethod.Outputs[0].Type.String())
+		assert.False(t, transferMethod.Constant) // transfer is not a view function
+		assert.False(t, transferMethod.Payable)  // transfer is not payable
+
+		// Test getting a view method
+		nameMethod, err := evmService.GetAbiMethod(abiJSON, "name")
+		require.NoError(t, err)
+
+		assert.Equal(t, "name", nameMethod.Name)
+		assert.Empty(t, nameMethod.Inputs)   // name takes no parameters
+		assert.Len(t, nameMethod.Outputs, 1) // name returns string
+		assert.Equal(t, "string", nameMethod.Outputs[0].Type.String())
+		// For SimpleToken, check StateMutability instead as it's more reliable
+		assert.Contains(t, []string{"view", "pure"}, nameMethod.StateMutability) // name is a view/pure function
+		assert.False(t, nameMethod.Payable)                                      // name is not payable
+	})
+
+	t.Run("Method not found", func(t *testing.T) {
+		weth9Artifact, err := contracts.GetWETH9Artifact()
+		require.NoError(t, err)
+
+		// Convert ABI directly to models.JSON
+		abiArray, ok := weth9Artifact.ABI.([]interface{})
+		require.True(t, ok)
+		abiJSONData := models.JSON(map[string]interface{}{
+			"abi": abiArray,
+		})
+
+		_, err = evmService.GetAbiMethod(abiJSONData, "nonExistentMethod")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "method 'nonExistentMethod' not found in ABI")
+	})
+
+	t.Run("Invalid ABI JSON", func(t *testing.T) {
+		invalidJSON := models.JSON(map[string]interface{}{
+			"invalid": "structure",
+		})
+
+		_, err := evmService.GetAbiMethod(invalidJSON, "someMethod")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse ABI")
+	})
+
+	t.Run("Empty method name", func(t *testing.T) {
+		weth9Artifact, err := contracts.GetWETH9Artifact()
+		require.NoError(t, err)
+
+		// Convert ABI directly to models.JSON
+		abiArray, ok := weth9Artifact.ABI.([]interface{})
+		require.True(t, ok)
+		abiJSONData := models.JSON(map[string]interface{}{
+			"abi": abiArray,
+		})
+
+		_, err = evmService.GetAbiMethod(abiJSONData, "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "method '' not found in ABI")
+	})
+}

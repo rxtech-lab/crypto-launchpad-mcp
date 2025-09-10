@@ -16,6 +16,8 @@ type EvmService interface {
 	GetContractDeploymentTransactionWithBytecodeAndAbi(args ContractDeploymentWithBytecodeAndAbiTransactionArgs) (models.TransactionDeployment, abi.ABI, error)
 	GetTransactionData(args GetTransactionDataArgs) (string, error)
 	GetContractFunctionCallTransaction(args GetContractFunctionCallTransactionArgs) (models.TransactionDeployment, error)
+	GetAllAbiMethods(abi models.JSON) ([]abi.Method, error)
+	GetAbiMethod(abi models.JSON, methodName string) (abi.Method, error)
 }
 
 type evmService struct {
@@ -161,4 +163,61 @@ func (s *evmService) getContractDeploymentTransactionData(contractName string, c
 		return "", abi.ABI{}, fmt.Errorf("failed to parse ABI: %w", err)
 	}
 	return txData, parsedABI, nil
+}
+
+func (s *evmService) GetAllAbiMethods(abiJSON models.JSON) ([]abi.Method, error) {
+	// Extract ABI string from the JSON
+	abiString := ""
+	if abiData, exists := abiJSON["abi"]; exists {
+		// If ABI is stored as "abi" field, marshal it
+		abiBytes, err := json.Marshal(abiData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal ABI data: %w", err)
+		}
+		abiString = string(abiBytes)
+	} else {
+		// Otherwise use the whole JSON as ABI string
+		abiString = abiJSON.String()
+	}
+
+	parsedABI, err := abi.JSON(strings.NewReader(abiString))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+
+	// Convert map to slice for consistent ordering
+	methods := make([]abi.Method, 0, len(parsedABI.Methods))
+	for _, method := range parsedABI.Methods {
+		methods = append(methods, method)
+	}
+
+	return methods, nil
+}
+
+func (s *evmService) GetAbiMethod(abiJSON models.JSON, methodName string) (abi.Method, error) {
+	// Extract ABI string from the JSON
+	abiString := ""
+	if abiData, exists := abiJSON["abi"]; exists {
+		// If ABI is stored as "abi" field, marshal it
+		abiBytes, err := json.Marshal(abiData)
+		if err != nil {
+			return abi.Method{}, fmt.Errorf("failed to marshal ABI data: %w", err)
+		}
+		abiString = string(abiBytes)
+	} else {
+		// Otherwise use the whole JSON as ABI string
+		abiString = abiJSON.String()
+	}
+
+	parsedABI, err := abi.JSON(strings.NewReader(abiString))
+	if err != nil {
+		return abi.Method{}, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+
+	method, exists := parsedABI.Methods[methodName]
+	if !exists {
+		return abi.Method{}, fmt.Errorf("method '%s' not found in ABI", methodName)
+	}
+
+	return method, nil
 }

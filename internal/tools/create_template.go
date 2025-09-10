@@ -31,11 +31,13 @@ type CreateTemplateArguments struct {
 }
 
 type CreateTemplateResult struct {
-	ID            uint                        `json:"id"`
-	Name          string                      `json:"name"`
-	Description   string                      `json:"description"`
-	ChainType     models.TransactionChainType `json:"chain_type"`
-	ContractNames []string                    `json:"contract_names"`
+	ID                 uint                        `json:"id"`
+	Name               string                      `json:"name"`
+	Description        string                      `json:"description"`
+	ChainType          models.TransactionChainType `json:"chain_type"`
+	ContractNames      []string                    `json:"contract_names,omitempty"`
+	TemplateParameters int                         `json:"template_parameters,omitempty"`
+	Metadata           models.JSON                 `json:"metadata,omitempty"`
 }
 
 type CompilationResult struct {
@@ -167,7 +169,22 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 			SampleTemplateValues: args.TemplateValues,
 			Metadata:             metadata,
 			UserId:               userId,
-			Abi:                  compilationResult.Abi,
+		}
+
+		// Set ABI only for Ethereum contracts with successful compilation
+		if compilationResult != nil && args.ChainType == "ethereum" {
+			if abi, exists := compilationResult.Abi[args.ContractName]; exists {
+				// Convert the ABI to models.JSON format
+				if abiMap, ok := abi.(models.JSON); ok {
+					template.Abi = abiMap
+				} else {
+					// If it's not already a models.JSON, convert it
+					abiBytes, _ := json.Marshal(abi)
+					var abiMap models.JSON
+					json.Unmarshal(abiBytes, &abiMap)
+					template.Abi = abiMap
+				}
+			}
 		}
 
 		if err := c.templateService.CreateTemplate(template); err != nil {
@@ -189,6 +206,12 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 				contractNames = append(contractNames, contractName)
 			}
 			result.ContractNames = contractNames
+		}
+
+		// Add metadata information
+		if len(metadata) > 0 {
+			result.TemplateParameters = len(metadata)
+			result.Metadata = metadata
 		}
 
 		// Format success message

@@ -236,11 +236,19 @@ func TestUpdateTemplateHandler_UpdateChainType(t *testing.T) {
 		errorMsg        string
 	}{
 		{
-			name:            "valid_ethereum_to_solana",
+			name:            "valid_ethereum_to_solana_without_code",
+			originalChain:   "ethereum",
+			newChainType:    "solana",
+			newTemplateCode: "", // No template code update
+			expectError:     false,
+		},
+		{
+			name:            "invalid_ethereum_to_solana_with_code",
 			originalChain:   "ethereum",
 			newChainType:    "solana",
 			newTemplateCode: validSolanaTemplate(),
-			expectError:     false,
+			expectError:     true,
+			errorMsg:        "Cannot update template code when changing chain type to Solana",
 		},
 	}
 
@@ -338,7 +346,13 @@ contract UpdatedToken {
 			expectError: true,
 			errorMsg:    "Solidity compilation failed",
 		},
-		// Removed invalid_solana_code_missing_requirements - Solana validation is skipped
+		{
+			name:        "solana_code_update_not_supported",
+			chainType:   "solana",
+			newCode:     validSolanaTemplate(),
+			expectError: true,
+			errorMsg:    "Solana template code updates are not supported",
+		},
 	}
 
 	for _, tt := range tests {
