@@ -8,6 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/rxtech-lab/launchpad-mcp/internal/constants"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
@@ -141,7 +142,7 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 			}
 
 			// Use Solidity version 0.8.20 for validation
-			result, err := utils.CompileSolidity("0.8.27", validationCode)
+			result, err := utils.CompileSolidity(constants.SolidityCompilerVersion, validationCode)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Solidity compilation failed. Please fix the template code base on the error: %v", err)), nil
 			}
@@ -178,11 +179,11 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 				if abiMap, ok := abi.(models.JSON); ok {
 					template.Abi = abiMap
 				} else {
-					// If it's not already a models.JSON, convert it
-					abiBytes, _ := json.Marshal(abi)
-					var abiMap models.JSON
-					json.Unmarshal(abiBytes, &abiMap)
-					template.Abi = abiMap
+					// The ABI from compilation is an array, but models.JSON is a map
+					// Wrap the ABI array in a map structure to store it properly
+					template.Abi = models.JSON{
+						"abi": abi,
+					}
 				}
 			}
 		}

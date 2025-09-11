@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -348,7 +347,7 @@ func (suite *CallFunctionToolTestSuite) TestHandlerWrongArgumentCount() {
 	}
 }
 
-func (suite *CallFunctionToolTestSuite) TestHandlerReadOnlyFunctionSuccess() {
+func (suite *CallFunctionToolTestSuite) TestHandlerReadOnlyFunctionConnectionError() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
@@ -363,28 +362,11 @@ func (suite *CallFunctionToolTestSuite) TestHandlerReadOnlyFunctionSuccess() {
 	result, err := handler(context.Background(), request)
 
 	suite.NoError(err)
-	suite.False(result.IsError)
-	suite.Len(result.Content, 2)
-
-	// Check success message
+	// Now expect error since we're making real RPC calls to localhost:8545 which isn't running
+	suite.True(result.IsError)
 	if len(result.Content) > 0 {
 		if textContent, ok := result.Content[0].(mcp.TextContent); ok {
-			suite.Contains(textContent.Text, "Function 'balanceOf' called successfully")
-		}
-	}
-
-	// Check result JSON
-	if len(result.Content) > 1 {
-		if textContent, ok := result.Content[1].(mcp.TextContent); ok {
-			var callResult CallFunctionResult
-			err := json.Unmarshal([]byte(textContent.Text), &callResult)
-			suite.NoError(err)
-			suite.Equal(fmt.Sprintf("%d", suite.deployment.ID), callResult.DeploymentID)
-			suite.Equal("balanceOf", callResult.FunctionName)
-			suite.Equal(suite.deployment.ContractAddress, callResult.ContractAddress)
-			suite.True(callResult.Success)
-			suite.True(callResult.IsReadOnly)
-			suite.Contains(callResult.Result, "placeholder implementation")
+			suite.Contains(textContent.Text, "Failed to call read-only function")
 		}
 	}
 }
@@ -535,12 +517,22 @@ func (suite *CallFunctionToolTestSuite) TestCallReadOnlyEthereumFunction() {
 	// Test the helper function
 	method := abi.Method{
 		Name: "balanceOf",
+		Inputs: abi.Arguments{
+			{Name: "account", Type: abi.Type{T: abi.AddressTy}},
+		},
+		Outputs: abi.Arguments{
+			{Name: "", Type: abi.Type{T: abi.UintTy, Size: 256}},
+		},
 	}
-	result, err := suite.tool.callReadOnlyEthereumFunction("0x123", method, []any{"0x456"})
 
-	suite.NoError(err)
-	suite.Contains(result, "placeholder implementation")
-	suite.Contains(result, "balanceOf")
+	// This test will fail with connection error since we're using localhost:8545
+	// but it tests that the method signature is correct and the error is from the RPC call
+	result, err := suite.tool.callReadOnlyEthereumFunction("0x123", method, []any{"0x456"}, suite.chain, suite.template)
+
+	// Expect error because we're trying to connect to localhost:8545 which isn't running
+	suite.Error(err)
+	suite.Contains(err.Error(), "failed to call read-only function")
+	suite.Empty(result)
 }
 
 func TestCallFunctionToolTestSuite(t *testing.T) {

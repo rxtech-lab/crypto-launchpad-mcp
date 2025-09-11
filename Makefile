@@ -51,11 +51,11 @@ binaries: build-frontend
 
 # Run tests
 test:
-	go test -v -p 1 -cover ./...
+	go test -v -p 1 -cover -timeout 90s ./...
 
 # Run tests with coverage output for codecov
 test-coverage:
-	go test -v -p 1 -race -coverprofile=coverage.out -covermode=atomic ./...
+	go test -v -p 1 -race -coverprofile=coverage.out -covermode=atomic -timeout 90s ./...
 
 # Run the MCP server directly (no build)
 run:
@@ -102,16 +102,16 @@ e2e-network:
 
 # Run browser E2E tests with chromedp
 e2e-browser:
-	go test -v ./e2e/api
+	go test -v -timeout 90s ./e2e/api
 
 # Run all E2E tests including browser tests
 e2e-all: e2e-network
-	go test -v ./e2e
-	go test -v ./e2e/api
+	go test -v -timeout 90s ./e2e
+	go test -v -timeout 90s ./e2e/api
 
 # Run browser tests in headful mode (with visible browser)
 e2e-browser-headful:
-	HEADLESS=false go test -v ./e2e/api
+	HEADLESS=false go test -v -timeout 90s ./e2e/api
 
 # Format code
 fmt:

@@ -179,9 +179,13 @@ func (c *callFunctionTool) makeEthereumFunctionCall(ctx context.Context, args Ca
 
 	if isReadOnly {
 		// For read-only functions, call directly and return result
-		result, err := c.callReadOnlyEthereumFunction(deployment.ContractAddress, method, args.FunctionArgs)
+		result, err := c.callReadOnlyEthereumFunction(deployment.ContractAddress, method, args.FunctionArgs, activeChain, template)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to call read-only function: %v", err)), nil
+		}
+		resultString, err := json.Marshal(result)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal result: %v", err)), nil
 		}
 
 		// Return direct result
@@ -189,7 +193,7 @@ func (c *callFunctionTool) makeEthereumFunctionCall(ctx context.Context, args Ca
 			DeploymentID:    args.DeploymentID,
 			ContractAddress: deployment.ContractAddress,
 			FunctionName:    args.FunctionName,
-			Result:          result,
+			Result:          string(resultString),
 			Success:         true,
 			IsReadOnly:      true,
 		}
@@ -226,11 +230,39 @@ func (c *callFunctionTool) makeEthereumFunctionCall(ctx context.Context, args Ca
 	}
 }
 
-func (c *callFunctionTool) callReadOnlyEthereumFunction(contractAddress string, method abi.Method, functionArgs []any) (string, error) {
-	// For now, return a placeholder since we need to implement the actual blockchain call
-	// This would use the evmService to make a read-only call to the contract
-	// TODO: Implement actual read-only function call using evmService
-	return fmt.Sprintf("Read-only call to %s with args %v (placeholder implementation)", method.Name, functionArgs), nil
+func (c *callFunctionTool) callReadOnlyEthereumFunction(contractAddress string, method abi.Method, functionArgs []any, activeChain *models.Chain, template *models.Template) ([]any, error) {
+	// Extract ABI string from template (same logic as in createFunctionCallTransaction)
+	var abiString string
+	if abiData, exists := template.Abi["abi"]; exists {
+		// If ABI is stored as "abi" field, marshal the array directly
+		abiBytes, err := json.Marshal(abiData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal ABI data: %w", err)
+		}
+		abiString = string(abiBytes)
+	} else {
+		// If template.Abi is the ABI array directly, marshal it
+		abiBytes, err := json.Marshal(template.Abi)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal ABI: %w", err)
+		}
+		abiString = string(abiBytes)
+	}
+
+	// Call the evmService to make the actual read-only function call
+	result, err := c.evmService.CallReadOnlyEthereumFunction(services.CallReadOnlyEthereumFunctionArgs{
+		ContractAddress: contractAddress,
+		FunctionName:    method.Name,
+		FunctionArgs:    functionArgs,
+		Abi:             abiString,
+		RpcURL:          activeChain.RPC,
+		Value:           "0", // Read-only calls don't send value
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to call read-only function: %w", err)
+	}
+
+	return result, nil
 }
 
 func (c *callFunctionTool) createFunctionCallTransaction(ctx context.Context, args CallFunctionArguments, activeChain *models.Chain, deployment *models.Deployment, template *models.Template) (string, error) {

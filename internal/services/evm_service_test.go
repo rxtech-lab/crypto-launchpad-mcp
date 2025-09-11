@@ -961,11 +961,11 @@ func TestGetAllAbiMethods(t *testing.T) {
 
 		// Convert ABI directly to models.JSON
 		// The ABI from artifact should be the ABI array
-		abiArray, ok := weth9Artifact.ABI.([]interface{})
+		abiArray, ok := weth9Artifact.ABI.([]any)
 		require.True(t, ok)
 
 		// Convert to models.JSON - this will represent the raw ABI array
-		abiJSONData := models.JSON(map[string]interface{}{
+		abiJSONData := models.JSON(map[string]any{
 			"abi": abiArray,
 		})
 
@@ -996,9 +996,9 @@ func TestGetAllAbiMethods(t *testing.T) {
 		require.NoError(t, err)
 
 		// Convert ABI directly to models.JSON
-		abiArray, ok := factoryArtifact.ABI.([]interface{})
+		abiArray, ok := factoryArtifact.ABI.([]any)
 		require.True(t, ok)
-		abiJSONData := models.JSON(map[string]interface{}{
+		abiJSONData := models.JSON(map[string]any{
 			"abi": abiArray,
 		})
 
@@ -1024,9 +1024,9 @@ func TestGetAllAbiMethods(t *testing.T) {
 		require.NoError(t, err)
 
 		// Convert ABI directly to models.JSON
-		abiArray, ok := routerArtifact.ABI.([]interface{})
+		abiArray, ok := routerArtifact.ABI.([]any)
 		require.True(t, ok)
-		abiJSONData := models.JSON(map[string]interface{}{
+		abiJSONData := models.JSON(map[string]any{
 			"abi": abiArray,
 		})
 
@@ -1066,23 +1066,23 @@ func TestGetAllAbiMethods(t *testing.T) {
 
 		// Convert parsed go-ethereum ABI back to ABI array format
 		// Extract the methods from the parsed ABI and create a simple ABI array
-		abiArray := []map[string]interface{}{}
+		abiArray := []map[string]any{}
 		for _, method := range abiData.Methods {
-			inputs := []map[string]interface{}{}
+			inputs := []map[string]any{}
 			for _, input := range method.Inputs {
-				inputs = append(inputs, map[string]interface{}{
+				inputs = append(inputs, map[string]any{
 					"name": input.Name,
 					"type": input.Type.String(),
 				})
 			}
-			outputs := []map[string]interface{}{}
+			outputs := []map[string]any{}
 			for _, output := range method.Outputs {
-				outputs = append(outputs, map[string]interface{}{
+				outputs = append(outputs, map[string]any{
 					"name": output.Name,
 					"type": output.Type.String(),
 				})
 			}
-			abiArray = append(abiArray, map[string]interface{}{
+			abiArray = append(abiArray, map[string]any{
 				"type":            "function",
 				"name":            method.Name,
 				"inputs":          inputs,
@@ -1093,7 +1093,7 @@ func TestGetAllAbiMethods(t *testing.T) {
 			})
 		}
 
-		abiJSON := models.JSON(map[string]interface{}{
+		abiJSON := models.JSON(map[string]any{
 			"abi": abiArray,
 		})
 
@@ -1116,7 +1116,7 @@ func TestGetAllAbiMethods(t *testing.T) {
 
 	t.Run("Invalid ABI JSON", func(t *testing.T) {
 		// Create invalid JSON
-		invalidJSON := models.JSON(map[string]interface{}{
+		invalidJSON := models.JSON(map[string]any{
 			"invalid": "structure",
 		})
 
@@ -1126,8 +1126,8 @@ func TestGetAllAbiMethods(t *testing.T) {
 	})
 
 	t.Run("Empty ABI", func(t *testing.T) {
-		emptyABI := models.JSON(map[string]interface{}{
-			"abi": []interface{}{},
+		emptyABI := models.JSON(map[string]any{
+			"abi": []any{},
 		})
 
 		methods, err := evmService.GetAllAbiMethods(emptyABI)
@@ -1145,9 +1145,9 @@ func TestGetAbiMethod(t *testing.T) {
 		require.NoError(t, err)
 
 		// Convert ABI directly to models.JSON
-		abiArray, ok := weth9Artifact.ABI.([]interface{})
+		abiArray, ok := weth9Artifact.ABI.([]any)
 		require.True(t, ok)
-		abiJSONData := models.JSON(map[string]interface{}{
+		abiJSONData := models.JSON(map[string]any{
 			"abi": abiArray,
 		})
 
@@ -1190,9 +1190,9 @@ func TestGetAbiMethod(t *testing.T) {
 		require.NoError(t, err)
 
 		// Convert ABI directly to models.JSON
-		abiArray, ok := factoryArtifact.ABI.([]interface{})
+		abiArray, ok := factoryArtifact.ABI.([]any)
 		require.True(t, ok)
-		abiJSONData := models.JSON(map[string]interface{}{
+		abiJSONData := models.JSON(map[string]any{
 			"abi": abiArray,
 		})
 
@@ -1228,9 +1228,9 @@ func TestGetAbiMethod(t *testing.T) {
 		require.NoError(t, err)
 
 		// Convert ABI directly to models.JSON
-		abiArray, ok := routerArtifact.ABI.([]interface{})
+		abiArray, ok := routerArtifact.ABI.([]any)
 		require.True(t, ok)
-		abiJSONData := models.JSON(map[string]interface{}{
+		abiJSONData := models.JSON(map[string]any{
 			"abi": abiArray,
 		})
 
@@ -1283,23 +1283,23 @@ func TestGetAbiMethod(t *testing.T) {
 
 		// Convert parsed go-ethereum ABI back to ABI array format
 		// Extract the methods from the parsed ABI and create a simple ABI array
-		abiArray := []map[string]interface{}{}
+		abiArray := []map[string]any{}
 		for _, method := range abiData.Methods {
-			inputs := []map[string]interface{}{}
+			inputs := []map[string]any{}
 			for _, input := range method.Inputs {
-				inputs = append(inputs, map[string]interface{}{
+				inputs = append(inputs, map[string]any{
 					"name": input.Name,
 					"type": input.Type.String(),
 				})
 			}
-			outputs := []map[string]interface{}{}
+			outputs := []map[string]any{}
 			for _, output := range method.Outputs {
-				outputs = append(outputs, map[string]interface{}{
+				outputs = append(outputs, map[string]any{
 					"name": output.Name,
 					"type": output.Type.String(),
 				})
 			}
-			abiArray = append(abiArray, map[string]interface{}{
+			abiArray = append(abiArray, map[string]any{
 				"type":            "function",
 				"name":            method.Name,
 				"inputs":          inputs,
@@ -1310,7 +1310,7 @@ func TestGetAbiMethod(t *testing.T) {
 			})
 		}
 
-		abiJSON := models.JSON(map[string]interface{}{
+		abiJSON := models.JSON(map[string]any{
 			"abi": abiArray,
 		})
 
@@ -1345,9 +1345,9 @@ func TestGetAbiMethod(t *testing.T) {
 		require.NoError(t, err)
 
 		// Convert ABI directly to models.JSON
-		abiArray, ok := weth9Artifact.ABI.([]interface{})
+		abiArray, ok := weth9Artifact.ABI.([]any)
 		require.True(t, ok)
-		abiJSONData := models.JSON(map[string]interface{}{
+		abiJSONData := models.JSON(map[string]any{
 			"abi": abiArray,
 		})
 
@@ -1357,7 +1357,7 @@ func TestGetAbiMethod(t *testing.T) {
 	})
 
 	t.Run("Invalid ABI JSON", func(t *testing.T) {
-		invalidJSON := models.JSON(map[string]interface{}{
+		invalidJSON := models.JSON(map[string]any{
 			"invalid": "structure",
 		})
 
@@ -1371,14 +1371,277 @@ func TestGetAbiMethod(t *testing.T) {
 		require.NoError(t, err)
 
 		// Convert ABI directly to models.JSON
-		abiArray, ok := weth9Artifact.ABI.([]interface{})
+		abiArray, ok := weth9Artifact.ABI.([]any)
 		require.True(t, ok)
-		abiJSONData := models.JSON(map[string]interface{}{
+		abiJSONData := models.JSON(map[string]any{
 			"abi": abiArray,
 		})
 
 		_, err = evmService.GetAbiMethod(abiJSONData, "")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "method '' not found in ABI")
+	})
+}
+
+// TestCallReadOnlyEthereumFunction tests the CallReadOnlyEthereumFunction method
+func TestCallReadOnlyEthereumFunction(t *testing.T) {
+	t.Run("Invalid RPC URL should fail", func(t *testing.T) {
+		evmService := services.NewEvmService()
+
+		args := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: "0x1234567890123456789012345678901234567890",
+			FunctionName:    "name",
+			FunctionArgs:    []any{},
+			Abi:             `[{"type":"function","name":"name","outputs":[{"type":"string"}],"stateMutability":"view"}]`,
+			RpcURL:          "http://invalid-url:8545", // Valid URL format but invalid host
+		}
+
+		_, err := evmService.CallReadOnlyEthereumFunction(args)
+		assert.Error(t, err)
+		// The connection might succeed but fail during the call, so check for either error
+		assert.True(t, strings.Contains(err.Error(), "failed to connect to Ethereum RPC") ||
+			strings.Contains(err.Error(), "failed to call contract"))
+	})
+
+	t.Run("Invalid arguments should fail", func(t *testing.T) {
+		evmService := services.NewEvmService()
+
+		args := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: "invalid-address", // Invalid address format
+			FunctionName:    "name",
+			FunctionArgs:    []any{},
+			Abi:             `[{"type":"function","name":"name","outputs":[{"type":"string"}],"stateMutability":"view"}]`,
+			RpcURL:          testnetRPC,
+		}
+
+		_, err := evmService.CallReadOnlyEthereumFunction(args)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid arguments")
+	})
+
+	t.Run("Call read-only functions on deployed contract", func(t *testing.T) {
+		// Skip if testnet is not running
+		client, err := connectToTestnet()
+		if err != nil {
+			t.Skipf("Testnet not running on %s (run 'make e2e-network'): %v", testnetRPC, err)
+		}
+		defer client.Close()
+
+		// Create EVM service
+		evmService := services.NewEvmService()
+
+		// Get test account
+		privateKey, fromAddress, err := getTestAccount()
+		require.NoError(t, err)
+
+		// Check balance
+		balance, err := client.BalanceAt(context.Background(), fromAddress, nil)
+		require.NoError(t, err)
+		t.Logf("Test account balance: %s ETH", balance.String())
+
+		// Prepare deployment arguments
+		args := services.ContractDeploymentWithContractCodeTransactionArgs{
+			ContractName:    "SimpleToken",
+			ConstructorArgs: []any{"Test Token", "TEST", big.NewInt(1000000)},
+			ContractCode:    simpleERC20Contract,
+			Title:           "Deploy Test Token",
+			Description:     "Deploying a test ERC20 token",
+			Value:           "0",
+			TransactionType: models.TransactionTypeUniswapV2TokenDeployment,
+		}
+
+		// Generate deployment transaction
+		deployment, abiData, err := evmService.GetContractDeploymentTransactionWithContractCode(args)
+		require.NoError(t, err)
+
+		// Deploy the contract
+		txHash, err := sendTransaction(client, privateKey, deployment.Data)
+		require.NoError(t, err)
+		t.Logf("Deployment transaction hash: %s", txHash.Hex())
+
+		// Wait for transaction to be mined
+		receipt, err := waitForTransaction(client, txHash, 30*time.Second)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), receipt.Status, "Deployment transaction should succeed")
+
+		contractAddress := receipt.ContractAddress
+		t.Logf("Contract deployed at: %s", contractAddress.Hex())
+
+		// Convert parsed ABI to JSON string for read calls
+		abiArray := []map[string]any{}
+		for _, method := range abiData.Methods {
+			inputs := []map[string]any{}
+			for _, input := range method.Inputs {
+				inputs = append(inputs, map[string]any{
+					"name": input.Name,
+					"type": input.Type.String(),
+				})
+			}
+			outputs := []map[string]any{}
+			for _, output := range method.Outputs {
+				outputs = append(outputs, map[string]any{
+					"name": output.Name,
+					"type": output.Type.String(),
+				})
+			}
+			abiArray = append(abiArray, map[string]any{
+				"type":            "function",
+				"name":            method.Name,
+				"inputs":          inputs,
+				"outputs":         outputs,
+				"stateMutability": method.StateMutability,
+				"constant":        method.Constant,
+				"payable":         method.Payable,
+			})
+		}
+
+		abiJSONBytes, err := json.Marshal(abiArray)
+		require.NoError(t, err)
+		abiJSONString := string(abiJSONBytes)
+
+		// Test calling name() function
+		nameArgs := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: contractAddress.Hex(),
+			FunctionName:    "name",
+			FunctionArgs:    []any{},
+			Abi:             abiJSONString,
+			RpcURL:          testnetRPC,
+		}
+
+		nameResult, err := evmService.CallReadOnlyEthereumFunction(nameArgs)
+		require.NoError(t, err)
+		require.Len(t, nameResult, 1)
+		assert.Equal(t, "Test Token", nameResult[0])
+		t.Logf("Contract name: %s", nameResult[0])
+
+		// Test calling symbol() function
+		symbolArgs := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: contractAddress.Hex(),
+			FunctionName:    "symbol",
+			FunctionArgs:    []any{},
+			Abi:             abiJSONString,
+			RpcURL:          testnetRPC,
+		}
+
+		symbolResult, err := evmService.CallReadOnlyEthereumFunction(symbolArgs)
+		require.NoError(t, err)
+		require.Len(t, symbolResult, 1)
+		assert.Equal(t, "TEST", symbolResult[0])
+		t.Logf("Contract symbol: %s", symbolResult[0])
+
+		// Test calling totalSupply() function
+		totalSupplyArgs := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: contractAddress.Hex(),
+			FunctionName:    "totalSupply",
+			FunctionArgs:    []any{},
+			Abi:             abiJSONString,
+			RpcURL:          testnetRPC,
+		}
+
+		totalSupplyResult, err := evmService.CallReadOnlyEthereumFunction(totalSupplyArgs)
+		require.NoError(t, err)
+		require.Len(t, totalSupplyResult, 1)
+		assert.Equal(t, "1000000", totalSupplyResult[0])
+		t.Logf("Contract totalSupply: %s", totalSupplyResult[0])
+
+		// Test calling balanceOf() function with owner address
+		balanceOfArgs := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: contractAddress.Hex(),
+			FunctionName:    "balanceOf",
+			FunctionArgs:    []any{fromAddress.Hex()},
+			Abi:             abiJSONString,
+			RpcURL:          testnetRPC,
+		}
+
+		balanceOfResult, err := evmService.CallReadOnlyEthereumFunction(balanceOfArgs)
+		require.NoError(t, err)
+		require.Len(t, balanceOfResult, 1)
+		assert.Equal(t, "1000000", balanceOfResult[0])
+		t.Logf("Owner balance: %s", balanceOfResult[0])
+
+		// Test calling balanceOf() function with zero address (should be 0)
+		zeroBalanceArgs := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: contractAddress.Hex(),
+			FunctionName:    "balanceOf",
+			FunctionArgs:    []any{common.Address{}.Hex()},
+			Abi:             abiJSONString,
+			RpcURL:          testnetRPC,
+		}
+
+		zeroBalanceResult, err := evmService.CallReadOnlyEthereumFunction(zeroBalanceArgs)
+		require.NoError(t, err)
+		require.Len(t, zeroBalanceResult, 1)
+		assert.Equal(t, "0", zeroBalanceResult[0])
+		t.Logf("Zero address balance: %s", zeroBalanceResult[0])
+	})
+
+	t.Run("Non-existent contract should fail to unpack", func(t *testing.T) {
+		evmService := services.NewEvmService()
+
+		args := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: "0x0000000000000000000000000000000000000000", // Contract doesn't exist
+			FunctionName:    "name",
+			FunctionArgs:    []any{},
+			Abi:             `[{"type":"function","name":"name","outputs":[{"type":"string"}],"stateMutability":"view"}]`,
+			RpcURL:          testnetRPC,
+		}
+
+		_, err := evmService.CallReadOnlyEthereumFunction(args)
+		// Skip test if testnet is not running
+		if err != nil && strings.Contains(err.Error(), "failed to connect to Ethereum RPC") {
+			t.Skipf("Testnet not running on %s (run 'make e2e-network'): %v", testnetRPC, err)
+		}
+		assert.Error(t, err)
+		// Calling a non-existent contract succeeds but returns empty data, which fails during unpacking
+		assert.Contains(t, err.Error(), "failed to unpack")
+	})
+
+	t.Run("Invalid ABI should fail", func(t *testing.T) {
+		evmService := services.NewEvmService()
+
+		args := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: "0x1234567890123456789012345678901234567890",
+			FunctionName:    "name",
+			FunctionArgs:    []any{},
+			Abi:             "invalid json",
+			RpcURL:          testnetRPC,
+		}
+
+		_, err := evmService.CallReadOnlyEthereumFunction(args)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse ABI")
+	})
+
+	t.Run("Non-existent function should fail", func(t *testing.T) {
+		evmService := services.NewEvmService()
+
+		args := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: "0x1234567890123456789012345678901234567890",
+			FunctionName:    "nonExistentFunction",
+			FunctionArgs:    []any{},
+			Abi:             `[{"type":"function","name":"name","outputs":[{"type":"string"}],"stateMutability":"view"}]`,
+			RpcURL:          testnetRPC,
+		}
+
+		_, err := evmService.CallReadOnlyEthereumFunction(args)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "method 'nonExistentFunction' not found in ABI")
+	})
+
+	t.Run("Function with wrong arguments should fail", func(t *testing.T) {
+		evmService := services.NewEvmService()
+
+		// balanceOf requires 1 address parameter, but we provide none
+		args := services.CallReadOnlyEthereumFunctionArgs{
+			ContractAddress: "0x1234567890123456789012345678901234567890",
+			FunctionName:    "balanceOf",
+			FunctionArgs:    []any{}, // Missing required address parameter
+			Abi:             `[{"type":"function","name":"balanceOf","inputs":[{"type":"address"}],"outputs":[{"type":"uint256"}],"stateMutability":"view"}]`,
+			RpcURL:          testnetRPC,
+		}
+
+		_, err := evmService.CallReadOnlyEthereumFunction(args)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to encode function call")
 	})
 }

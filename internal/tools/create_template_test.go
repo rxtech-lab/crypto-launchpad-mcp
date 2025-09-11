@@ -562,6 +562,320 @@ func TestCreateTemplateHandler_MultipleTemplates(t *testing.T) {
 	assert.Equal(t, models.TransactionChainType("solana"), solTemplate.ChainType)
 }
 
+func TestCreateTemplateHandler_EthereumABIStorage(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name         string
+		templateCode string
+		contractName string
+		expectABI    bool
+		abiChecks    func(t *testing.T, abi models.JSON)
+	}{
+		{
+			name:         "simple_ethereum_contract_with_abi",
+			templateCode: validEthereumTemplate(),
+			contractName: "SimpleToken",
+			expectABI:    true,
+			abiChecks: func(t *testing.T, abi models.JSON) {
+				// Verify ABI is not empty
+				assert.NotEmpty(t, abi)
+
+				// The ABI is now stored as {"abi": [...]}
+				abiArrayInterface, exists := abi["abi"]
+				assert.True(t, exists, "ABI should contain 'abi' key")
+
+				// Convert the ABI array to JSON and parse it
+				abiBytes, err := json.Marshal(abiArrayInterface)
+				assert.NoError(t, err)
+
+				// Parse ABI as array of function definitions
+				var abiArray []map[string]interface{}
+				err = json.Unmarshal(abiBytes, &abiArray)
+				assert.NoError(t, err)
+				assert.NotEmpty(t, abiArray)
+
+				// Check for expected functions in ABI
+				functionNames := make([]string, 0)
+				for _, item := range abiArray {
+					if itemType, ok := item["type"].(string); ok && itemType == "function" {
+						if name, ok := item["name"].(string); ok {
+							functionNames = append(functionNames, name)
+						}
+					}
+				}
+
+				// Verify expected functions exist
+				assert.Contains(t, functionNames, "transfer")
+				assert.Contains(t, functionNames, "name")
+				assert.Contains(t, functionNames, "symbol")
+				assert.Contains(t, functionNames, "totalSupply")
+				assert.Contains(t, functionNames, "balanceOf")
+			},
+		},
+		{
+			name: "openzeppelin_contract_with_abi",
+			templateCode: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+
+contract MyToken is ERC20 {
+    constructor() ERC20("{{.TokenName}}", "{{.TokenSymbol}}") {
+        _mint(msg.sender, {{.InitialSupply}} * 10**decimals());
+    }
+}`,
+			contractName: "MyToken",
+			expectABI:    true,
+			abiChecks: func(t *testing.T, abi models.JSON) {
+				// Verify ABI is not empty
+				assert.NotEmpty(t, abi)
+
+				// The ABI is now stored as {"abi": [...]}
+				abiArrayInterface, exists := abi["abi"]
+				assert.True(t, exists, "ABI should contain 'abi' key")
+
+				// Convert the ABI array to JSON and parse it
+				abiBytes, err := json.Marshal(abiArrayInterface)
+				assert.NoError(t, err)
+
+				// Parse ABI as array of function definitions
+				var abiArray []map[string]interface{}
+				err = json.Unmarshal(abiBytes, &abiArray)
+				assert.NoError(t, err)
+				assert.NotEmpty(t, abiArray)
+
+				// Check for expected ERC20 functions in ABI
+				functionNames := make([]string, 0)
+				for _, item := range abiArray {
+					if itemType, ok := item["type"].(string); ok && itemType == "function" {
+						if name, ok := item["name"].(string); ok {
+							functionNames = append(functionNames, name)
+						}
+					}
+				}
+
+				// Verify standard ERC20 functions exist
+				assert.Contains(t, functionNames, "transfer")
+				assert.Contains(t, functionNames, "transferFrom")
+				assert.Contains(t, functionNames, "approve")
+				assert.Contains(t, functionNames, "balanceOf")
+				assert.Contains(t, functionNames, "allowance")
+				assert.Contains(t, functionNames, "totalSupply")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a fresh database for each test case
+			templateService := setupTestDatabase(t)
+			createTemplateTool := NewCreateTemplateTool(templateService)
+			handler := createTemplateTool.GetHandler()
+
+			request := mcp.CallToolRequest{
+				Params: mcp.CallToolParams{
+					Arguments: map[string]interface{}{
+						"name":            "Test ABI Template",
+						"description":     "Test template for ABI storage verification",
+						"chain_type":      "ethereum",
+						"contract_name":   tt.contractName,
+						"template_code":   tt.templateCode,
+						"template_values": map[string]interface{}{"TokenName": "TestToken", "TokenSymbol": "TTK", "InitialSupply": "1000"},
+					},
+				},
+			}
+
+			result, err := handler(ctx, request)
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.False(t, result.IsError)
+
+			// Verify template was created successfully
+			assert.Len(t, result.Content, 2)
+
+			// Parse the result to get template ID
+			textContent1 := result.Content[1].(mcp.TextContent)
+			var resultData map[string]interface{}
+			err = json.Unmarshal([]byte(textContent1.Text), &resultData)
+			assert.NoError(t, err)
+
+			templateID := uint(resultData["id"].(float64))
+
+			// Retrieve template from database to verify ABI storage
+			template, err := templateService.GetTemplateByID(templateID)
+			assert.NoError(t, err)
+			assert.NotNil(t, template)
+
+			if tt.expectABI {
+				// Verify ABI was stored
+				assert.NotEmpty(t, template.Abi)
+
+				// Run specific ABI checks
+				tt.abiChecks(t, template.Abi)
+			} else {
+				// Verify no ABI was stored
+				assert.Empty(t, template.Abi)
+			}
+		})
+	}
+}
+
+func TestCreateTemplateHandler_ContractNameMismatch(t *testing.T) {
+	ctx := context.Background()
+	templateService := setupTestDatabase(t)
+	createTemplateTool := NewCreateTemplateTool(templateService)
+	handler := createTemplateTool.GetHandler()
+
+	// Use a valid contract but specify wrong contract name
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: map[string]interface{}{
+				"name":            "Test Mismatch Template",
+				"description":     "Test template for contract name mismatch",
+				"chain_type":      "ethereum",
+				"contract_name":   "NonExistentContract",   // Wrong contract name
+				"template_code":   validEthereumTemplate(), // Contains SimpleToken
+				"template_values": map[string]interface{}{"TokenName": "TestToken", "TokenSymbol": "TTK", "InitialSupply": "1000"},
+			},
+		},
+	}
+
+	result, err := handler(ctx, request)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.True(t, result.IsError)
+
+	// Verify error message
+	assert.Len(t, result.Content, 1)
+	textContent := result.Content[0].(mcp.TextContent)
+	assert.Contains(t, textContent.Text, "Contract NonExistentContract not found in the compilation result")
+	assert.Contains(t, textContent.Text, "AvailableContracts are: SimpleToken")
+}
+
+func TestCreateTemplateHandler_ABIVerification(t *testing.T) {
+	ctx := context.Background()
+	templateService := setupTestDatabase(t)
+	createTemplateTool := NewCreateTemplateTool(templateService)
+	handler := createTemplateTool.GetHandler()
+
+	// Create a template with known contract structure
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: map[string]interface{}{
+				"name":            "ABI Verification Template",
+				"description":     "Template for detailed ABI verification",
+				"chain_type":      "ethereum",
+				"contract_name":   "SimpleToken",
+				"template_code":   validEthereumTemplate(),
+				"template_values": map[string]interface{}{"TokenName": "VerifyToken", "TokenSymbol": "VTK", "InitialSupply": "5000"},
+			},
+		},
+	}
+
+	result, err := handler(ctx, request)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.False(t, result.IsError)
+
+	// Parse result to get template ID
+	textContent1 := result.Content[1].(mcp.TextContent)
+	var resultData map[string]interface{}
+	err = json.Unmarshal([]byte(textContent1.Text), &resultData)
+	assert.NoError(t, err)
+
+	templateID := uint(resultData["id"].(float64))
+
+	// Retrieve template from database
+	template, err := templateService.GetTemplateByID(templateID)
+	assert.NoError(t, err)
+	assert.NotNil(t, template)
+
+	// Verify ABI structure in detail
+	assert.NotEmpty(t, template.Abi)
+
+	// The ABI is now stored as {"abi": [...]}
+	abiArrayInterface, exists := template.Abi["abi"]
+	assert.True(t, exists, "ABI should contain 'abi' key")
+
+	// Convert the ABI array to JSON for detailed parsing
+	abiBytes, err := json.Marshal(abiArrayInterface)
+	assert.NoError(t, err)
+
+	var abiArray []map[string]interface{}
+	err = json.Unmarshal(abiBytes, &abiArray)
+	assert.NoError(t, err)
+
+	// Count different types of ABI entries
+	functionCount := 0
+	constructorCount := 0
+	variableCount := 0
+
+	functionInputs := make(map[string][]map[string]interface{})
+	functionOutputs := make(map[string][]map[string]interface{})
+
+	for _, item := range abiArray {
+		itemType, ok := item["type"].(string)
+		assert.True(t, ok, "Each ABI item should have a type")
+
+		switch itemType {
+		case "function":
+			functionCount++
+			if name, ok := item["name"].(string); ok {
+				if inputs, ok := item["inputs"].([]interface{}); ok {
+					inputsTyped := make([]map[string]interface{}, len(inputs))
+					for i, input := range inputs {
+						inputsTyped[i] = input.(map[string]interface{})
+					}
+					functionInputs[name] = inputsTyped
+				}
+				if outputs, ok := item["outputs"].([]interface{}); ok {
+					outputsTyped := make([]map[string]interface{}, len(outputs))
+					for i, output := range outputs {
+						outputsTyped[i] = output.(map[string]interface{})
+					}
+					functionOutputs[name] = outputsTyped
+				}
+			}
+		case "constructor":
+			constructorCount++
+		default:
+			// Public variables become function getters
+			if name, ok := item["name"].(string); ok && name != "" {
+				variableCount++
+			}
+		}
+	}
+
+	// Verify expected counts and function signatures
+	assert.Greater(t, functionCount, 0, "Should have at least one function")
+	assert.Equal(t, 1, constructorCount, "Should have exactly one constructor")
+
+	// Verify specific function signatures
+	// transfer function should have 2 inputs (address, uint256) and 1 output (bool)
+	if transferInputs, exists := functionInputs["transfer"]; exists {
+		assert.Len(t, transferInputs, 2, "transfer function should have 2 inputs")
+		assert.Equal(t, "address", transferInputs[0]["type"], "First input should be address")
+		assert.Equal(t, "uint256", transferInputs[1]["type"], "Second input should be uint256")
+	}
+
+	if transferOutputs, exists := functionOutputs["transfer"]; exists {
+		assert.Len(t, transferOutputs, 1, "transfer function should have 1 output")
+		assert.Equal(t, "bool", transferOutputs[0]["type"], "Output should be bool")
+	}
+
+	// Verify balanceOf function
+	if balanceOfInputs, exists := functionInputs["balanceOf"]; exists {
+		assert.Len(t, balanceOfInputs, 1, "balanceOf function should have 1 input")
+		assert.Equal(t, "address", balanceOfInputs[0]["type"], "Input should be address")
+	}
+
+	if balanceOfOutputs, exists := functionOutputs["balanceOf"]; exists {
+		assert.Len(t, balanceOfOutputs, 1, "balanceOf function should have 1 output")
+		assert.Equal(t, "uint256", balanceOfOutputs[0]["type"], "Output should be uint256")
+	}
+}
+
 // Helper functions for test templates
 func validEthereumTemplate() string {
 	return `// SPDX-License-Identifier: MIT

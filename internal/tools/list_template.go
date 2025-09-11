@@ -14,7 +14,7 @@ import (
 
 func NewListTemplateTool(templateService services.TemplateService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("list_template",
-		mcp.WithDescription("List predefined smart contract templates with optional filtering by chain type and keyword search. Uses SQLite search for template names and descriptions."),
+		mcp.WithDescription("List predefined smart contract templates with optional filtering by chain type and keyword search. Uses SQLite search for template names and descriptions. Will only return a list of templates with their names, descriptions, and chain types. Call view_template tool to get detailed information including all available methods and method parameters."),
 		mcp.WithString("chain_type",
 			mcp.Description("Filter by blockchain type (ethereum or solana). If not provided, lists templates for all chains."),
 		),

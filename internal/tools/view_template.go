@@ -59,7 +59,7 @@ func NewViewTemplateTool(templateService services.TemplateService, evmService se
 
 func (c *viewTemplateTool) GetTool() mcp.Tool {
 	tool := mcp.NewTool("view_template",
-		mcp.WithDescription("View the template by id"),
+		mcp.WithDescription("View the template by id. The list_template tool only returns a summary of templates. Use this tool to get detailed information including all available methods and method parameters."),
 		mcp.WithString("template_id",
 			mcp.Required(),
 			mcp.Description("ID of the template to view"),
