@@ -43,3 +43,15 @@ func (j *JSON) Scan(value interface{}) error {
 
 	return json.Unmarshal(bytes, j)
 }
+
+// String returns JSON as string representation
+func (j JSON) String() string {
+	if j == nil {
+		return ""
+	}
+	bytes, err := json.Marshal(j)
+	if err != nil {
+		return ""
+	}
+	return string(bytes)
+}

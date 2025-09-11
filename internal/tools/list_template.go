@@ -14,7 +14,7 @@ import (
 
 func NewListTemplateTool(templateService services.TemplateService) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("list_template",
-		mcp.WithDescription("List predefined smart contract templates with optional filtering by chain type and keyword search. Uses SQLite search for template names and descriptions."),
+		mcp.WithDescription("List predefined smart contract templates with optional filtering by chain type and keyword search. Uses SQLite search for template names and descriptions. Will only return a list of templates with their names, descriptions, and chain types. Call view_template tool to get detailed information including all available methods and method parameters."),
 		mcp.WithString("chain_type",
 			mcp.Description("Filter by blockchain type (ethereum or solana). If not provided, lists templates for all chains."),
 		),
@@ -54,7 +54,7 @@ func NewListTemplateTool(templateService services.TemplateService) (mcp.Tool, se
 		}
 
 		if len(templates) == 0 {
-			result := map[string]interface{}{
+			result := map[string]any{
 				"templates": []interface{}{},
 				"count":     0,
 				"message":   "No templates found matching the criteria",
@@ -64,23 +64,20 @@ func NewListTemplateTool(templateService services.TemplateService) (mcp.Tool, se
 		}
 
 		// Format templates for response
-		templateList := make([]map[string]interface{}, len(templates))
+		templateList := make([]map[string]any, len(templates))
 		for i, template := range templates {
-			templateList[i] = map[string]interface{}{
-				"id":                     template.ID,
-				"name":                   template.Name,
-				"description":            template.Description,
-				"chain_type":             template.ChainType,
-				"created_at":             template.CreatedAt,
-				"updated_at":             template.UpdatedAt,
-				"sample_template_values": template.SampleTemplateValues,
+			templateList[i] = map[string]any{
+				"id":          template.ID,
+				"name":        template.Name,
+				"description": template.Description,
+				"chain_type":  template.ChainType,
 			}
 		}
 
-		result := map[string]interface{}{
+		result := map[string]any{
 			"templates": templateList,
 			"count":     len(templates),
-			"filters": map[string]interface{}{
+			"filters": map[string]any{
 				"chain_type": chainType,
 				"keyword":    keyword,
 				"limit":      limit,

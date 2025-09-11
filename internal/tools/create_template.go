@@ -8,6 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/rxtech-lab/launchpad-mcp/internal/constants"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
@@ -28,6 +29,21 @@ type CreateTemplateArguments struct {
 
 	// Optional fields
 	TemplateMetadata string `json:"template_metadata,omitempty"`
+}
+
+type CreateTemplateResult struct {
+	ID                 uint                        `json:"id"`
+	Name               string                      `json:"name"`
+	Description        string                      `json:"description"`
+	ChainType          models.TransactionChainType `json:"chain_type"`
+	ContractNames      []string                    `json:"contract_names,omitempty"`
+	TemplateParameters int                         `json:"template_parameters,omitempty"`
+	Metadata           models.JSON                 `json:"metadata,omitempty"`
+}
+
+type CompilationResult struct {
+	Bytecode map[string]string `json:"bytecode"`
+	Abi      map[string]any    `json:"abi"`
 }
 
 func NewCreateTemplateTool(templateService services.TemplateService) *createTemplateTool {
@@ -126,7 +142,7 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 			}
 
 			// Use Solidity version 0.8.20 for validation
-			result, err := utils.CompileSolidity("0.8.27", validationCode)
+			result, err := utils.CompileSolidity(constants.SolidityCompilerVersion, validationCode)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Solidity compilation failed. Please fix the template code base on the error: %v", err)), nil
 			}
@@ -156,34 +172,47 @@ func (c *createTemplateTool) GetHandler() server.ToolHandlerFunc {
 			UserId:               userId,
 		}
 
+		// Set ABI only for Ethereum contracts with successful compilation
+		if compilationResult != nil && args.ChainType == "ethereum" {
+			if abi, exists := compilationResult.Abi[args.ContractName]; exists {
+				// Convert the ABI to models.JSON format
+				if abiMap, ok := abi.(models.JSON); ok {
+					template.Abi = abiMap
+				} else {
+					// The ABI from compilation is an array, but models.JSON is a map
+					// Wrap the ABI array in a map structure to store it properly
+					template.Abi = models.JSON{
+						"abi": abi,
+					}
+				}
+			}
+		}
+
 		if err := c.templateService.CreateTemplate(template); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error creating template: %v", err)), nil
 		}
 
 		// Prepare result
-		result := map[string]interface{}{
-			"id":          template.ID,
-			"name":        template.Name,
-			"description": template.Description,
-			"chain_type":  template.ChainType,
-			"created_at":  template.CreatedAt,
-		}
-
-		// Include metadata if provided
-		if len(metadata) > 0 {
-			result["metadata"] = metadata
-			result["template_parameters"] = len(metadata)
+		result := CreateTemplateResult{
+			ID:          template.ID,
+			Name:        template.Name,
+			Description: template.Description,
+			ChainType:   template.ChainType,
 		}
 
 		// Add compilation information for Ethereum
 		if compilationResult != nil {
-			result["compilation_status"] = "success"
-			result["compiled_contracts"] = len(compilationResult.Bytecode)
 			var contractNames []string
 			for contractName := range compilationResult.Bytecode {
 				contractNames = append(contractNames, contractName)
 			}
-			result["contract_names"] = contractNames
+			result.ContractNames = contractNames
+		}
+
+		// Add metadata information
+		if len(metadata) > 0 {
+			result.TemplateParameters = len(metadata)
+			result.Metadata = metadata
 		}
 
 		// Format success message

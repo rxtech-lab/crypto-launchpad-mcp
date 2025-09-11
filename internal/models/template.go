@@ -15,6 +15,7 @@ type Template struct {
 	TemplateCode         string               `gorm:"type:text;not null" json:"template_code"`
 	Metadata             JSON                 `gorm:"type:text" json:"metadata"` // Template parameter definitions (key: empty value pairs)
 	SampleTemplateValues JSON                 `gorm:"type:text" json:"sample_template_values"`
+	Abi                  JSON                 `gorm:"type:text" json:"abi"`
 	CreatedAt            time.Time            `json:"created_at"`
 	UpdatedAt            time.Time            `json:"updated_at"`
 	DeletedAt            gorm.DeletedAt       `gorm:"index" json:"-"`

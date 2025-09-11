@@ -131,7 +131,8 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 			return mcp.NewToolResultError(fmt.Sprintf("Template values validation failed, make sure your template values matches %s", template.SampleTemplateValues)), nil
 		}
 
-		if activeChain.ChainType == models.TransactionChainTypeEthereum {
+		switch activeChain.ChainType {
+		case models.TransactionChainTypeEthereum:
 			// Render contract template
 			renderedContract, err := utils.RenderContractTemplate(template.TemplateCode, args.TemplateValues)
 			if err != nil {
@@ -160,7 +161,7 @@ func (l *launchTool) GetHandler() server.ToolHandlerFunc {
 					mcp.NewTextContent(url),
 				},
 			}, nil
-		} else if activeChain.ChainType == models.TransactionChainTypeSolana {
+		case models.TransactionChainTypeSolana:
 			// Solana not implemented yet
 			// Placeholder for future Solana implementation
 			sessionID := "solana-tx-session-placeholder"

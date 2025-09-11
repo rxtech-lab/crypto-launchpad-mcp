@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/rxtech-lab/launchpad-mcp/internal/constants"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
@@ -24,12 +24,20 @@ type UpdateTemplateArguments struct {
 	TemplateID string `json:"template_id" validate:"required"`
 
 	// Optional fields
-	Description      string                 `json:"description,omitempty"`
-	ChainType        string                 `json:"chain_type,omitempty"`
-	ContractName     string                 `json:"contract_name,omitempty"`
-	TemplateCode     string                 `json:"template_code,omitempty"`
-	TemplateMetadata string                 `json:"template_metadata,omitempty"`
-	TemplateValues   map[string]interface{} `json:"template_values,omitempty"`
+	Description      string         `json:"description,omitempty"`
+	ChainType        string         `json:"chain_type,omitempty"`
+	ContractName     string         `json:"contract_name,omitempty"`
+	TemplateCode     string         `json:"template_code,omitempty"`
+	TemplateMetadata string         `json:"template_metadata,omitempty"`
+	TemplateValues   map[string]any `json:"template_values,omitempty"`
+}
+
+type UpdateTemplateResult struct {
+	ID            uint                        `json:"id"`
+	Name          string                      `json:"name"`
+	Description   string                      `json:"description"`
+	ChainType     models.TransactionChainType `json:"chain_type"`
+	ContractNames []string                    `json:"contract_names"`
 }
 
 func NewUpdateTemplateTool(templateService services.TemplateService) *updateTemplateTool {
@@ -109,13 +117,20 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 			return mcp.NewToolResultError(fmt.Sprintf("Template not found: %v", err)), nil
 		}
 
-		// Track what's being updated
-		updates := make([]string, 0)
+		// Track which fields are being updated
+		var updatedFields []string
+
+		// Check if any updates are provided
+		hasUpdates := args.Description != "" || args.ChainType != "" || args.TemplateCode != "" || args.TemplateMetadata != "" || args.TemplateValues != nil
+
+		if !hasUpdates {
+			return mcp.NewToolResultError("No update parameters provided"), nil
+		}
 
 		// Update description if provided
 		if args.Description != "" {
 			template.Description = args.Description
-			updates = append(updates, "description")
+			updatedFields = append(updatedFields, "description")
 		}
 
 		// Update chain type if provided
@@ -123,23 +138,32 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 			if args.ChainType != "ethereum" && args.ChainType != "solana" {
 				return mcp.NewToolResultError("Invalid chain_type. Supported values: ethereum, solana"), nil
 			}
+
+			// Check if changing to Solana with template code update
+			if args.ChainType == "solana" && args.TemplateCode != "" {
+				return mcp.NewToolResultError("Cannot update template code when changing chain type to Solana"), nil
+			}
+
 			template.ChainType = models.TransactionChainType(args.ChainType)
-			updates = append(updates, "chain_type")
+			updatedFields = append(updatedFields, "chain_type")
 		}
 
 		// Update metadata if provided
 		if args.TemplateMetadata != "" {
 			template.Metadata = metadata
-			updates = append(updates, "metadata")
+			updatedFields = append(updatedFields, "metadata")
 		}
 
 		if args.TemplateValues != nil {
 			template.SampleTemplateValues = args.TemplateValues
-			updates = append(updates, "sample_template_values")
+			updatedFields = append(updatedFields, "template_values")
 		}
 
+		var compilationResult *utils.CompilationResult
 		// Update template code if provided
 		if args.TemplateCode != "" {
+			updatedFields = append(updatedFields, "template_code")
+
 			// Use the current or new chain type for validation
 			validationChainType := template.ChainType
 			if args.ChainType != "" {
@@ -147,31 +171,53 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 			}
 
 			// Validate template code using Solidity compiler for Ethereum
-			if validationChainType == "ethereum" {
+			switch validationChainType {
+			case "ethereum":
 				// For validation, use dummy values if TemplateValues not provided
 				templateValues := args.TemplateValues
+				if templateValues == nil {
+					// Use sample values from existing template or provide dummy ones
+					templateValues = template.SampleTemplateValues
+					if templateValues == nil {
+						templateValues = map[string]any{"TokenName": "TestToken", "TokenSymbol": "TEST", "InitialSupply": "1000"}
+					}
+				}
+
 				renderedCode, err := utils.RenderContractTemplate(args.TemplateCode, templateValues)
 				if err != nil {
 					return mcp.NewToolResultError(fmt.Sprintf("Error rendering template: %v", err)), nil
 				}
 
 				// Use Solidity version 0.8.27 for validation
-				_, err = utils.CompileSolidity("0.8.27", renderedCode)
+				result, err := utils.CompileSolidity(constants.SolidityCompilerVersion, renderedCode)
 				if err != nil {
 					return mcp.NewToolResultError(fmt.Sprintf("Solidity compilation failed: %v", err)), nil
 				}
-			} else if validationChainType == "solana" {
-				// Solana validation skipped - accept any template code
+
+				compilationResult = &result
+
+				// Update ABI if contract name provided and compilation successful
+				if args.ContractName != "" {
+					if abi, exists := compilationResult.Abi[args.ContractName]; exists {
+						// Convert the ABI to models.JSON format
+						if abiMap, ok := abi.(models.JSON); ok {
+							template.Abi = abiMap
+						} else {
+							// The ABI from compilation is an array, but models.JSON is a map
+							// Wrap the ABI array in a map structure to store it properly
+							template.Abi = models.JSON{
+								"abi": abi,
+							}
+						}
+					}
+				}
+			case "solana":
+				// Solana template code updates are not supported
+				return mcp.NewToolResultError("Solana template code updates are not supported"), nil
 			}
 
 			// Update the template code
 			template.TemplateCode = args.TemplateCode
-			updates = append(updates, "template_code")
-		}
-
-		// Check if any updates were provided
-		if len(updates) == 0 {
-			return mcp.NewToolResultError("No update parameters provided. Specify description, chain_type, template_code, or template_metadata"), nil
 		}
 
 		// Save updated template
@@ -185,21 +231,28 @@ func (u *updateTemplateTool) GetHandler() server.ToolHandlerFunc {
 			"name":           template.Name,
 			"description":    template.Description,
 			"chain_type":     template.ChainType,
-			"updated_at":     template.UpdatedAt,
-			"updated_fields": updates,
-			"message":        fmt.Sprintf("Template updated successfully. Fields updated: %v", updates),
+			"updated_fields": updatedFields,
+		}
+
+		// Add compilation information for Ethereum
+		if compilationResult != nil {
+			var contractNames []string
+			for contractName := range compilationResult.Abi {
+				contractNames = append(contractNames, contractName)
+			}
+			result["contract_names"] = contractNames
 		}
 
 		// Add metadata information if updated
-		if args.TemplateMetadata != "" && len(metadata) > 0 {
-			result["metadata"] = metadata
+		if args.TemplateMetadata != "" && metadata != nil && len(metadata) > 0 {
 			result["template_parameters"] = len(metadata)
+			result["metadata"] = metadata
 		}
 
-		// Format success message
+		// Format success message with updated fields
 		successMessage := "Template updated successfully"
-		if len(updates) > 0 {
-			successMessage += fmt.Sprintf(" (fields: %s)", strings.Join(updates, ", "))
+		if len(updatedFields) > 0 {
+			successMessage += " (" + fmt.Sprintf("updated: %v", updatedFields) + ")"
 		}
 
 		resultJSON, _ := json.Marshal(result)
