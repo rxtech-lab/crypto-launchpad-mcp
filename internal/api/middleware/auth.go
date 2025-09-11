@@ -38,14 +38,23 @@ func DefaultAuthConfig() AuthConfig {
 	}
 }
 
-// AuthMiddleware returns a Fiber middleware for Bearer token authentication
-func AuthMiddleware(config ...AuthConfig) fiber.Handler {
+// OauthAuthMiddleware returns a Fiber middleware for Bearer token authentication
+func OauthAuthMiddleware(config ...AuthConfig) fiber.Handler {
 	cfg := DefaultAuthConfig()
 	if len(config) > 0 {
 		cfg = config[0]
 	}
 
 	return func(c *fiber.Ctx) error {
+		// check if the ctx already has an authenticated user
+		if c.Locals(AuthenticatedUserContextKey) != nil {
+			return c.Next()
+		}
+
+		// skip /mcp routes
+		if strings.HasPrefix(c.Path(), "/mcp") {
+			return c.Next()
+		}
 		// skip /tx routes
 		if strings.HasPrefix(c.Path(), "/tx") {
 			return c.Next()

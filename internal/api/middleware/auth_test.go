@@ -92,7 +92,7 @@ func TestAuthMiddleware_UserStoredInContext(t *testing.T) {
 			app := fiber.New()
 
 			// Add the auth middleware
-			app.Use(AuthMiddleware(tt.config))
+			app.Use(OauthAuthMiddleware(tt.config))
 
 			// Add a test route that checks for the authenticated user in context
 			app.Get("/test", func(c *fiber.Ctx) error {
@@ -204,7 +204,7 @@ func TestAuthMiddleware_ResourceIDValidation(t *testing.T) {
 				TokenValidator: tt.tokenValidator,
 			}
 
-			app.Use(AuthMiddleware(config))
+			app.Use(OauthAuthMiddleware(config))
 
 			app.Get("/test", func(c *fiber.Ctx) error {
 				user := c.Locals(AuthenticatedUserContextKey)
@@ -261,7 +261,7 @@ func TestAuthMiddleware_WWWAuthenticateHeaders(t *testing.T) {
 				},
 			}
 
-			app.Use(AuthMiddleware(config))
+			app.Use(OauthAuthMiddleware(config))
 
 			app.Get("/test", func(c *fiber.Ctx) error {
 				return c.JSON(fiber.Map{"success": true})
@@ -361,7 +361,7 @@ func TestAuthMiddleware_IntegrationWithActualHandler(t *testing.T) {
 		},
 	}
 
-	app.Use(AuthMiddleware(config))
+	app.Use(OauthAuthMiddleware(config))
 
 	// Protected endpoint that requires admin role
 	app.Delete("/admin/users/:id", func(c *fiber.Ctx) error {
