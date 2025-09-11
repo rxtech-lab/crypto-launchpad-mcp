@@ -311,17 +311,21 @@ func (s *TokenDeploymentPageLoadTestSuite) TearDownSuite() {
 
 // Test runner functions that testify expects
 func TestTokenDeployment(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret")
 	suite.Run(t, new(TokenDeploymentTestSuite))
 }
 
 func TestTokenDeploymentErrorHandling(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret")
 	suite.Run(t, new(TokenDeploymentErrorTestSuite))
 }
 
 func TestTokenDeploymentWithoutWallet(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret")
 	suite.Run(t, new(TokenDeploymentWalletTestSuite))
 }
 
 func TestTokenDeploymentPageLoad(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret")
 	suite.Run(t, new(TokenDeploymentPageLoadTestSuite))
 }

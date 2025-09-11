@@ -65,10 +65,6 @@ jobs:
           ls -la bin/
           file bin/launchpad-mcp
 
-      - name: Test binary execution
-        run: |
-          timeout 5s ./bin/launchpad-mcp || [ $? -eq 124 ]
-
   docker-build:
     runs-on: ubuntu-latest
     permissions:

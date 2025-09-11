@@ -22,6 +22,7 @@ type StdioServerTestSuite struct {
 }
 
 func (suite *StdioServerTestSuite) SetupSuite() {
+	suite.T().Setenv("JWT_SECRET", "test-secret")
 	// Create in-memory database
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	suite.Require().NoError(err)

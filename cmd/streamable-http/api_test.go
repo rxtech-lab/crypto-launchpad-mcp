@@ -24,6 +24,7 @@ type StreamableHTTPTestSuite struct {
 
 func (suite *StreamableHTTPTestSuite) SetupSuite() {
 	// Create in-memory database
+	suite.T().Setenv("JWT_SECRET", "test-secret")
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	suite.Require().NoError(err)
 	suite.db = db

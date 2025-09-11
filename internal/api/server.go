@@ -28,6 +28,7 @@ type APIServer struct {
 	chainService          services.ChainService
 	mcpServer             *mcp.MCPServer
 	authenticator         *utils.JwtAuthenticator
+	simpleAuthenticator   *utils.SimpleJwtAuthenticator
 	port                  int
 	authenticationEnabled bool
 }
@@ -44,7 +45,8 @@ func NewAPIServer(dbService services.DBService, txService services.TransactionSe
 		TimeFormat: "15:04:05",
 		TimeZone:   "Local",
 	}))
-	// Get JWKS URI from environment variable
+
+	// Get JWKS URI from environment variable (OAuth fallback)
 	jwksUri := os.Getenv("SCALEKIT_ENV_URL")
 	var authenticator *utils.JwtAuthenticator
 	if jwksUri != "" {
@@ -52,16 +54,22 @@ func NewAPIServer(dbService services.DBService, txService services.TransactionSe
 		authenticator = &auth
 		log.Printf("JWT authenticator initialized with JWKS URI: %s", jwksUri)
 	} else {
-		log.Println("Warning: SCALEKIT_ENV_URL not set, JWT authentication disabled")
+		log.Println("Warning: SCALEKIT_ENV_URL not set, OAuth JWT authentication disabled")
+	}
+
+	simpleAuthenticator, err := utils.NewSimpleJwtAuthenticator(os.Getenv("JWT_SECRET"))
+	if err != nil {
+		log.Fatalf("Failed to initialize simple JWT authenticator: %v", err)
 	}
 
 	server := &APIServer{
-		app:           app,
-		dbService:     dbService,
-		txService:     txService,
-		hookService:   hookService,
-		chainService:  chainService,
-		authenticator: authenticator,
+		app:                 app,
+		dbService:           dbService,
+		txService:           txService,
+		hookService:         hookService,
+		chainService:        chainService,
+		authenticator:       authenticator,
+		simpleAuthenticator: &simpleAuthenticator,
 	}
 	return server
 }
@@ -81,6 +89,12 @@ func (s *APIServer) SetupRoutes() {
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(map[string]string{"status": "ok"})
 	})
+
+	s.app.Get("/authentication", func(c *fiber.Ctx) error {
+		// return the authenticated user
+		authenticatedUser := c.Locals(middleware.AuthenticatedUserContextKey).(*utils.AuthenticatedUser)
+		return c.JSON(map[string]interface{}{"status": "ok", "authenticatedUser": authenticatedUser})
+	})
 }
 
 func (s *APIServer) EnableAuthentication() {
@@ -90,7 +104,11 @@ func (s *APIServer) EnableAuthentication() {
 	// oauth routes
 	s.app.Get("/.well-known/oauth-protected-resource/mcp", s.handleOAuthProtectedResource)
 	// Add authentication middleware to all routes
-	s.app.Use(middleware.AuthMiddleware(middleware.AuthConfig{
+	s.app.Use(middleware.JwtAuthMiddleware(
+		s.simpleAuthenticator,
+	))
+
+	s.app.Use(middleware.OauthAuthMiddleware(middleware.AuthConfig{
 		SkipWellKnown: true,
 		TokenValidator: func(token string, audience []string) (*utils.AuthenticatedUser, error) {
 			if s.authenticator != nil {
@@ -217,22 +235,30 @@ func (s *APIServer) createAuthenticatedMCPHandler(streamableServer *server.Strea
 			})
 		}
 
-		// Validate token if authenticator is available
-		if authenticator != nil {
+		// Try simple JWT authenticator first
+		if s.simpleAuthenticator != nil {
+			if user, err := s.simpleAuthenticator.ValidateToken(token); err == nil {
+				authenticatedUser = user
+				log.Printf("MCP request authenticated with simple JWT for user: %s", user.Sub)
+			} else {
+				log.Printf("Simple JWT validation failed, trying OAuth: %v", err)
+			}
+		}
+
+		// Fallback to OAuth JWT authenticator if simple JWT failed
+		if authenticatedUser == nil && authenticator != nil {
 			if user, err := authenticator.ValidateToken(token); err == nil {
 				authenticatedUser = user
-				log.Printf("MCP request authenticated as user: %s", user.Sub)
+				log.Printf("MCP request authenticated with OAuth JWT for user: %s", user.Sub)
 			} else {
-				log.Printf("MCP authentication failed: %v", err)
-				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-					"error": "Invalid token",
-				})
+				log.Printf("OAuth JWT validation failed: %v", err)
 			}
-		} else {
-			// No authenticator configured, but we still require a token to be present
-			// This maintains security by default even when JWT validation is disabled
+		}
+
+		// If no authentication succeeded, return error
+		if authenticatedUser == nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Authentication not configured",
+				"error": "Invalid token",
 			})
 		}
 

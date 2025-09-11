@@ -45,6 +45,7 @@ type TxHandlerTestSuite struct {
 }
 
 func (suite *TxHandlerTestSuite) SetupSuite() {
+	suite.T().Setenv("JWT_SECRET", "test-secret")
 	// Initialize in-memory database
 	db, err := services.NewSqliteDBService(":memory:")
 	suite.Require().NoError(err)
