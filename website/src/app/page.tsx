@@ -50,7 +50,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <section className="relative px-4 pt-32 pb-20 overflow-hidden">
+      <section className="relative px-4 pt-20 pb-20 overflow-hidden">
         <div className="container mx-auto max-w-6xl">
           <HeroSection
             subtitle="AI-Powered Token Launchpad"
@@ -67,10 +67,14 @@ export default async function Home() {
       />
 
       {/* Features Section */}
-      <FeaturesGrid features={features} />
+      <section id="features">
+        <FeaturesGrid features={features} />
+      </section>
 
       {/* Installation Section */}
-      <QuickStartSection />
+      <section id="installation">
+        <QuickStartSection />
+      </section>
 
       {/* CTA Section */}
       <CTASection />
