@@ -67,12 +67,7 @@ func NewAPIServer(dbService services.DBService, txService services.TransactionSe
 
 	var mcprouterAuthenticator *auth.ApikeyAuthenticator
 	if os.Getenv("MCPROUTER_SERVER_URL") != "" {
-		mcprouterAuthenticator := auth.NewApikeyAuthenticator(os.Getenv("MCPROUTER_SERVER_URL"), http.DefaultClient)
-		if err != nil {
-			log.Fatalf("Failed to initialize MCPRouter authenticator: %v", err)
-		} else {
-			mcprouterAuthenticator = mcprouterAuthenticator
-		}
+		mcprouterAuthenticator = auth.NewApikeyAuthenticator(os.Getenv("MCPROUTER_SERVER_URL"), http.DefaultClient)
 	}
 
 	server := &APIServer{
@@ -116,6 +111,7 @@ func (s *APIServer) EnableAuthentication() {
 	s.authenticationEnabled = true
 
 	if s.mcprouterAuthenticator != nil {
+		log.Printf("MCPRouter authenticator enabled")
 		s.app.Use(auth2.FiberApikeyMiddleware(s.mcprouterAuthenticator, os.Getenv("MCPROUTER_SERVER_API_KEY"), func(c *fiber.Ctx, user *types.User) error {
 			// Store user in context for later use - adapt types.User to utils.AuthenticatedUser
 			authenticatedUser := &utils.AuthenticatedUser{
