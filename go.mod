@@ -1,17 +1,18 @@
 module github.com/rxtech-lab/launchpad-mcp
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/chromedp/chromedp v0.14.1
 	github.com/ethereum/go-ethereum v1.15.11
 	github.com/go-playground/validator/v10 v10.27.0
-	github.com/gofiber/fiber/v2 v2.52.5
+	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/mark3labs/mcp-go v0.37.0
+	github.com/rxtech-lab/mcprouter-authenticator v1.0.4
 	github.com/rxtech-lab/solc-go v0.1.2
 	github.com/stretchr/testify v1.10.0
 	gorm.io/driver/postgres v1.6.0
@@ -22,7 +23,7 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
-	github.com/andybalholm/brotli v1.0.5 // indirect
+	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -57,7 +58,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/klauspost/compress v1.17.0 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.3 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
@@ -67,7 +68,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/orisano/pixelmatch v0.0.0-20230914042517-fa304d1dc785 // indirect

@@ -13,6 +13,11 @@ import (
 // Always calls next() - never blocks requests
 func JwtAuthMiddleware(authenticator *utils.SimpleJwtAuthenticator) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		// check if the ctx already has an authenticated user
+		if c.Locals(AuthenticatedUserContextKey) != nil {
+			return c.Next()
+		}
+
 		// Skip if no authenticator configured
 		if authenticator == nil {
 			return c.Next()

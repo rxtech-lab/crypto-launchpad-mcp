@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
@@ -18,19 +17,23 @@ import (
 	"github.com/rxtech-lab/launchpad-mcp/internal/mcp"
 	"github.com/rxtech-lab/launchpad-mcp/internal/services"
 	"github.com/rxtech-lab/launchpad-mcp/internal/utils"
+	auth "github.com/rxtech-lab/mcprouter-authenticator/authenticator"
+	auth2 "github.com/rxtech-lab/mcprouter-authenticator/middleware"
+	"github.com/rxtech-lab/mcprouter-authenticator/types"
 )
 
 type APIServer struct {
-	app                   *fiber.App
-	dbService             services.DBService
-	txService             services.TransactionService
-	hookService           services.HookService
-	chainService          services.ChainService
-	mcpServer             *mcp.MCPServer
-	authenticator         *utils.JwtAuthenticator
-	simpleAuthenticator   *utils.SimpleJwtAuthenticator
-	port                  int
-	authenticationEnabled bool
+	app                    *fiber.App
+	dbService              services.DBService
+	txService              services.TransactionService
+	hookService            services.HookService
+	chainService           services.ChainService
+	mcpServer              *mcp.MCPServer
+	authenticator          *utils.JwtAuthenticator
+	simpleAuthenticator    *utils.SimpleJwtAuthenticator
+	mcprouterAuthenticator *auth.ApikeyAuthenticator
+	port                   int
+	authenticationEnabled  bool
 }
 
 func NewAPIServer(dbService services.DBService, txService services.TransactionService, hookService services.HookService, chainService services.ChainService) *APIServer {
@@ -62,14 +65,25 @@ func NewAPIServer(dbService services.DBService, txService services.TransactionSe
 		log.Fatalf("Failed to initialize simple JWT authenticator: %v", err)
 	}
 
+	var mcprouterAuthenticator *auth.ApikeyAuthenticator
+	if os.Getenv("MCPROUTER_SERVER_URL") != "" {
+		mcprouterAuthenticator := auth.NewApikeyAuthenticator(os.Getenv("MCPROUTER_SERVER_URL"), http.DefaultClient)
+		if err != nil {
+			log.Fatalf("Failed to initialize MCPRouter authenticator: %v", err)
+		} else {
+			mcprouterAuthenticator = mcprouterAuthenticator
+		}
+	}
+
 	server := &APIServer{
-		app:                 app,
-		dbService:           dbService,
-		txService:           txService,
-		hookService:         hookService,
-		chainService:        chainService,
-		authenticator:       authenticator,
-		simpleAuthenticator: &simpleAuthenticator,
+		app:                    app,
+		dbService:              dbService,
+		txService:              txService,
+		hookService:            hookService,
+		chainService:           chainService,
+		authenticator:          authenticator,
+		simpleAuthenticator:    &simpleAuthenticator,
+		mcprouterAuthenticator: mcprouterAuthenticator,
 	}
 	return server
 }
@@ -100,6 +114,19 @@ func (s *APIServer) SetupRoutes() {
 func (s *APIServer) EnableAuthentication() {
 	// Set authentication enabled state
 	s.authenticationEnabled = true
+
+	if s.mcprouterAuthenticator != nil {
+		s.app.Use(auth2.FiberApikeyMiddleware(s.mcprouterAuthenticator, os.Getenv("MCPROUTER_SERVER_API_KEY"), func(c *fiber.Ctx, user *types.User) error {
+			// Store user in context for later use - adapt types.User to utils.AuthenticatedUser
+			authenticatedUser := &utils.AuthenticatedUser{
+				Sub:   user.ID,
+				Roles: []string{user.Role}, // Map single role to roles array
+			}
+			// Store the adapted AuthenticatedUser instead of the raw types.User
+			c.Locals(middleware.AuthenticatedUserContextKey, authenticatedUser)
+			return nil
+		}))
+	}
 
 	// oauth routes
 	s.app.Get("/.well-known/oauth-protected-resource/mcp", s.handleOAuthProtectedResource)
@@ -215,53 +242,13 @@ func (s *APIServer) handleSigningAppCSS(c *fiber.Ctx) error {
 // and passes authenticated context to the MCP streamable HTTP server
 func (s *APIServer) createAuthenticatedMCPHandler(streamableServer *server.StreamableHTTPServer, authenticator *utils.JwtAuthenticator) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Extract Bearer token from Authorization header
-		authHeader := c.Get("Authorization")
-		var authenticatedUser *utils.AuthenticatedUser
-
-		// Check if Authorization header is present
-		if !strings.HasPrefix(authHeader, "Bearer ") {
+		user := c.Locals(middleware.AuthenticatedUserContextKey)
+		if user == nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Authorization header required",
+				"error": "Unauthorized",
 			})
 		}
-
-		token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
-
-		// Check if token is empty
-		if token == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid token",
-			})
-		}
-
-		// Try simple JWT authenticator first
-		if s.simpleAuthenticator != nil {
-			if user, err := s.simpleAuthenticator.ValidateToken(token); err == nil {
-				authenticatedUser = user
-				log.Printf("MCP request authenticated with simple JWT for user: %s", user.Sub)
-			} else {
-				log.Printf("Simple JWT validation failed, trying OAuth: %v", err)
-			}
-		}
-
-		// Fallback to OAuth JWT authenticator if simple JWT failed
-		if authenticatedUser == nil && authenticator != nil {
-			if user, err := authenticator.ValidateToken(token); err == nil {
-				authenticatedUser = user
-				log.Printf("MCP request authenticated with OAuth JWT for user: %s", user.Sub)
-			} else {
-				log.Printf("OAuth JWT validation failed: %v", err)
-			}
-		}
-
-		// If no authentication succeeded, return error
-		if authenticatedUser == nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid token",
-			})
-		}
-
+		authenticatedUser := user.(*utils.AuthenticatedUser)
 		// Create a custom HTTP handler that injects authentication context
 		httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
