@@ -65,6 +65,10 @@ func OauthAuthMiddleware(config ...AuthConfig) fiber.Handler {
 			return c.Next()
 		}
 
+		if strings.HasPrefix(c.Path(), "/api/tx") {
+			return c.Next()
+		}
+
 		// skip /health route
 		if c.Path() == "/health" {
 			return c.Next()
