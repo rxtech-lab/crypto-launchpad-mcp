@@ -107,11 +107,6 @@ type AuthTestSuite struct {
 
 func (s *AuthTestSuite) SetupSuite() {
 	s.setup = NewTestSetup(s.T())
-
-	// Verify Ethereum connection is available for tests
-	err := s.setup.VerifyEthereumConnection()
-	s.Require().NoError(err, "Ethereum testnet should be running on localhost:8545 (run 'make e2e-network')")
-
 	// Setup authentication helper
 	s.authHelper = NewAuthTestHelper(s.T())
 
@@ -237,6 +232,24 @@ func (s *AuthTestSuite) TestJWTAuth_TransactionAPI_ValidToken() {
 	body, err := io.ReadAll(resp.Body)
 	s.Require().NoError(err)
 	s.T().Log(string(body))
+	s.Equal(http.StatusOK, resp.StatusCode)
+
+}
+
+func (s *AuthTestSuite) TestJWTAuth_ShouldBeAbleToGetStaticAssets() {
+	// /static/tx/app.js
+	//static/tx/app.css
+
+	resp, err := s.makeRequest("GET", "/static/tx/app.js", "", nil)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+
+	s.Equal(http.StatusOK, resp.StatusCode)
+
+	resp, err = s.makeRequest("GET", "/static/tx/app.css", "", nil)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+
 	s.Equal(http.StatusOK, resp.StatusCode)
 
 }
