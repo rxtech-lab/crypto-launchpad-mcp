@@ -252,6 +252,11 @@ func (s *AuthTestSuite) TestJWTAuth_ShouldBeAbleToGetStaticAssets() {
 
 	s.Equal(http.StatusOK, resp.StatusCode)
 
+	resp, err = s.makeRequest("POST", "/api/tx/123/transaction/0", "", nil)
+	s.Require().NoError(err)
+	// We should be able to access the api/tx endpoint without authentication
+	s.NotEqual(http.StatusUnauthorized, resp.StatusCode)
+	defer resp.Body.Close()
 }
 
 func TestAuthSuite(t *testing.T) {
