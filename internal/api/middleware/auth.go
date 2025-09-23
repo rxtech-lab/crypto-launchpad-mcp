@@ -60,6 +60,11 @@ func OauthAuthMiddleware(config ...AuthConfig) fiber.Handler {
 			return c.Next()
 		}
 
+		// skip /static routes
+		if strings.HasPrefix(c.Path(), "/static") {
+			return c.Next()
+		}
+
 		// skip /health route
 		if c.Path() == "/health" {
 			return c.Next()

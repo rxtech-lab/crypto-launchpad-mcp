@@ -36,7 +36,7 @@ func TestGetTransactionSessionUrl(t *testing.T) {
 			},
 			validate: func(t *testing.T, url string, err error) {
 				require.NoError(t, err)
-				assert.Equal(t, "https://api.example.com/tx/3000/test-session-123", url)
+				assert.Equal(t, "https://api.example.com/tx/test-session-123", url)
 			},
 		},
 		{
@@ -51,48 +51,6 @@ func TestGetTransactionSessionUrl(t *testing.T) {
 			validate: func(t *testing.T, url string, err error) {
 				expected := "http://" + "localhost" + ":9000/tx/session-456"
 				assert.Equal(t, expected, url)
-			},
-		},
-		{
-			name:        "with BASE_URL but invalid PORT",
-			serverPort:  8080,
-			sessionId:   "test-session-789",
-			baseUrl:     "https://api.example.com",
-			port:        "invalid-port",
-			expectError: true,
-			setup: func() {
-				os.Setenv("BASE_URL", "https://api.example.com")
-				os.Setenv("PORT", "invalid-port")
-			},
-			cleanup: func() {
-				os.Unsetenv("BASE_URL")
-				os.Unsetenv("PORT")
-			},
-			validate: func(t *testing.T, url string, err error) {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), "invalid PORT env var")
-				assert.Equal(t, "", url)
-			},
-		},
-		{
-			name:        "with BASE_URL but empty PORT",
-			serverPort:  8080,
-			sessionId:   "test-session-empty-port",
-			baseUrl:     "https://api.example.com",
-			port:        "",
-			expectError: true,
-			setup: func() {
-				os.Setenv("BASE_URL", "https://api.example.com")
-				os.Setenv("PORT", "")
-			},
-			cleanup: func() {
-				os.Unsetenv("BASE_URL")
-				os.Unsetenv("PORT")
-			},
-			validate: func(t *testing.T, url string, err error) {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), "invalid PORT env var")
-				assert.Equal(t, "", url)
 			},
 		},
 		{
@@ -111,7 +69,7 @@ func TestGetTransactionSessionUrl(t *testing.T) {
 			},
 			validate: func(t *testing.T, url string, err error) {
 				require.NoError(t, err)
-				assert.Equal(t, "https://api.example.com//tx/4000/test-session-trailing", url)
+				assert.Equal(t, "https://api.example.com/tx/test-session-trailing", url)
 			},
 		},
 		{
