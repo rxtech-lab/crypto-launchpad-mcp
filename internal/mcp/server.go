@@ -104,6 +104,9 @@ func (s *MCPServer) InitializeTools(dbService services.DBService, serverPort int
 	getUniswapAddressesTool, getUniswapAddressesHandler := tools.NewGetUniswapAddressesTool(uniswapService, chainService)
 	srv.AddTool(getUniswapAddressesTool, getUniswapAddressesHandler)
 
+	setUniswapAddressesTool := tools.NewSetUniswapAddressesTool(uniswapService, chainService)
+	srv.AddTool(setUniswapAddressesTool.GetTool(), setUniswapAddressesTool.GetHandler())
+
 	// Liquidity Management Tools
 	createLiquidityPoolTool := tools.NewCreateLiquidityPoolTool(chainService, serverPort, evmService, txService, liquidityService, uniswapService)
 	srv.AddTool(createLiquidityPoolTool.GetTool(), createLiquidityPoolTool.GetHandler())
@@ -210,31 +213,34 @@ func getToolInstructions(category string) string {
 1. deploy_uniswap - Deploy Uniswap infrastructure contracts (factory, router, WETH)
    Usage: Deploy complete Uniswap V2 infrastructure to enable trading
 
-2. set_uniswap_version - Configure Uniswap version and contract addresses
-   Usage: Set Uniswap version (v2/v3/v4) and all required contract addresses
-
-3. get_uniswap_addresses - Get current Uniswap configuration
+2. get_uniswap_addresses - Get current Uniswap configuration
    Usage: Retrieve the active Uniswap version and contract addresses
 
-4. create_liquidity_pool - Create new liquidity pool with signing interface
+3. set_uniswap_addresses - Set or update Uniswap contract addresses
+   Usage: Manually configure factory, router, and WETH addresses for externally deployed contracts
+
+4. remove_uniswap_deployment - Remove Uniswap deployments by IDs
+   Usage: Delete one or multiple Uniswap deployment records
+
+5. create_liquidity_pool - Create new liquidity pool with signing interface
    Usage: Initialize new trading pairs on Uniswap
 
-5. add_liquidity - Add liquidity to existing pool with signing interface
+6. add_liquidity - Add liquidity to existing pool with signing interface
    Usage: Provide liquidity to earn trading fees
 
-6. remove_liquidity - Remove liquidity from pool with signing interface
+7. remove_liquidity - Remove liquidity from pool with signing interface
    Usage: Withdraw liquidity positions
 
-7. swap_tokens - Execute token swaps with signing interface
+8. swap_tokens - Execute token swaps with signing interface
    Usage: Trade tokens through Uniswap
 
-8. get_pool_info - Retrieve pool metrics (read-only)
+9. get_pool_info - Retrieve pool metrics (read-only)
    Usage: Get current pool statistics and information
 
-9. get_swap_quote - Get swap estimates and price impact (read-only)
-   Usage: Calculate swap amounts and price impact before trading
+10. get_swap_quote - Get swap estimates and price impact (read-only)
+    Usage: Calculate swap amounts and price impact before trading
 
-10. monitor_pool - Real-time pool monitoring and event tracking (read-only)
+11. monitor_pool - Real-time pool monitoring and event tracking (read-only)
     Usage: Track pool activity and events`
 
 	case "balance":
@@ -250,7 +256,7 @@ func getToolInstructions(category string) string {
 	case "all":
 		return `Crypto Launchpad MCP Tools Overview:
 
-This MCP server provides 20 tools for managing cryptocurrency token deployments and Uniswap operations:
+This MCP server provides 21 tools for managing cryptocurrency token deployments and Uniswap operations:
 
 CHAIN MANAGEMENT (3 tools):
 - list_chains: List all configured blockchain chains
@@ -269,10 +275,11 @@ DEPLOYMENT (3 tools):
 - list_deployments: View all deployed contracts
 - call_function: Call smart contract functions using deployment ID and ABI
 
-UNISWAP INTEGRATION (10 tools):
+UNISWAP INTEGRATION (11 tools):
 - deploy_uniswap: Deploy Uniswap infrastructure contracts
-- set_uniswap_version: Configure Uniswap version and addresses
 - get_uniswap_addresses: Get current Uniswap configuration
+- set_uniswap_addresses: Set or update Uniswap contract addresses
+- remove_uniswap_deployment: Remove Uniswap deployments by IDs
 - create_liquidity_pool: Create new pools
 - add_liquidity: Provide liquidity
 - remove_liquidity: Withdraw liquidity
