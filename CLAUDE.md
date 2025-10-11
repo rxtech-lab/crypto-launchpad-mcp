@@ -9,12 +9,12 @@ Crypto Launchpad MCP server built in Go for cryptocurrency token deployments and
 - **Database**: GORM + SQLite (`~/launchpad.db`)
 - **Frontend**: HTMX + Tailwind CSS with EIP-6963 wallet discovery
 
-## Tools (18 total)
+## Tools (19 total)
 
-**Chain**: `select_chain`, `set_chain`  
-**Templates**: `list_template`, `create_template`, `update_template`, `delete_template`  
-**Deployment**: `launch`, `list_deployments`  
-**Uniswap**: `deploy_uniswap`, `remove_uniswap_deployment`, `set_uniswap_version`, `get_uniswap_addresses`, `create_liquidity_pool`, `add_liquidity`, `remove_liquidity`, `swap_tokens`, `get_pool_info`, `get_swap_quote`, `monitor_pool`  
+**Chain**: `select_chain`, `set_chain`, `list_chains`
+**Templates**: `list_template`, `create_template`, `update_template`, `delete_template`, `view_template`
+**Deployment**: `launch`, `list_deployments`, `call_function`
+**Uniswap**: `deploy_uniswap`, `get_uniswap_addresses`, `set_uniswap_addresses`, `remove_uniswap_deployment`, `create_liquidity_pool`, `add_liquidity`, `remove_liquidity`, `swap_tokens`, `get_pool_info`, `get_swap_quote`, `monitor_pool`
 **Balance**: `query_balance`
 
 ## Development Commands
