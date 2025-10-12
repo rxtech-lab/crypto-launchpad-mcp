@@ -70,33 +70,29 @@ func (suite *AddDeploymentTestSuite) setupTestChain() {
 }
 
 func (suite *AddDeploymentTestSuite) setupTestTemplate() {
-	contractCode := `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
-
-contract TestToken {
-    string public name = "{{.TokenName}}";
-    string public symbol = "{{.TokenSymbol}}";
-}`
-
-	template := &models.Template{
-		Name:         "TestToken",
-		Description:  "A test token template",
-		ChainType:    models.TransactionChainTypeEthereum,
-		TemplateCode: contractCode,
-		SampleTemplateValues: map[string]any{
-			"TokenName":   "Test",
-			"TokenSymbol": "TST",
-		},
-	}
-
-	err := suite.templateService.CreateTemplate(template)
-	suite.Require().NoError(err)
-	suite.template = template
+	// Not needed anymore since templates are auto-created
+	// But keep for backward compatibility with some tests
 }
 
 func (suite *AddDeploymentTestSuite) cleanupTestData() {
-	// Clean up deployments
+	// Clean up deployments and templates
 	suite.db.GetDB().Where("1 = 1").Delete(&models.Deployment{})
+	suite.db.GetDB().Where("1 = 1").Delete(&models.Template{})
+}
+
+func (suite *AddDeploymentTestSuite) getTestContractCode() string {
+	return `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract TestToken {
+    string public name;
+    string public symbol;
+
+    constructor(string memory _name, string memory _symbol) {
+        name = _name;
+        symbol = _symbol;
+    }
+}`
 }
 
 // TestGetTool tests the tool definition
@@ -109,25 +105,24 @@ func (suite *AddDeploymentTestSuite) TestGetTool() {
 
 	// Verify required parameters
 	properties := tool.InputSchema.Properties
-	suite.Contains(properties, "template_id")
+	suite.Contains(properties, "contract_code")
 	suite.Contains(properties, "chain_id")
 	suite.Contains(properties, "contract_address")
-	suite.Contains(properties, "transaction_hash")
-	suite.Contains(properties, "deployer_address")
+	suite.Contains(properties, "owner_address")
 
 	// Verify optional parameters
-	suite.Contains(properties, "status")
+	suite.Contains(properties, "transaction_hash")
 	suite.Contains(properties, "template_values")
-	suite.Contains(properties, "session_id")
-	suite.Contains(properties, "user_id")
+	suite.Contains(properties, "solc_version")
+	suite.Contains(properties, "template_name")
+	suite.Contains(properties, "description")
 
 	// Verify required fields
 	required := tool.InputSchema.Required
-	suite.Contains(required, "template_id")
+	suite.Contains(required, "contract_code")
 	suite.Contains(required, "chain_id")
 	suite.Contains(required, "contract_address")
-	suite.Contains(required, "transaction_hash")
-	suite.Contains(required, "deployer_address")
+	suite.Contains(required, "owner_address")
 }
 
 // TestHandlerSuccess tests successful deployment creation
@@ -135,11 +130,11 @@ func (suite *AddDeploymentTestSuite) TestHandlerSuccess() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"template_id":      fmt.Sprintf("%d", suite.template.ID),
+				"contract_code":    suite.getTestContractCode(),
 				"chain_id":         fmt.Sprintf("%d", suite.chain.ID),
 				"contract_address": "0x1234567890123456789012345678901234567890",
+				"owner_address":    "0x9876543210987654321098765432109876543210",
 				"transaction_hash": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-				"deployer_address": "0x9876543210987654321098765432109876543210",
 			},
 		},
 	}
@@ -156,7 +151,7 @@ func (suite *AddDeploymentTestSuite) TestHandlerSuccess() {
 		err = json.Unmarshal([]byte(textContent.Text), &response)
 		suite.NoError(err)
 		suite.NotNil(response["id"])
-		suite.Equal(float64(suite.template.ID), response["template_id"])
+		suite.NotNil(response["template_id"])
 		suite.Equal(float64(suite.chain.ID), response["chain_id"])
 		suite.Equal("0x1234567890123456789012345678901234567890", response["contract_address"])
 		suite.Equal("0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd", response["transaction_hash"])
@@ -168,6 +163,13 @@ func (suite *AddDeploymentTestSuite) TestHandlerSuccess() {
 	deployments, err := suite.deploymentService.ListDeployments()
 	suite.NoError(err)
 	suite.Len(deployments, 1)
+	suite.NotEmpty(deployments[0].SessionId) // Session ID should be auto-generated
+
+	// Verify template was auto-created
+	templates, err := suite.templateService.ListTemplates(nil, "", "", 0)
+	suite.NoError(err)
+	suite.Len(templates, 1)
+	suite.Equal("TestToken", templates[0].Name)
 }
 
 // TestHandlerWithTemplateValues tests deployment creation with template values
@@ -175,11 +177,11 @@ func (suite *AddDeploymentTestSuite) TestHandlerWithTemplateValues() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"template_id":      fmt.Sprintf("%d", suite.template.ID),
+				"contract_code":    suite.getTestContractCode(),
 				"chain_id":         fmt.Sprintf("%d", suite.chain.ID),
 				"contract_address": "0x1234567890123456789012345678901234567890",
+				"owner_address":    "0x9876543210987654321098765432109876543210",
 				"transaction_hash": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-				"deployer_address": "0x9876543210987654321098765432109876543210",
 				"template_values": map[string]any{
 					"TokenName":   "MyToken",
 					"TokenSymbol": "MTK",
@@ -206,17 +208,16 @@ func (suite *AddDeploymentTestSuite) TestHandlerWithTemplateValues() {
 	}
 }
 
-// TestHandlerWithCustomStatus tests deployment creation with custom status
-func (suite *AddDeploymentTestSuite) TestHandlerWithCustomStatus() {
+// TestHandlerDefaultStatus tests that deployment is created with confirmed status by default
+func (suite *AddDeploymentTestSuite) TestHandlerDefaultStatus() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"template_id":      fmt.Sprintf("%d", suite.template.ID),
+				"contract_code":    suite.getTestContractCode(),
 				"chain_id":         fmt.Sprintf("%d", suite.chain.ID),
 				"contract_address": "0x1234567890123456789012345678901234567890",
+				"owner_address":    "0x9876543210987654321098765432109876543210",
 				"transaction_hash": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-				"deployer_address": "0x9876543210987654321098765432109876543210",
-				"status":           "pending",
 			},
 		},
 	}
@@ -231,7 +232,7 @@ func (suite *AddDeploymentTestSuite) TestHandlerWithCustomStatus() {
 		var response map[string]interface{}
 		err = json.Unmarshal([]byte(textContent.Text), &response)
 		suite.NoError(err)
-		suite.Equal("pending", response["status"])
+		suite.Equal("confirmed", response["status"])
 	}
 }
 
@@ -246,11 +247,11 @@ func (suite *AddDeploymentTestSuite) TestHandlerWithAuthenticatedUser() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"template_id":      fmt.Sprintf("%d", suite.template.ID),
+				"contract_code":    suite.getTestContractCode(),
 				"chain_id":         fmt.Sprintf("%d", suite.chain.ID),
 				"contract_address": "0x1234567890123456789012345678901234567890",
+				"owner_address":    "0x9876543210987654321098765432109876543210",
 				"transaction_hash": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-				"deployer_address": "0x9876543210987654321098765432109876543210",
 			},
 		},
 	}
@@ -269,16 +270,15 @@ func (suite *AddDeploymentTestSuite) TestHandlerWithAuthenticatedUser() {
 	}
 }
 
-// TestHandlerInvalidTemplateID tests error handling for invalid template ID
-func (suite *AddDeploymentTestSuite) TestHandlerInvalidTemplateID() {
+// TestHandlerInvalidContractCode tests error handling for invalid contract code
+func (suite *AddDeploymentTestSuite) TestHandlerInvalidContractCode() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"template_id":      "999",
+				"contract_code":    "invalid solidity code",
 				"chain_id":         fmt.Sprintf("%d", suite.chain.ID),
 				"contract_address": "0x1234567890123456789012345678901234567890",
-				"transaction_hash": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-				"deployer_address": "0x9876543210987654321098765432109876543210",
+				"owner_address":    "0x9876543210987654321098765432109876543210",
 			},
 		},
 	}
@@ -289,7 +289,7 @@ func (suite *AddDeploymentTestSuite) TestHandlerInvalidTemplateID() {
 	suite.NoError(err)
 	suite.True(result.IsError)
 	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
-		suite.Contains(textContent.Text, "Template not found")
+		suite.Contains(textContent.Text, "Failed to compile contract")
 	}
 }
 
@@ -298,11 +298,10 @@ func (suite *AddDeploymentTestSuite) TestHandlerInvalidChainID() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"template_id":      fmt.Sprintf("%d", suite.template.ID),
+				"contract_code":    suite.getTestContractCode(),
 				"chain_id":         "999",
 				"contract_address": "0x1234567890123456789012345678901234567890",
-				"transaction_hash": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-				"deployer_address": "0x9876543210987654321098765432109876543210",
+				"owner_address":    "0x9876543210987654321098765432109876543210",
 			},
 		},
 	}
@@ -317,52 +316,17 @@ func (suite *AddDeploymentTestSuite) TestHandlerInvalidChainID() {
 	}
 }
 
-// TestHandlerChainTypeMismatch tests error handling for chain type mismatch
-func (suite *AddDeploymentTestSuite) TestHandlerChainTypeMismatch() {
-	// Create a Solana chain
-	solanaChain := &models.Chain{
-		ChainType: models.TransactionChainTypeSolana,
-		RPC:       "http://localhost:8899",
-		NetworkID: "solana-testnet",
-		Name:      "Solana Testnet",
-		IsActive:  false,
-	}
-	err := suite.chainService.CreateChain(solanaChain)
-	suite.Require().NoError(err)
-
+// TestHandlerWithCustomTemplateName tests deployment with custom template name
+func (suite *AddDeploymentTestSuite) TestHandlerWithCustomTemplateName() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"template_id":      fmt.Sprintf("%d", suite.template.ID), // Ethereum template
-				"chain_id":         fmt.Sprintf("%d", solanaChain.ID),    // Solana chain
-				"contract_address": "0x1234567890123456789012345678901234567890",
-				"transaction_hash": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-				"deployer_address": "0x9876543210987654321098765432109876543210",
-			},
-		},
-	}
-
-	handler := suite.tool.GetHandler()
-	result, err := handler(context.Background(), request)
-
-	suite.NoError(err)
-	suite.True(result.IsError)
-	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
-		suite.Contains(textContent.Text, "doesn't match chain type")
-	}
-}
-
-// TestHandlerInvalidStatus tests error handling for invalid status
-func (suite *AddDeploymentTestSuite) TestHandlerInvalidStatus() {
-	request := mcp.CallToolRequest{
-		Params: mcp.CallToolParams{
-			Arguments: map[string]interface{}{
-				"template_id":      fmt.Sprintf("%d", suite.template.ID),
+				"contract_code":    suite.getTestContractCode(),
 				"chain_id":         fmt.Sprintf("%d", suite.chain.ID),
 				"contract_address": "0x1234567890123456789012345678901234567890",
-				"transaction_hash": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-				"deployer_address": "0x9876543210987654321098765432109876543210",
-				"status":           "invalid_status",
+				"owner_address":    "0x9876543210987654321098765432109876543210",
+				"template_name":    "CustomTokenName",
+				"description":      "A custom token template",
 			},
 		},
 	}
@@ -371,10 +335,14 @@ func (suite *AddDeploymentTestSuite) TestHandlerInvalidStatus() {
 	result, err := handler(context.Background(), request)
 
 	suite.NoError(err)
-	suite.True(result.IsError)
-	if textContent, ok := result.Content[0].(mcp.TextContent); ok {
-		suite.Contains(textContent.Text, "Invalid status")
-	}
+	suite.False(result.IsError)
+
+	// Verify template was created with custom name
+	templates, err := suite.templateService.ListTemplates(nil, "", "", 0)
+	suite.NoError(err)
+	suite.Len(templates, 1)
+	suite.Equal("CustomTokenName", templates[0].Name)
+	suite.Equal("A custom token template", templates[0].Description)
 }
 
 // TestHandlerMissingRequiredFields tests error handling for missing required fields
@@ -382,8 +350,8 @@ func (suite *AddDeploymentTestSuite) TestHandlerMissingRequiredFields() {
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"template_id": fmt.Sprintf("%d", suite.template.ID),
-				// Missing required fields
+				"chain_id": fmt.Sprintf("%d", suite.chain.ID),
+				// Missing required fields: contract_code, contract_address, owner_address
 			},
 		},
 	}

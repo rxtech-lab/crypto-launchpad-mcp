@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
@@ -22,17 +23,17 @@ type addDeploymentTool struct {
 
 type AddDeploymentArguments struct {
 	// Required fields
-	TemplateID      string `json:"template_id" validate:"required"`
-	ChainID         string `json:"chain_id" validate:"required"`
+	ContractCode    string `json:"contract_code" validate:"required"`
 	ContractAddress string `json:"contract_address" validate:"required"`
-	TransactionHash string `json:"transaction_hash" validate:"required"`
-	DeployerAddress string `json:"deployer_address" validate:"required"`
+	OwnerAddress    string `json:"owner_address" validate:"required"`
+	ChainID         string `json:"chain_id" validate:"required"`
 
 	// Optional fields
-	Status         string         `json:"status,omitempty"`
-	TemplateValues map[string]any `json:"template_values,omitempty"`
-	SessionID      string         `json:"session_id,omitempty"`
-	UserID         string         `json:"user_id,omitempty"`
+	TransactionHash string         `json:"transaction_hash,omitempty"`
+	TemplateValues  map[string]any `json:"template_values,omitempty"`
+	SolcVersion     string         `json:"solc_version,omitempty"`
+	TemplateName    string         `json:"template_name,omitempty"`
+	Description     string         `json:"description,omitempty"`
 }
 
 func NewAddDeploymentTool(deploymentService services.DeploymentService, templateService services.TemplateService, chainService services.ChainService) *addDeploymentTool {
@@ -45,38 +46,37 @@ func NewAddDeploymentTool(deploymentService services.DeploymentService, template
 
 func (a *addDeploymentTool) GetTool() mcp.Tool {
 	tool := mcp.NewTool("add_deployment",
-		mcp.WithDescription("Manually add a deployment entry to the database for contracts deployed outside the system. Useful for tracking existing deployments."),
-		mcp.WithString("template_id",
+		mcp.WithDescription("Add a deployment entry by providing contract code, contract address, and owner address. The tool will compile the contract, create a template automatically, and track the deployment."),
+		mcp.WithString("contract_code",
 			mcp.Required(),
-			mcp.Description("ID of the template used for deployment"),
-		),
-		mcp.WithString("chain_id",
-			mcp.Required(),
-			mcp.Description("ID of the chain where contract is deployed"),
+			mcp.Description("Solidity contract source code"),
 		),
 		mcp.WithString("contract_address",
 			mcp.Required(),
 			mcp.Description("Deployed contract address (e.g., 0x123...)"),
 		),
+		mcp.WithString("owner_address",
+			mcp.Required(),
+			mcp.Description("Address of the contract owner (e.g., 0xdef...)"),
+		),
+		mcp.WithString("chain_id",
+			mcp.Required(),
+			mcp.Description("ID of the chain where contract is deployed"),
+		),
 		mcp.WithString("transaction_hash",
-			mcp.Required(),
 			mcp.Description("Transaction hash of the deployment (e.g., 0xabc...)"),
-		),
-		mcp.WithString("deployer_address",
-			mcp.Required(),
-			mcp.Description("Address that deployed the contract (e.g., 0xdef...)"),
-		),
-		mcp.WithString("status",
-			mcp.Description("Deployment status (pending, confirmed, failed). Defaults to 'confirmed'"),
 		),
 		mcp.WithObject("template_values",
 			mcp.Description("JSON object with template parameter values used during deployment (e.g., {\"TokenName\": \"MyToken\", \"TokenSymbol\": \"MTK\"})"),
 		),
-		mcp.WithString("session_id",
-			mcp.Description("Optional session ID if this deployment is associated with a transaction session"),
+		mcp.WithString("solc_version",
+			mcp.Description("Solidity compiler version (e.g., 0.8.20). Defaults to 0.8.20"),
 		),
-		mcp.WithString("user_id",
-			mcp.Description("Optional user ID to associate with this deployment. If not provided, will use authenticated user if available"),
+		mcp.WithString("template_name",
+			mcp.Description("Name for the auto-created template. If not provided, will use contract name"),
+		),
+		mcp.WithString("description",
+			mcp.Description("Description for the auto-created template"),
 		),
 	)
 
@@ -94,25 +94,13 @@ func (a *addDeploymentTool) GetHandler() server.ToolHandlerFunc {
 			return mcp.NewToolResultError(fmt.Sprintf("Invalid arguments: %v", err)), nil
 		}
 
-		// Parse template ID
-		templateID, err := strconv.ParseUint(args.TemplateID, 10, 32)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Invalid template_id: %v", err)), nil
-		}
-
 		// Parse chain ID
 		chainID, err := strconv.ParseUint(args.ChainID, 10, 32)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Invalid chain_id: %v", err)), nil
 		}
 
-		// Verify template exists
-		template, err := a.templateService.GetTemplateByID(uint(templateID))
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Template not found: %v", err)), nil
-		}
-
-		// Verify chain exists by attempting to get all chains and finding the one with matching ID
+		// Verify chain exists
 		chains, err := a.chainService.ListChains()
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to list chains: %v", err)), nil
@@ -130,19 +118,64 @@ func (a *addDeploymentTool) GetHandler() server.ToolHandlerFunc {
 			return mcp.NewToolResultError("Chain not found"), nil
 		}
 
-		// Validate that template chain type matches chain
-		if template.ChainType != chain.ChainType {
-			return mcp.NewToolResultError(fmt.Sprintf("Template chain type (%s) doesn't match chain type (%s)", template.ChainType, chain.ChainType)), nil
+		// Default solc version
+		solcVersion := args.SolcVersion
+		if solcVersion == "" {
+			solcVersion = "0.8.20"
 		}
 
-		// Determine status (default to confirmed)
-		status := models.TransactionStatusConfirmed
-		if args.Status != "" {
-			status = models.TransactionStatus(args.Status)
-			// Validate status
-			if status != models.TransactionStatusPending && status != models.TransactionStatusConfirmed && status != models.TransactionStatusFailed {
-				return mcp.NewToolResultError("Invalid status. Must be one of: pending, confirmed, failed"), nil
+		// Compile contract
+		compilationResult, err := utils.CompileSolidity(solcVersion, args.ContractCode)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to compile contract: %v", err)), nil
+		}
+
+		// Extract first contract name and its ABI
+		var contractName string
+		var contractABI models.JSON
+		for name, abi := range compilationResult.Abi {
+			contractName = name
+			// Convert the ABI to models.JSON format
+			if abiMap, ok := abi.(models.JSON); ok {
+				contractABI = abiMap
+			} else {
+				// The ABI from compilation is typically an array, but models.JSON is a map
+				// Wrap the ABI array in a map structure to store it properly
+				contractABI = models.JSON{
+					"abi": abi,
+				}
 			}
+			break
+		}
+
+		if contractName == "" {
+			return mcp.NewToolResultError("No contract found in compilation result"), nil
+		}
+
+		// Determine template name
+		templateName := args.TemplateName
+		if templateName == "" {
+			templateName = contractName
+		}
+
+		// Get user ID from context
+		var userIDPtr *string
+		if user, ok := utils.GetAuthenticatedUser(ctx); ok {
+			userIDPtr = &user.Sub
+		}
+
+		// Create template
+		template := &models.Template{
+			Name:         templateName,
+			Description:  args.Description,
+			UserId:       userIDPtr,
+			ChainType:    chain.ChainType,
+			TemplateCode: args.ContractCode,
+			Abi:          contractABI,
+		}
+
+		if err := a.templateService.CreateTemplate(template); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to create template: %v", err)), nil
 		}
 
 		// Convert template values to JSON
@@ -151,24 +184,19 @@ func (a *addDeploymentTool) GetHandler() server.ToolHandlerFunc {
 			templateValuesJSON = args.TemplateValues
 		}
 
-		// Determine user ID
-		var userIDPtr *string
-		if args.UserID != "" {
-			userIDPtr = &args.UserID
-		} else if user, ok := utils.GetAuthenticatedUser(ctx); ok {
-			userIDPtr = &user.Sub
-		}
+		// Generate session ID
+		sessionID := uuid.New().String()
 
-		// Create deployment
+		// Create deployment with confirmed status by default
 		deployment := &models.Deployment{
-			TemplateID:      uint(templateID),
+			TemplateID:      template.ID,
 			ChainID:         uint(chainID),
 			ContractAddress: args.ContractAddress,
 			TransactionHash: args.TransactionHash,
-			DeployerAddress: args.DeployerAddress,
-			Status:          status,
+			DeployerAddress: args.OwnerAddress,
+			Status:          models.TransactionStatusConfirmed,
 			TemplateValues:  templateValuesJSON,
-			SessionId:       args.SessionID,
+			SessionId:       sessionID,
 			UserID:          userIDPtr,
 		}
 
@@ -226,7 +254,7 @@ func (a *addDeploymentTool) GetHandler() server.ToolHandlerFunc {
 		resultJSON, _ := json.Marshal(result)
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
-				mcp.NewTextContent("Deployment added successfully: "),
+				mcp.NewTextContent("Deployment added successfully with auto-created template: "),
 				mcp.NewTextContent(string(resultJSON)),
 			},
 		}, nil
