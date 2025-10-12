@@ -90,6 +90,9 @@ func (s *MCPServer) InitializeTools(dbService services.DBService, serverPort int
 	listDeploymentsTool, listDeploymentsHandler := tools.NewListDeploymentsTool(deploymentService)
 	srv.AddTool(listDeploymentsTool, listDeploymentsHandler)
 
+	addDeploymentTool := tools.NewAddDeploymentTool(deploymentService, templateService, chainService)
+	srv.AddTool(addDeploymentTool.GetTool(), addDeploymentTool.GetHandler())
+
 	// Function Call Tool
 	callFunctionTool := tools.NewCallFunctionTool(templateService, evmService, txService, chainService, deploymentService, serverPort)
 	srv.AddTool(callFunctionTool.GetTool(), callFunctionTool.GetHandler())
