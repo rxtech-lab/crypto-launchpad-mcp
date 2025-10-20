@@ -541,7 +541,7 @@ func (suite *CreateLiquidityPoolTestSuite) TestCreateLiquidityPoolWithEth() {
 	// Get transaction session and deployments
 	session, err := suite.txService.GetTransactionSession(sessionID)
 	suite.NoError(err)
-	suite.Len(session.TransactionDeployments, 2) // ETH pairs have 2 transactions
+	suite.Len(session.TransactionDeployments, 3) // ETH pairs have 3 transactions: Create Pair, Approve, Add Liquidity
 
 	// Execute transactions in order
 	suite.T().Log("Executing blockchain transactions...")
@@ -642,7 +642,7 @@ func (suite *CreateLiquidityPoolTestSuite) TestCreateLiquidityPoolWithTokenToTok
 	// Get transaction session and deployments
 	session, err := suite.txService.GetTransactionSession(sessionID)
 	suite.NoError(err)
-	suite.Len(session.TransactionDeployments, 3) // Token-to-token pairs have 3 transactions (2 approvals + 1 addLiquidity)
+	suite.Len(session.TransactionDeployments, 4) // Token-to-token pairs have 4 transactions: Create Pair, 2 Approvals, Add Liquidity
 
 	// Execute transactions in order
 	suite.T().Log("Executing blockchain transactions...")
@@ -780,6 +780,7 @@ func TestCreateLiquidityPoolTestSuite(t *testing.T) {
 	// Check if Ethereum testnet is available before running tests
 	client, err := ethclient.Dial(POOL_TEST_TESTNET_RPC)
 	if err != nil {
+		t.Logf("Error connecting to Ethereum testnet: %v", err)
 		t.Skipf("Skipping create liquidity pool tests: Ethereum testnet not available at %s. Run 'make e2e-network' to start testnet.", POOL_TEST_TESTNET_RPC)
 		return
 	}
