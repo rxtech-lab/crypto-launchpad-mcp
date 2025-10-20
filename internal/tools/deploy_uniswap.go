@@ -211,11 +211,16 @@ func (d *deployUniswapTool) createUniswapV2DeploymentSession(activeChain *models
 		deploymentType = "Router"
 	}
 
+	url, err := utils.GetTransactionSessionUrl(d.serverPort, sessionID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to get transaction session url: %v", err)), nil
+	}
+
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.NewTextContent(fmt.Sprintf("Transaction session created: %s", sessionID)),
 			mcp.NewTextContent(fmt.Sprintf("Please sign the Uniswap V2 %s deployment transactions in the URL", deploymentType)),
-			mcp.NewTextContent(fmt.Sprintf("http://localhost:%d/tx/%s", d.serverPort, sessionID)),
+			mcp.NewTextContent(url),
 		},
 	}, nil
 }
