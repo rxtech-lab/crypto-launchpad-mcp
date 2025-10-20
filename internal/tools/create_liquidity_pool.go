@@ -185,8 +185,10 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 		}
 		// ETH pair: use addLiquidityETH
 		transactionDeployments, err = c.createETHPairTransactions(
+			uniswapDeployment.FactoryAddress,
 			uniswapDeployment.RouterAddress,
 			nonEthTokenAddress,
+			uniswapDeployment.WETHAddress,
 			nonEthTokenAmount,
 			ethTokenAmount,
 			args.OwnerAddress,
@@ -194,6 +196,7 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 	} else {
 		// Token pair: use addLiquidity
 		transactionDeployments, err = c.createTokenPairTransactions(
+			uniswapDeployment.FactoryAddress,
 			uniswapDeployment.RouterAddress,
 			args.Token0Address,
 			args.Token1Address,
@@ -270,13 +273,14 @@ func (c *createLiquidityPoolTool) createEthereumLiquidityPool(ctx context.Contex
 }
 
 // createETHPairTransactions creates transactions for ETH-to-Token liquidity pools using addLiquidityETH
+// factoryAddress is the address of the Uniswap factory contract
 // routerAddress is the address of the Uniswap router contract
 // token0Address is the address of the custom token (not WETH)
 // token1Address is the WETH address
 // token0Amount is the amount of custom token to add to the pool
 // token1Amount is the amount of ETH to add to the pool (will be sent as transaction value)
 // ownerAddress is the address that will receive the liquidity pool tokens
-func (c *createLiquidityPoolTool) createETHPairTransactions(routerAddress, nonEthTokenAddress, nonEthTokenAmount, ethTokenAmount, ownerAddress string) ([]models.TransactionDeployment, error) {
+func (c *createLiquidityPoolTool) createETHPairTransactions(factoryAddress, routerAddress, nonEthTokenAddress, wethAddress, nonEthTokenAmount, ethTokenAmount, ownerAddress string) ([]models.TransactionDeployment, error) {
 	// Get Uniswap V2 contracts to extract Router ABI
 	v2Contracts, err := utils.FetchUniswapV2Contracts()
 	if err != nil {
@@ -303,11 +307,24 @@ func (c *createLiquidityPoolTool) createETHPairTransactions(routerAddress, nonEt
 	if !utils.IsValidEthereumAddress(nonEthTokenAddress) {
 		return nil, fmt.Errorf("invalid token0 address: %s", nonEthTokenAddress)
 	}
+	if !utils.IsValidEthereumAddress(wethAddress) {
+		return nil, fmt.Errorf("invalid WETH address: %s", wethAddress)
+	}
 	if !utils.IsValidEthereumAddress(routerAddress) {
 		return nil, fmt.Errorf("invalid router address: %s", routerAddress)
 	}
+	if !utils.IsValidEthereumAddress(factoryAddress) {
+		return nil, fmt.Errorf("invalid factory address: %s", factoryAddress)
+	}
 
-	// Transaction 1: Approve Token0 (custom token) for Router
+	// Transaction 1: Create Pair (if it doesn't exist)
+	createPairTx, err := c.createPairTransaction(factoryAddress, nonEthTokenAddress, wethAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pair transaction: %w", err)
+	}
+	transactionDeployments = append(transactionDeployments, createPairTx)
+
+	// Transaction 2: Approve Token0 (custom token) for Router
 	// Note: We don't need to approve WETH for ETH pairs since we send ETH directly
 	approveTx, err := c.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: nonEthTokenAddress,
@@ -330,7 +347,7 @@ func (c *createLiquidityPoolTool) createETHPairTransactions(routerAddress, nonEt
 		return nil, fmt.Errorf("failed to calculate minimum amounts with slippage: %w", err)
 	}
 
-	// Transaction 2: Add Liquidity with ETH
+	// Transaction 3: Add Liquidity with ETH
 	// addLiquidityETH(address token, uint amountTokenDesired, uint amountTokenMin, uint amountETHMin, address to, uint deadline)
 	addLiquidityETHTx, err := c.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: routerAddress,
@@ -357,14 +374,62 @@ func (c *createLiquidityPoolTool) createETHPairTransactions(routerAddress, nonEt
 	return transactionDeployments, nil
 }
 
+// createPairTransaction creates a transaction to call Factory.createPair()
+// factoryAddress is the address of the Uniswap factory contract
+// token0Address is the address of the first token
+// token1Address is the address of the second token
+func (c *createLiquidityPoolTool) createPairTransaction(factoryAddress, token0Address, token1Address string) (models.TransactionDeployment, error) {
+	// Get Uniswap V2 contracts to extract Factory ABI
+	v2Contracts, err := utils.FetchUniswapV2Contracts()
+	if err != nil {
+		return models.TransactionDeployment{}, fmt.Errorf("failed to fetch Uniswap V2 contracts: %w", err)
+	}
+
+	// Get Factory ABI
+	factoryAbi, err := json.Marshal(v2Contracts.Factory.ABI)
+	if err != nil {
+		return models.TransactionDeployment{}, fmt.Errorf("failed to marshal Factory ABI: %w", err)
+	}
+
+	// Validate addresses before creating transaction
+	if !utils.IsValidEthereumAddress(token0Address) {
+		return models.TransactionDeployment{}, fmt.Errorf("invalid token0 address: %s", token0Address)
+	}
+	if !utils.IsValidEthereumAddress(token1Address) {
+		return models.TransactionDeployment{}, fmt.Errorf("invalid token1 address: %s", token1Address)
+	}
+	if !utils.IsValidEthereumAddress(factoryAddress) {
+		return models.TransactionDeployment{}, fmt.Errorf("invalid factory address: %s", factoryAddress)
+	}
+
+	// Create createPair transaction
+	// createPair(address tokenA, address tokenB) returns (address pair)
+	createPairTx, err := c.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
+		ContractAddress: factoryAddress,
+		FunctionName:    "createPair",
+		FunctionArgs:    []any{token0Address, token1Address},
+		Abi:             string(factoryAbi),
+		Value:           "0",
+		Title:           "Create Pair",
+		Description:     fmt.Sprintf("Create Uniswap pair for %s/%s (or use existing pair)", token0Address, token1Address),
+		TransactionType: models.TransactionTypeRegular,
+	})
+	if err != nil {
+		return models.TransactionDeployment{}, fmt.Errorf("failed to create createPair transaction: %w", err)
+	}
+
+	return createPairTx, nil
+}
+
 // createTokenPairTransactions creates transactions for Token-to-Token liquidity pools using addLiquidity
+// factoryAddress is the address of the Uniswap factory contract
 // routerAddress is the address of the Uniswap router contract
 // token0Address is the address of the first token
 // token1Address is the address of the second token (not WETH)
 // token0Amount is the amount of first token to add to the pool
 // token1Amount is the amount of second token to add to the pool
 // ownerAddress is the address that will receive the liquidity pool tokens
-func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, token0Address, token1Address, token0Amount, token1Amount, ownerAddress string) ([]models.TransactionDeployment, error) {
+func (c *createLiquidityPoolTool) createTokenPairTransactions(factoryAddress, routerAddress, token0Address, token1Address, token0Amount, token1Amount, ownerAddress string) ([]models.TransactionDeployment, error) {
 	// Get Uniswap V2 contracts to extract Router ABI
 	v2Contracts, err := utils.FetchUniswapV2Contracts()
 	if err != nil {
@@ -394,10 +459,20 @@ func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, tok
 	if !utils.IsValidEthereumAddress(routerAddress) {
 		return nil, fmt.Errorf("invalid router address: %s", routerAddress)
 	}
+	if !utils.IsValidEthereumAddress(factoryAddress) {
+		return nil, fmt.Errorf("invalid factory address: %s", factoryAddress)
+	}
 
 	var transactionDeployments []models.TransactionDeployment
 
-	// Transaction 1: Approve Token0 for Router
+	// Transaction 1: Create Pair (if it doesn't exist)
+	createPairTx, err := c.createPairTransaction(factoryAddress, token0Address, token1Address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pair transaction: %w", err)
+	}
+	transactionDeployments = append(transactionDeployments, createPairTx)
+
+	// Transaction 2: Approve Token0 for Router
 	approve0Tx, err := c.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: token0Address,
 		FunctionName:    "approve",
@@ -413,7 +488,7 @@ func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, tok
 	}
 	transactionDeployments = append(transactionDeployments, approve0Tx)
 
-	// Transaction 2: Approve Token1 for Router
+	// Transaction 3: Approve Token1 for Router
 	functionArgs := []any{routerAddress, constants.MaxUint256.String()}
 	approve1Tx, err := c.evmService.GetContractFunctionCallTransaction(services.GetContractFunctionCallTransactionArgs{
 		ContractAddress: token1Address,
@@ -444,7 +519,7 @@ func (c *createLiquidityPoolTool) createTokenPairTransactions(routerAddress, tok
 		return nil, fmt.Errorf("failed to calculate minimum amounts with slippage: %w", err)
 	}
 
-	// Transaction 3: Add Liquidity for Token Pair
+	// Transaction 4: Add Liquidity for Token Pair
 	// addLiquidity(address tokenA, address tokenB, uint amountADesired, uint amountBDesired, uint amountAMin, uint amountBMin, address to, uint deadline)
 	addLiquidityFunctionArgs := []any{
 		token0Address,               // tokenA
