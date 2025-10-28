@@ -2,12 +2,12 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 )
 
 func GetTransactionSessionUrl(serverPort int, sessionId string) (string, error) {
-
 	// Override baseUrl if BASE_URL env var is set
 	if os.Getenv("BASE_URL") != "" {
 		baseUrl := os.Getenv("BASE_URL")
@@ -19,6 +19,7 @@ func GetTransactionSessionUrl(serverPort int, sessionId string) (string, error) 
 		return parsedUrl.String(), nil
 	}
 
+	log.Println("BASE_URL env var is not set, using default localhost")
 	url := fmt.Sprintf("http://localhost:%d/tx/%s", serverPort, sessionId)
 	return url, nil
 }
