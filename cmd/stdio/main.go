@@ -94,10 +94,21 @@ func main() {
 	}
 
 	// Initialize database
-	dbPath := homePath + "/launchpad.db"
-	dbService, err := services.NewSqliteDBService(dbPath)
-	if err != nil {
-		log.Fatal("Failed to initialize database:", err)
+	// Check for Turso configuration first, then fall back to local SQLite
+	var dbService services.DBService
+	tursoURL := os.Getenv("TURSO_DATABASE_URL")
+	tursoAuthToken := os.Getenv("TURSO_AUTH_TOKEN")
+	if tursoURL != "" {
+		dbService, err = services.NewTursoDBService(tursoURL, tursoAuthToken)
+		if err != nil {
+			log.Fatal("Failed to initialize Turso database:", err)
+		}
+	} else {
+		dbPath := homePath + "/launchpad.db"
+		dbService, err = services.NewSqliteDBService(dbPath)
+		if err != nil {
+			log.Fatal("Failed to initialize database:", err)
+		}
 	}
 	defer dbService.Close()
 
