@@ -111,9 +111,16 @@ func NewTursoDBService(url string, authToken string) (DBService, error) {
 		return nil, fmt.Errorf("failed to open Turso database connection: %w", err)
 	}
 
+	// Ensure cleanup on any subsequent failure
+	success := false
+	defer func() {
+		if !success {
+			sqlDB.Close()
+		}
+	}()
+
 	// Verify connectivity
 	if err := sqlDB.Ping(); err != nil {
-		sqlDB.Close()
 		return nil, fmt.Errorf("failed to ping Turso database: %w", err)
 	}
 
@@ -133,16 +140,15 @@ func NewTursoDBService(url string, authToken string) (DBService, error) {
 		Logger: gormLogger,
 	})
 	if err != nil {
-		sqlDB.Close()
 		return nil, fmt.Errorf("failed to initialize GORM with Turso database: %w", err)
 	}
 
 	service := &dbService{db: db}
 	if err := service.migrate(); err != nil {
-		sqlDB.Close()
 		return nil, fmt.Errorf("failed to migrate Turso database: %w", err)
 	}
 
+	success = true
 	return service, nil
 }
 
