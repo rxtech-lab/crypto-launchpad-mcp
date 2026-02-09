@@ -41,9 +41,9 @@ jobs:
       - name: Format check
         run: |
           make fmt
-          if [ -n "$(git status --porcelain)" ]; then
+          if [ -n "$(git status --porcelain '*.go')" ]; then
             echo "Code is not formatted. Please run 'make fmt'"
-            git status --porcelain
+            git status --porcelain '*.go'
             exit 1
           fi
       - name: Install dependencies

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rxtech-lab/launchpad-mcp/internal/models"
+	_ "github.com/tursodatabase/libsql-client-go/libsql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -91,6 +93,62 @@ func NewPostgresDBService(dsn string) (DBService, error) {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}
 
+	return service, nil
+}
+
+// NewTursoDBService creates a new DBService with a remote Turso (libSQL) connection.
+// The url should be in the format "libsql://[your-database].turso.io" and authToken
+// is the authentication token for the Turso database.
+func NewTursoDBService(url string, authToken string) (DBService, error) {
+	// Build DSN with auth token
+	dsn := url
+	if authToken != "" {
+		dsn = fmt.Sprintf("%s?authToken=%s", url, authToken)
+	}
+
+	sqlDB, err := sql.Open("libsql", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open Turso database connection: %w", err)
+	}
+
+	// Ensure cleanup on any subsequent failure
+	success := false
+	defer func() {
+		if !success {
+			sqlDB.Close()
+		}
+	}()
+
+	// Verify connectivity
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping Turso database: %w", err)
+	}
+
+	// Configure GORM logger - only log errors and slow queries
+	gormLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
+		logger.Config{
+			SlowThreshold:             time.Second,
+			LogLevel:                  logger.Error,
+			IgnoreRecordNotFoundError: true,
+			ParameterizedQueries:      false,
+			Colorful:                  false,
+		},
+	)
+
+	db, err := gorm.Open(sqlite.Dialector{Conn: sqlDB}, &gorm.Config{
+		Logger: gormLogger,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize GORM with Turso database: %w", err)
+	}
+
+	service := &dbService{db: db}
+	if err := service.migrate(); err != nil {
+		return nil, fmt.Errorf("failed to migrate Turso database: %w", err)
+	}
+
+	success = true
 	return service, nil
 }
 

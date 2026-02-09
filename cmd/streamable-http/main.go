@@ -23,9 +23,15 @@ func configureAndStartServer(db *gorm.DB, port int) (*api.APIServer, int, error)
 		// Use provided DB connection (for testing)
 		dbService = services.NewDBServiceFromDB(db)
 	} else {
-		// Initialize postgres database from environment
-		postgresUrl := os.Getenv("POSTGRES_URL")
-		dbService, err = services.NewPostgresDBService(postgresUrl)
+		// Check for Turso configuration first, then fall back to PostgreSQL
+		tursoURL := os.Getenv("TURSO_DATABASE_URL")
+		tursoAuthToken := os.Getenv("TURSO_AUTH_TOKEN")
+		if tursoURL != "" {
+			dbService, err = services.NewTursoDBService(tursoURL, tursoAuthToken)
+		} else {
+			postgresUrl := os.Getenv("POSTGRES_URL")
+			dbService, err = services.NewPostgresDBService(postgresUrl)
+		}
 		if err != nil {
 			return nil, 0, err
 		}
